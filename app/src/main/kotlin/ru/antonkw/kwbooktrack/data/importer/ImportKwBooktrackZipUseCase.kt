@@ -58,16 +58,16 @@ class ImportKwBooktrackZipUseCase @Inject constructor(
         }
 
         val parsedManifest = manifest
-            ?: return ImportResult(0, 0, IllegalStateException("manifest.json не найден в ZIP"))
+            ?: return ImportResult(0, 0, listOf(-1 to IllegalStateException("manifest.json не найден в ZIP")))
         if (parsedManifest.source != "kwbooktrack") {
             return ImportResult(
                 0,
                 0,
-                IllegalStateException("ZIP не является экспортом kwbooktrack (source=${parsedManifest.source})"),
+                listOf(-1 to IllegalStateException("ZIP не является экспортом kwbooktrack (source=${parsedManifest.source})")),
             )
         }
         val csv = booksCsv
-            ?: return ImportResult(0, 0, IllegalStateException("books.csv не найден в ZIP"))
+            ?: return ImportResult(0, 0, listOf(-1 to IllegalStateException("books.csv не найден в ZIP")))
 
         val format = CSVFormat.Builder.create()
             .setDelimiter(';')
@@ -81,9 +81,9 @@ class ImportKwBooktrackZipUseCase @Inject constructor(
 
         var imported = 0
         var skipped = 0
-        var lastError: Throwable? = null
+        val errors = mutableListOf<Pair<Int, Throwable>>()
 
-        records.forEachIndexed { _, record ->
+        records.forEachIndexed { idx, record ->
             try {
                 val title = record.get("title").orEmpty().trim()
                 if (title.isEmpty()) {
@@ -114,12 +114,16 @@ class ImportKwBooktrackZipUseCase @Inject constructor(
                 imported++
 
                 // Восстанавливаем обложку, если она была в архиве.
-                val coverEntry = coverBytes.entries.firstOrNull { entry ->
-                    entry.key.startsWith("$newId.")
-                }
+                // Ищем по точному имени файла "{bookId}.{ext}", которое мы только
+                // что сгенерировали на экспорте (ExportZipUseCase пишет
+                // "covers/{book.id}.{file.extension}"). Префиксный поиск по
+                // startsWith ловил чужие id ("1.jpg" для книги 12).
+                val coverName = book.coverPath?.substringAfterLast('/')
+                val coverEntry = coverName?.let { name -> coverBytes[name]?.let { name to it } }
                 if (coverEntry != null) {
-                    val ext = coverEntry.key.substringAfterLast('.', "jpg")
-                    val tempPath = coverStorage.saveTemp(coverEntry.value.inputStream(), ext)
+                    val (name, bytes) = coverEntry
+                    val ext = name.substringAfterLast('.', "jpg")
+                    val tempPath = coverStorage.saveTemp(bytes.inputStream(), ext)
                     val finalPath = coverStorage.promoteToBook(newId, tempPath)
                     if (finalPath != null) {
                         val updated = book.copy(id = newId, coverPath = finalPath)
@@ -127,12 +131,12 @@ class ImportKwBooktrackZipUseCase @Inject constructor(
                     }
                 }
             } catch (e: Exception) {
-                lastError = e
+                errors += idx to e
                 skipped++
             }
         }
 
-        return ImportResult(imported = imported, skipped = skipped, error = lastError)
+        return ImportResult(imported = imported, skipped = skipped, errors = errors)
     }
 
     private fun parseDate(raw: String?): Long? {
@@ -151,7 +155,9 @@ class ImportKwBooktrackZipUseCase @Inject constructor(
 data class ImportResult(
     val imported: Int,
     val skipped: Int,
-    val error: Throwable?,
+    val errors: List<Pair<Int, Throwable>> = emptyList(),
 ) {
-    val isSuccess: Boolean get() = error == null
+    /** Last error from the import run, or null if every row was processed cleanly. */
+    val error: Throwable? get() = errors.lastOrNull()?.second
+    val isSuccess: Boolean get() = errors.isEmpty()
 }

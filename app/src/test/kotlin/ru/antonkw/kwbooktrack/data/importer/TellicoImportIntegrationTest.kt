@@ -15,6 +15,7 @@ import ru.antonkw.kwbooktrack.data.TestDb
 import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.NoteRepository
+import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
 import java.io.File
 import java.io.FileReader
 import java.nio.file.Files
@@ -27,17 +28,30 @@ class TellicoImportIntegrationTest {
     private lateinit var noteRepo: NoteRepository
     private lateinit var useCase: ImportTellicoUseCase
     private lateinit var tempOut: File
-
-    private val tellicoCsv: File = File("/home/kvanton/projects/pet/kwbooktrack/tellico/tellico.csv")
-    private val coversDir: File = File("/home/kvanton/projects/pet/kwbooktrack/tellico/Books_files")
+    private lateinit var tellicoCsv: File
+    private lateinit var coversDir: File
 
     @Before
     fun setUp() {
-        assumeTrue("real tellico.csv present", tellicoCsv.exists() && tellicoCsv.length() > 0)
-        assumeTrue("Books_files present", coversDir.exists() && coversDir.isDirectory)
+        // Resolve the bundled CSV from test resources (no absolute path) and the
+        // optional covers directory from an environment variable. The covers
+        // directory is ~50MB of real Tellico art and isn't worth checking in.
+        val resource = javaClass.classLoader!!.getResource("fixtures/tellico/sample.csv")
+            ?: error("fixtures/tellico/sample.csv not found in test resources")
+        tellicoCsv = File(resource.toURI())
+        assumeTrue("sample.csv present", tellicoCsv.exists() && tellicoCsv.length() > 0)
+
+        val envCovers = System.getenv("KWBOOKTRACK_TELLICO_COVERS")
+        coversDir = if (envCovers != null) File(envCovers) else File("tellico/Books_files")
+        val coversAvailable = coversDir.exists() && coversDir.isDirectory
 
         db = TestDb.createInMemory(ApplicationProvider.getApplicationContext())
-        repo = BookRepository(db.bookDao(), db.tagDao(), ru.antonkw.kwbooktrack.data.NoOpCoverStorage)
+        repo = BookRepository(
+            db.bookDao(),
+            db.tagDao(),
+            ru.antonkw.kwbooktrack.data.NoOpCoverStorage,
+            PhotoRepository(db.photoDao(), ru.antonkw.kwbooktrack.data.NoOpPhotoStorage),
+        )
         noteRepo = NoteRepository(db.noteDao(), ru.antonkw.kwbooktrack.data.NoOpPhotoStorage)
         useCase = ImportTellicoUseCase(
             csvReader = TellicoCsvReader(),
@@ -72,6 +86,10 @@ class TellicoImportIntegrationTest {
 
     @Test
     fun fullImportInsertsBooksAndCopiesCovers() = runBlocking {
+        // The bundled sample.csv has no associated covers dir; skip cover assertions
+        // when covers aren't available (env var not set).
+        assumeTrue("covers dir present (set KWBOOKTRACK_TELLICO_COVERS to enable)", coversDir.exists() && coversDir.isDirectory)
+
         val result = FileReader(tellicoCsv).use { reader ->
             useCase(
                 input = reader,
@@ -97,6 +115,8 @@ class TellicoImportIntegrationTest {
 
     @Test
     fun secondImportIsIdempotent() = runBlocking {
+        assumeTrue("covers dir present (set KWBOOKTRACK_TELLICO_COVERS to enable)", coversDir.exists() && coversDir.isDirectory)
+
         FileReader(tellicoCsv).use { reader ->
             useCase(
                 input = reader,

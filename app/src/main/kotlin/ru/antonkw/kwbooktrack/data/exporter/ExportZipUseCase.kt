@@ -1,8 +1,10 @@
 package ru.antonkw.kwbooktrack.data.exporter
 
+import androidx.room.withTransaction
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.db.dao.NoteDao
 import ru.antonkw.kwbooktrack.data.db.dao.PhotoDao
 import ru.antonkw.kwbooktrack.data.db.dao.ReadingSessionDao
@@ -46,22 +48,32 @@ class ExportZipUseCase @Inject constructor(
     private val photoDao: PhotoDao,
     private val tagDao: TagDao,
     private val versionProvider: AppVersionProvider,
+    private val database: KwBooktrackDatabase,
 ) {
     suspend operator fun invoke(outputFile: File): ExportManifest {
-        val allBooks = bookRepository.observeAll().first()
+        // Single transaction so the books list and the per-table counts are
+        // taken from the same logical snapshot — without this, a write that
+        // lands between observeAll().first() and the count() calls makes the
+        // manifest disagree with the CSV.
+        val snapshot = database.withTransaction {
+            val books = bookRepository.observeAll().first()
+            Snapshot(
+                books = books,
+                counts = ExportCounts(
+                    books = books.size,
+                    sessions = sessionDao.count(),
+                    notes = noteDao.countByKind(NoteKind.NOTE),
+                    quotes = noteDao.countByKind(NoteKind.QUOTE),
+                    photos = photoDao.count(),
+                    tags = tagDao.count(),
+                ),
+            )
+        }
 
-        val counts = ExportCounts(
-            books = allBooks.size,
-            sessions = sessionDao.count(),
-            notes = noteDao.countByKind(NoteKind.NOTE),
-            quotes = noteDao.countByKind(NoteKind.QUOTE),
-            photos = photoDao.count(),
-            tags = tagDao.count(),
-        )
         val manifest = ExportManifest(
             appVersion = versionProvider.appVersion,
             exportedAt = System.currentTimeMillis(),
-            counts = counts,
+            counts = snapshot.counts,
         )
 
         ZipOutputStream(BufferedOutputStream(FileOutputStream(outputFile))).use { zip ->
@@ -74,7 +86,7 @@ class ExportZipUseCase @Inject constructor(
             zip.putNextEntry(ZipEntry("books.csv"))
             zip.write(BOOKS_HEADER.toByteArray(StandardCharsets.UTF_8))
             zip.write("\n".toByteArray(StandardCharsets.UTF_8))
-            allBooks.forEach { book ->
+            snapshot.books.forEach { book ->
                 val line = listOf(
                     csvField(book.title),
                     csvField(book.subtitle.orEmpty()),
@@ -97,7 +109,7 @@ class ExportZipUseCase @Inject constructor(
             zip.closeEntry()
 
             // covers/ — копия обложек, если файл существует
-            allBooks.forEach { book ->
+            snapshot.books.forEach { book ->
                 val cover = book.coverPath ?: return@forEach
                 val file = File(cover)
                 if (!file.exists() || !file.isFile) return@forEach
@@ -110,6 +122,11 @@ class ExportZipUseCase @Inject constructor(
 
         return manifest
     }
+
+    private data class Snapshot(
+        val books: List<ru.antonkw.kwbooktrack.data.db.entity.BookEntity>,
+        val counts: ExportCounts,
+    )
 
     private fun csvField(value: String): String {
         val escaped = value.replace("\"", "\"\"")

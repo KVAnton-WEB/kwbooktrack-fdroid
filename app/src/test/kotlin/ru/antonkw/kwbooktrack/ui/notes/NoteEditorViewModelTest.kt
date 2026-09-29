@@ -18,6 +18,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.shadows.ShadowLooper
 import ru.antonkw.kwbooktrack.data.TestDb
+import ru.antonkw.kwbooktrack.data.NoOpPhotoStorage
 import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
 import ru.antonkw.kwbooktrack.data.db.entity.NoteEntity
@@ -40,9 +41,9 @@ class NoteEditorViewModelTest {
     fun setUp() {
         Dispatchers.setMain(dispatcher)
         db = TestDb.createInMemory(ApplicationProvider.getApplicationContext())
-        bookRepository = BookRepository(db.bookDao(), db.tagDao(), ru.antonkw.kwbooktrack.data.NoOpCoverStorage)
+        photoRepository = PhotoRepository(db.photoDao(), NoOpPhotoStorage)
+        bookRepository = BookRepository(db.bookDao(), db.tagDao(), ru.antonkw.kwbooktrack.data.NoOpCoverStorage, photoRepository)
         noteRepository = NoteRepository(db.noteDao(), ru.antonkw.kwbooktrack.data.NoOpPhotoStorage)
-        photoRepository = PhotoRepository(db.photoDao())
     }
 
     @After

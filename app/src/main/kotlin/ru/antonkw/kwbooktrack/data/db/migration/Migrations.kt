@@ -16,10 +16,17 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 )
 class Migrate1To2 : AutoMigrationSpec {
     override fun onPostMigrate(db: SupportSQLiteDatabase) {
-        // Триггеры удаляем первыми, чтобы они не висели на удалённой таблице.
-        db.execSQL("DROP TRIGGER IF EXISTS room_fts_content_sync_books_fts_BEFORE_UPDATE")
-        db.execSQL("DROP TRIGGER IF EXISTS room_fts_content_sync_books_fts_BEFORE_DELETE")
-        db.execSQL("DROP TRIGGER IF EXISTS room_fts_content_sync_books_fts_AFTER_UPDATE")
-        db.execSQL("DROP TRIGGER IF EXISTS room_fts_content_sync_books_fts_AFTER_INSERT")
+        // v1 schema created six FTS4 content-sync triggers (BEFORE/AFTER ×
+        // INSERT/UPDATE/DELETE); the v1→v2 migration only drops the virtual
+        // table itself. Any orphaned trigger would block future DDL on the
+        // `books` table. Drop them all by name pattern from sqlite_master.
+        db.query(
+            "SELECT name FROM sqlite_master WHERE type = 'trigger' AND tbl_name = 'books' AND name LIKE 'room_fts_content_sync_books_fts_%'",
+        ).use { cursor ->
+            while (cursor.moveToNext()) {
+                val name = cursor.getString(0)
+                db.execSQL("DROP TRIGGER IF EXISTS `$name`")
+            }
+        }
     }
 }

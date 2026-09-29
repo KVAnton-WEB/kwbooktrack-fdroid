@@ -14,6 +14,7 @@ import ru.antonkw.kwbooktrack.data.TestDb
 import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.NoteRepository
+import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
 import java.io.File
 import java.nio.file.Files
 
@@ -35,7 +36,12 @@ class TellicoZipImportRealTest {
         assumeTrue("tellico.zip present", zipFile.exists() && zipFile.length() > 0)
 
         db = TestDb.createInMemory(ApplicationProvider.getApplicationContext())
-        repo = BookRepository(db.bookDao(), db.tagDao(), ru.antonkw.kwbooktrack.data.NoOpCoverStorage)
+        repo = BookRepository(
+            db.bookDao(),
+            db.tagDao(),
+            ru.antonkw.kwbooktrack.data.NoOpCoverStorage,
+            PhotoRepository(db.photoDao(), ru.antonkw.kwbooktrack.data.NoOpPhotoStorage),
+        )
         noteRepo = NoteRepository(db.noteDao(), ru.antonkw.kwbooktrack.data.NoOpPhotoStorage)
         useCase = ImportTellicoZipUseCase(TellicoCsvReader(), TellicoBookMapper(), repo, noteRepo)
         tempOut = Files.createTempDirectory("kwbooktrack-zip-").toFile()

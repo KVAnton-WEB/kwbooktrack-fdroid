@@ -27,7 +27,7 @@ import ru.antonkw.kwbooktrack.data.db.migration.Migrate1To2
         TagEntity::class,
         BookTagCrossRef::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
     autoMigrations = [
         // v1 → v2: добавлены title_search / author_search (Room автодетектит),
@@ -36,6 +36,8 @@ import ru.antonkw.kwbooktrack.data.db.migration.Migrate1To2
         AutoMigration(from = 1, to = 2, spec = Migrate1To2::class),
         // v2 → v3: добавлены nullable purchase_date / purchase_price — чистый auto.
         AutoMigration(from = 2, to = 3),
+        // v3 → v4: Index on notes(kind) for observeByKind / countByKind.
+        AutoMigration(from = 3, to = 4),
     ],
 )
 @TypeConverters(Converters::class)

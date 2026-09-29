@@ -139,11 +139,16 @@ class BookListViewModel @Inject constructor(
     private val query = MutableStateFlow(savedStateHandle.get<String>(KEY_QUERY) ?: "")
     private val isGrid = MutableStateFlow(savedStateHandle.get<Boolean>(KEY_GRID) ?: false)
     private val filterType = MutableStateFlow(
-        BookFilterType.valueOf(savedStateHandle.get<String>(KEY_FILTER) ?: BookFilterType.ALL.name)
+        runCatching { BookFilterType.valueOf(savedStateHandle.get<String>(KEY_FILTER) ?: BookFilterType.ALL.name) }
+            .getOrDefault(BookFilterType.ALL)
     )
+    // Compute the period list exactly once. Calling generate() twice could straddle
+    // midnight and return two different lists (e.g. December → January next year),
+    // and then getOrNull(idx) would silently pick the wrong option from the second list.
+    private val periodOptions: List<PeriodOption> = PeriodOptions.generate()
     private val period = MutableStateFlow(
-        savedStateHandle.get<Int>(KEY_PERIOD_INDEX)?.let { PeriodOptions.generate().getOrNull(it) }
-            ?: PeriodOptions.generate().first()
+        savedStateHandle.get<Int>(KEY_PERIOD_INDEX)?.let { periodOptions.getOrNull(it) }
+            ?: periodOptions.first()
     )
 
     private fun attachProgress(
@@ -178,15 +183,16 @@ class BookListViewModel @Inject constructor(
         query.debounce(150),
         filterType,
         period,
+        isGrid,
         sessionRepository.observeAll(),
-    ) { q, type, p, sessions ->
+    ) { q, type, p, grid, sessions ->
         val baseFlow = if (q.isBlank()) bookRepository.observeAll() else bookRepository.search(q.trim())
         baseFlow.map { all ->
             val filtered = applyFilters(all)
             BookListUiState.Loaded(
                 books = attachProgress(filtered, sessions),
                 query = q,
-                isGrid = isGrid.value,
+                isGrid = grid,
                 filter = FilterState(p, type),
             ) as BookListUiState
         }

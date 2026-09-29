@@ -13,6 +13,7 @@ import ru.antonkw.kwbooktrack.data.TestDb
 import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
+import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
 
 @RunWith(RobolectricTestRunner::class)
 class BookSearchCaseInsensitivityTest {
@@ -22,7 +23,12 @@ class BookSearchCaseInsensitivityTest {
     @Before
     fun setUp() {
         db = TestDb.createInMemory(ApplicationProvider.getApplicationContext())
-        repo = BookRepository(db.bookDao(), db.tagDao(), ru.antonkw.kwbooktrack.data.NoOpCoverStorage)
+        repo = BookRepository(
+            db.bookDao(),
+            db.tagDao(),
+            ru.antonkw.kwbooktrack.data.NoOpCoverStorage,
+            PhotoRepository(db.photoDao(), ru.antonkw.kwbooktrack.data.NoOpPhotoStorage),
+        )
     }
 
     @After

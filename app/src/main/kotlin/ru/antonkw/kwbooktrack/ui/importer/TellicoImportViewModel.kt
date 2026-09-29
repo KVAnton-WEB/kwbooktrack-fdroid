@@ -44,27 +44,36 @@ class TellicoImportViewModel @Inject constructor(
 
     fun importFromUri(uri: Uri) {
         if (_state.value.inProgress) return
-        _state.value = ImportUiState(inProgress = true)
+        // copy() leaves result intact — keeps the previous result visible while
+        // the new import runs instead of blanking it on every picker tap.
+        _state.value = _state.value.copy(inProgress = true, error = null)
         viewModelScope.launch {
+            val cacheDir = File(context.cacheDir, "imports").apply { mkdirs() }
+            val tempZip = File(cacheDir, "tellico-${System.currentTimeMillis()}.zip")
             try {
-                val cacheDir = File(context.cacheDir, "imports").apply { mkdirs() }
-                val tempZip = File(cacheDir, "tellico-${System.currentTimeMillis()}.zip")
                 context.contentResolver.openInputStream(uri)?.use { input ->
                     FileOutputStream(tempZip).use { output -> input.copyTo(output) }
                 } ?: run {
-                    _state.value = ImportUiState(error = UiText.Res(R.string.tellico_import_error_read))
+                    _state.value = _state.value.copy(
+                        inProgress = false,
+                        error = UiText.Res(R.string.tellico_import_error_read),
+                    )
                     return@launch
                 }
                 val coversDir = File(context.filesDir, "covers").apply { mkdirs() }
                 val result = importTellicoZipUseCase(tempZip, coversDir)
-                _state.value = ImportUiState(result = result)
-                tempZip.delete()
+                _state.value = ImportUiState(inProgress = false, result = result)
             } catch (e: Exception) {
                 val msg = e.message
-                _state.value = ImportUiState(
+                _state.value = _state.value.copy(
+                    inProgress = false,
                     error = if (msg.isNullOrBlank()) UiText.Res(R.string.tellico_import_error_unknown)
                     else UiText.Raw(msg),
                 )
+            } finally {
+                // tempZip is the only file written to cacheDir/imports for this run;
+                // without finally a thrown ImportTellicoZipUseCase would leak it.
+                tempZip.delete()
             }
         }
     }

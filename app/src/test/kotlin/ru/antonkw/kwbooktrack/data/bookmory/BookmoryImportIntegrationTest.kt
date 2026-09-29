@@ -15,6 +15,7 @@ import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.NoteRepository
+import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
 import ru.antonkw.kwbooktrack.data.repository.SessionRepository
 import java.io.File
 import java.nio.file.Files
@@ -28,14 +29,29 @@ class BookmoryImportIntegrationTest {
     private lateinit var noteRepository: NoteRepository
     private lateinit var useCase: ImportBookmoryUseCase
     private lateinit var tempDir: File
-
-    private val bookmoryDir = File("/home/kvanton/projects/pet/kwbooktrack/Bookmory")
+    private lateinit var bookmoryDir: File
 
     @Before
     fun setUp() {
-        assumeTrue("real Bookmory data present", bookmoryDir.exists() && bookmoryDir.listFiles()?.isNotEmpty() == true)
+        // Prefer the bundled sample; fall back to KWBOOKTRACK_BOOKMORY_DIR env var
+        // for the real ~hundreds-of-files dataset.
+        val resource = javaClass.classLoader!!.getResource("fixtures/bookmory/sample-book.md")
+        bookmoryDir = if (resource != null) {
+            val tmp = Files.createTempDirectory("kwbooktrack-bookmory-fixture-").toFile()
+            File(resource.toURI()).copyTo(File(tmp, "sample-book.md"))
+            tmp
+        } else {
+            val envDir = System.getenv("KWBOOKTRACK_BOOKMORY_DIR")
+            if (envDir != null) File(envDir) else File("Bookmory")
+        }
+        assumeTrue("bookmory data present", bookmoryDir.exists() && bookmoryDir.listFiles()?.isNotEmpty() == true)
         db = TestDb.createInMemory(ApplicationProvider.getApplicationContext())
-        bookRepository = BookRepository(db.bookDao(), db.tagDao(), ru.antonkw.kwbooktrack.data.NoOpCoverStorage)
+        bookRepository = BookRepository(
+            db.bookDao(),
+            db.tagDao(),
+            ru.antonkw.kwbooktrack.data.NoOpCoverStorage,
+            PhotoRepository(db.photoDao(), ru.antonkw.kwbooktrack.data.NoOpPhotoStorage),
+        )
         sessionRepository = SessionRepository(db.readingSessionDao())
         noteRepository = NoteRepository(db.noteDao(), ru.antonkw.kwbooktrack.data.NoOpPhotoStorage)
         useCase = ImportBookmoryUseCase(BookmoryParser(), bookRepository, sessionRepository, noteRepository)
@@ -46,6 +62,9 @@ class BookmoryImportIntegrationTest {
     fun tearDown() {
         db.close()
         tempDir.deleteRecursively()
+        if (bookmoryDir.parentFile?.name?.startsWith("kwbooktrack-bookmory-fixture-") == true) {
+            bookmoryDir.parentFile.deleteRecursively()
+        }
     }
 
     @Test
@@ -97,11 +116,20 @@ class BookmoryImportIntegrationTest {
 
     @Test
     fun importsRealBookmoryDirectory() = runBlocking {
+        // Real Bookmory directory has hundreds of files; the bundled sample has 1.
+        // Use the file count to gate the bulk assertion.
         val result = useCase(bookmoryDir)
+        val isRealData = bookmoryDir.listFiles()!!.size > 5
 
-        assertThat(result.totalFiles).isGreaterThan(10)
-        assertThat(result.importedBooks).isGreaterThan(10)
-        assertThat(result.importedNotes).isGreaterThan(0)
+        if (isRealData) {
+            assertThat(result.totalFiles).isGreaterThan(10)
+            assertThat(result.importedBooks).isGreaterThan(10)
+            assertThat(result.importedNotes).isGreaterThan(0)
+        } else {
+            assertThat(result.totalFiles).isEqualTo(1)
+            assertThat(result.importedBooks).isEqualTo(1)
+            assertThat(result.importedNotes).isEqualTo(1)
+        }
         assertThat(result.skipped).isEqualTo(0)
 
         // Verify books exist in DB

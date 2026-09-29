@@ -16,4 +16,5 @@ object NoOpPhotoStorage : PhotoStorage {
     override fun saveForNote(noteId: Long, source: InputStream, extension: String): String = ""
     override fun deleteForNote(noteId: Long) = Unit
     override fun deleteForBook(bookId: Long) = Unit
+    override fun deletePaths(paths: Collection<String>) = Unit
 }

@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -55,27 +56,39 @@ class AddBookViewModel @Inject constructor(
     private val _state = MutableStateFlow(AddBookState(loading = isEditing))
     val state: StateFlow<AddBookState> = _state.asStateFlow()
 
-    private val initialState: AddBookState = _state.value
+    // Cache the initial snapshot once. The old impl rebuilt two AddBookState
+    // copies on every getter access (`get() = _state.value.copy(...) != ...`),
+    // which is both wasted work and a latent race: a second `init` could
+    // replace _state before the dirty check ran.
+    private val initialSnapshot: AddBookState = _state.value
+
+    // Per-suggestion flows: only the field they depend on is `distinctUntilChanged`d
+    // so typing in `author` doesn't recompute `genreSuggestions` and vice versa.
+    private val authorField = _state.map { it.author }.distinctUntilChanged()
+    private val genreField = _state.map { it.genre }.distinctUntilChanged()
+    private val publisherField = _state.map { it.publisher }.distinctUntilChanged()
+
+    private val booksFlow = bookRepository.observeAll()
 
     val authorSuggestions: StateFlow<List<String>> = combine(
-        bookRepository.observeAll(),
-        _state,
-    ) { books, current ->
-        suggest(books, current.author) { it.author }
+        booksFlow,
+        authorField,
+    ) { books, author ->
+        suggest(books, author) { it.author }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val genreSuggestions: StateFlow<List<String>> = combine(
-        bookRepository.observeAll(),
-        _state,
-    ) { books, current ->
-        suggest(books, current.genre) { it.genre }
+        booksFlow,
+        genreField,
+    ) { books, genre ->
+        suggest(books, genre) { it.genre }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val publisherSuggestions: StateFlow<List<String>> = combine(
-        bookRepository.observeAll(),
-        _state,
-    ) { books, current ->
-        suggest(books, current.publisher) { it.publisher }
+        booksFlow,
+        publisherField,
+    ) { books, publisher ->
+        suggest(books, publisher) { it.publisher }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private fun suggest(
@@ -94,7 +107,8 @@ class AddBookViewModel @Inject constructor(
     }
 
     val isDirty: Boolean
-        get() = _state.value.copy(saved = false, loading = false) != initialState.copy(saved = false, loading = false)
+        get() = _state.value.copy(saved = false, loading = false) !=
+            initialSnapshot.copy(saved = false, loading = false)
 
     init {
         if (isEditing) {
@@ -138,6 +152,11 @@ class AddBookViewModel @Inject constructor(
 
     fun attachCover(uri: Uri) {
         viewModelScope.launch {
+            // Drop the previously attached file before overwriting state —
+            // otherwise picking A then B leaks A in covers/ until the screen is
+            // dismissed. The final cover copy in save() does NOT delete the
+            // previous one because it's the same path (promoteToBook).
+            val previous = _state.value.coverPath
             val saved = withContext(Dispatchers.IO) {
                 runCatching {
                     val coversDir = File(context.filesDir, "covers").apply { mkdirs() }
@@ -153,6 +172,7 @@ class AddBookViewModel @Inject constructor(
                 }.getOrNull()
             }
             if (saved != null) {
+                if (previous != null && previous != saved) runCatching { File(previous).delete() }
                 _state.value = _state.value.copy(coverPath = saved)
             }
         }
@@ -167,6 +187,15 @@ class AddBookViewModel @Inject constructor(
         val capturesDir = File(context.cacheDir, "captures").apply { mkdirs() }
         val target = File(capturesDir, "capture_${System.currentTimeMillis()}.jpg")
         return FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", target)
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        // The cover was promoted to covers/{bookId}.* on save, so by the time
+        // we reach here state.coverPath (if any) is either still a temp copy or
+        // never set. Safe to unlink — the persisted book cover is on a
+        // different path.
+        _state.value.coverPath?.let { runCatching { File(it).delete() } }
     }
 
     fun save(): Job? {

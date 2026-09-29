@@ -257,8 +257,11 @@ private fun BarChartWithLabels(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.Bottom,
         ) {
-            labels.forEachIndexed { idx, _ ->
-                val v = values[idx + 1] ?: values.values.toList().getOrNull(idx) ?: 0
+            labels.forEachIndexed { idx, label ->
+                // BY_MONTH labels are short month names ("Янв"…) → fall back to idx+1.
+                // BY_YEAR labels are 4-digit years → use the year as the map key.
+                val key = label.toIntOrNull() ?: (idx + 1)
+                val v = values[key] ?: 0
                 val frac = if (maxVal > 0) v.toFloat() / maxVal else 0f
                 Box(
                     modifier = Modifier

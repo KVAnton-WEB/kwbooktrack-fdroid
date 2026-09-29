@@ -4,6 +4,7 @@ import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.io.InputStream
+import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -31,8 +32,9 @@ class FileCoverStorage @Inject constructor(
     private val coversDir: File = File(context.filesDir, "covers").apply { mkdirs() }
 
     override fun saveTemp(source: InputStream, extension: String): String {
-        val tempId = -System.currentTimeMillis()
-        val target = File(coversDir, "cover_$tempId.${extension.ifEmpty { "jpg" }}")
+        // UUID avoids races where two parallel saves within the same millisecond
+        // would pick the same name and overwrite each other.
+        val target = File(coversDir, "cover_${UUID.randomUUID()}.${extension.ifEmpty { "jpg" }}")
         source.use { input ->
             target.outputStream().use { input.copyTo(it) }
         }
@@ -73,6 +75,13 @@ interface PhotoStorage {
     fun saveForNote(noteId: Long, source: InputStream, extension: String): String
     fun deleteForNote(noteId: Long)
     fun deleteForBook(bookId: Long)
+
+    /**
+     * Delete specific photo files by absolute path. Used by BookRepository
+     * to clean up the actual files that PhotoEntity.pathsForBook() returned
+     * before the CASCADE delete wiped the DB rows.
+     */
+    fun deletePaths(paths: Collection<String>)
 }
 
 @Singleton
@@ -82,7 +91,9 @@ class FilePhotoStorage @Inject constructor(
     private val photosDir: File = File(context.filesDir, "photos").apply { mkdirs() }
 
     override fun saveForNote(noteId: Long, source: InputStream, extension: String): String {
-        val target = File(photosDir, "note_${noteId}_${System.currentTimeMillis()}.${extension.ifEmpty { "jpg" }}")
+        // UUID suffix to disambiguate parallel saves; `noteId_timestamp` collided
+        // when two attaches happened within the same millisecond.
+        val target = File(photosDir, "note_${noteId}_${UUID.randomUUID()}.${extension.ifEmpty { "jpg" }}")
         source.use { input ->
             target.outputStream().use { input.copyTo(it) }
         }
@@ -96,9 +107,17 @@ class FilePhotoStorage @Inject constructor(
     }
 
     override fun deleteForBook(bookId: Long) {
-        // Намеренно пустая: фото удаляются через deleteForNote при удалении заметок.
-        // PhotoEntity использует ON DELETE SET NULL для noteId, поэтому при удалении
-        // книги (CASCADE → notes CASCADE → photos SET NULL) фото остаются как осиротевшие.
-        // Вычищать их предполагается через явный purge в BookRepository.delete.
+        // PhotoEntity uses ON DELETE SET NULL for noteId and ON DELETE CASCADE for
+        // bookId, so the DB rows are gone after BookRepository.delete — but the
+        // underlying files in filesDir/photos/ stay. The repository reads those
+        // paths up front via PhotoDao.pathsForBook() and calls [deletePaths]
+        // below, so this entry point is a no-op for symmetry.
+    }
+
+    override fun deletePaths(paths: Collection<String>) {
+        paths.forEach { path ->
+            val f = File(path)
+            if (f.exists() && f.parentFile == photosDir) f.delete()
+        }
     }
 }

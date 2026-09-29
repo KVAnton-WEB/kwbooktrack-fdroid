@@ -15,7 +15,6 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import java.io.File
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
 import ru.antonkw.kwbooktrack.data.db.entity.NoteEntity
 import ru.antonkw.kwbooktrack.data.db.entity.PhotoEntity
@@ -24,6 +23,7 @@ import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.NoteRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
 import ru.antonkw.kwbooktrack.data.repository.SessionRepository
+import ru.antonkw.kwbooktrack.data.storage.PhotoStorage
 import javax.inject.Inject
 
 data class BookProgress(
@@ -49,6 +49,7 @@ class BookDetailViewModel @Inject constructor(
     private val sessionRepository: SessionRepository,
     private val noteRepository: NoteRepository,
     private val photoRepository: PhotoRepository,
+    private val photoStorage: PhotoStorage,
 ) : ViewModel() {
 
     private val bookId: Long = savedStateHandle.get<Long>(KEY_BOOK_ID) ?: -1L
@@ -110,12 +111,16 @@ class BookDetailViewModel @Inject constructor(
 
     fun deleteBook() {
         viewModelScope.launch {
-            // Snapshot photo paths BEFORE the cascade — DB cascade removes the photo
-            // records but leaves the on-disk files as orphans. We delete them after.
+            // Snapshot photo paths BEFORE the cascade — the DAO will also delete
+            // the rows in BookRepository.deleteById (issue #18) and the storage
+            // layer unlinks them. Going through photoStorage keeps the cleanup
+            // in one place and avoids unlinking a file the user might have
+            // reattached to a different book.
             val photoPaths = photoRepository.observeByBook(bookId).first().map { it.path }
-            // FK CASCADE on sessions, notes, and photos removes DB records.
+            // FK CASCADE on sessions, notes, and photos removes DB records; the
+            // repository also runs photoStorage.deletePaths for us.
             bookRepository.deleteById(bookId)
-            photoPaths.forEach { File(it).delete() }
+            photoStorage.deletePaths(photoPaths)
             _deleted.value = true
         }
     }

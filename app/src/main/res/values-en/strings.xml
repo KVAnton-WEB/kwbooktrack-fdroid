@@ -48,6 +48,7 @@
     <string name="search_hint">Search by title, author, ISBN…</string>
     <string name="empty_library">Library is empty — add your first book</string>
     <string name="empty_search">Nothing found for «%1$s»</string>
+    <string name="empty_no_matches">No books match the current filter</string>
     <string name="label_period">Period</string>
     <string name="label_type">Type</string>
     <string name="matches_count">Matches: %1$d</string>
@@ -277,6 +278,7 @@
     <!-- Tellico importer -->
     <string name="tellico_import_title">Import Tellico</string>
     <string name="tellico_import_pick_csv">Pick CSV file</string>
+    <string name="tellico_import_pick_zip">Pick ZIP file</string>
     <string name="tellico_import_run">Run import</string>
     <string name="tellico_import_running">Importing…</string>
     <string name="tellico_import_result_format">Imported: %1$d, skipped: %2$d</string>

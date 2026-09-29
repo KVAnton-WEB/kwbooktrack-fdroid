@@ -48,6 +48,7 @@
     <string name="search_hint">Поиск по названию, автору, ISBN…</string>
     <string name="empty_library">Библиотека пуста — добавьте первую книгу</string>
     <string name="empty_search">Ничего не найдено по «%1$s»</string>
+    <string name="empty_no_matches">Нет книг, подходящих под фильтр</string>
     <string name="label_period">Период</string>
     <string name="label_type">Тип</string>
     <string name="matches_count">Количество совпадений: %1$d</string>
@@ -280,6 +281,7 @@
     <!-- Tellico importer -->
     <string name="tellico_import_title">Импорт Tellico</string>
     <string name="tellico_import_pick_csv">Выбрать CSV-файл</string>
+    <string name="tellico_import_pick_zip">Выбрать ZIP-файл</string>
     <string name="tellico_import_run">Запустить импорт</string>
     <string name="tellico_import_running">Идёт импорт…</string>
     <string name="tellico_import_result_format">Импортировано: %1$d, пропущено: %2$d</string>

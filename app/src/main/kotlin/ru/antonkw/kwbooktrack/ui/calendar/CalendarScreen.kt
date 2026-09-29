@@ -148,7 +148,13 @@ fun CalendarScreen(
                 verticalArrangement = Arrangement.spacedBy(0.dp),
                 modifier = Modifier.fillMaxSize().padding(top = 4.dp),
             ) {
-                items(uiState.days.size) { idx ->
+                // Key on the date string so scroll state and any per-cell state survive month
+                // changes — without it, swapping the underlying days list leaves
+                // the grid thinking item N at index N when in fact the date moved.
+                items(
+                    count = uiState.days.size,
+                    key = { idx -> uiState.days[idx]?.date?.toString() ?: "pad_$idx" },
+                ) { idx ->
                     val day = uiState.days[idx]
                     DayCell(day = day)
                 }
@@ -235,7 +241,9 @@ private fun DayCell(day: CalendarDay?) {
 
 @Composable
 private fun CoverTile(book: CalendarBook, fillHeight: Boolean) {
-    if (!book.coverPath.isNullOrBlank() && File(book.coverPath).exists()) {
+    // AsyncImage handles a missing/invalid file path by going to the error
+    // branch itself — no need for a File.exists() check on the UI thread here.
+    if (!book.coverPath.isNullOrBlank()) {
         AsyncImage(
             model = File(book.coverPath),
             contentDescription = book.title,

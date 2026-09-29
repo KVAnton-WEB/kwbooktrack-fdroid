@@ -38,26 +38,31 @@ class NotesListViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val query = MutableStateFlow("")
+    private val booksFlow = bookRepository.observeAll()
 
-    val uiState: StateFlow<NotesListUiState> = query
+    // bookRepository.observeAll() hoisted out of the per-keystroke flow so a
+    // search box update doesn't tear down + recreate the Room subscription.
+    // Only the notes side switches between observeAll / search on query change.
+    private val notesFlow = query
         .debounce(150)
         .flatMapLatest { q ->
-            val notesFlow = if (q.isBlank()) noteRepository.observeAll() else noteRepository.search(q.trim())
-            notesFlow.combine(bookRepository.observeAll()) { notes, books ->
-                val booksById = books.associateBy { it.id }
-                val items = notes
-                    .filter { it.kind != NoteKind.REVIEW }
-                    .map { note ->
-                        val book = booksById[note.bookId]
-                        NoteListItem(
-                            note = note,
-                            bookTitle = book?.title ?: "(книга удалена)",
-                            author = book?.author.orEmpty(),
-                        )
-                    }
-                NotesListUiState.Loaded(items)
-            }
+            if (q.isBlank()) noteRepository.observeAll() else noteRepository.search(q.trim())
         }
+
+    val uiState: StateFlow<NotesListUiState> = combine(notesFlow, booksFlow) { notes, books ->
+        val booksById = books.associateBy { it.id }
+        val items = notes
+            .filter { it.kind != NoteKind.REVIEW }
+            .map { note ->
+                val book = booksById[note.bookId]
+                NoteListItem(
+                    note = note,
+                    bookTitle = book?.title ?: "(книга удалена)",
+                    author = book?.author.orEmpty(),
+                )
+            }
+        NotesListUiState.Loaded(items) as NotesListUiState
+    }
         .catch { emit(NotesListUiState.Loaded(emptyList())) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, NotesListUiState.Loading)
 

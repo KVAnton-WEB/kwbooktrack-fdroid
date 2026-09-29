@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import ru.antonkw.kwbooktrack.data.db.entity.BookTagCrossRef
 import ru.antonkw.kwbooktrack.data.db.entity.TagEntity
 
@@ -29,4 +30,22 @@ interface TagDao {
 
     @Query("SELECT COUNT(*) FROM tags")
     suspend fun count(): Int
+
+    /**
+     * Atomic find-or-create. Two concurrent callers both seeing `findByName`
+     * return null and both calling `insert` would race; the second insert
+     * is silently ignored (-1) and the second caller's caller would attach
+     * a tag to a non-existent id. @Transaction wraps the read+insert so
+     * SQLite's row lock serializes them; the loser sees the winner's row
+     * via a re-read.
+     */
+    @Transaction
+    suspend fun findOrCreate(name: String): Long {
+        val existing = findByName(name)
+        if (existing != null) return existing.id
+        val newId = insert(TagEntity(name = name))
+        if (newId != -1L) return newId
+        // Lost the race — someone inserted between our insert and now. Read theirs.
+        return findByName(name)?.id ?: -1L
+    }
 }

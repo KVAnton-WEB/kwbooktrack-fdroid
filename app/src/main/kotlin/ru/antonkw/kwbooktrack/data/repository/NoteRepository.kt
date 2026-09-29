@@ -26,10 +26,11 @@ class NoteRepository @Inject constructor(
             .map { it.filter { ch -> ch.isLetterOrDigit() } }
             .filter { it.isNotEmpty() }
         if (tokens.isEmpty()) return observeAll()
-        val sql = "SELECT * FROM notes WHERE " + tokens.joinToString(" AND ") { t ->
-            "LOWER(body_md) LIKE '%' || '$t' || '%'"
-        } + " ORDER BY created_at DESC"
-        return noteDao.rawSearch(SimpleSQLiteQuery(sql))
+        val sql = "SELECT * FROM notes WHERE " + tokens.joinToString(" AND ") { "LOWER(body_md) LIKE ?" } +
+            " ORDER BY created_at DESC"
+        // Use bind args rather than string interpolation; tokens are filtered
+        // to letters/digits today, but relying on that for SQL safety is fragile.
+        return noteDao.rawSearch(SimpleSQLiteQuery(sql, tokens.map { "%$it%" }.toTypedArray()))
     }
 
     suspend fun randomOne(): NoteEntity? = noteDao.randomOne()

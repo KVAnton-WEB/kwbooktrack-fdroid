@@ -83,6 +83,8 @@ fun BookDetailScreen(
     var pageInput by remember { mutableStateOf("") }
     var notesQuery by remember { mutableStateOf("") }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    var showFinishDialog by remember { mutableStateOf(false) }
+    var tempRating by remember { mutableStateOf(0) }
     val book = state.book
 
     androidx.compose.runtime.LaunchedEffect(deleted) {
@@ -259,8 +261,6 @@ fun BookDetailScreen(
                                 .padding(top = 12.dp),
                         )
                         if (book.status != BookStatus.FINISHED) {
-                            var showFinishDialog by remember { mutableStateOf(false) }
-                            var tempRating by remember { mutableStateOf(book.rating ?: 0) }
                             OutlinedButton(
                                 onClick = {
                                     tempRating = book.rating ?: 0
@@ -511,10 +511,11 @@ private fun SessionRow(session: ReadingSessionEntity) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = remember { DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm", Locale("ru")) }
-                    .format(java.time.Instant.ofEpochMilli(session.startedAt)
+                text = SESSION_FMT.format(
+                    java.time.Instant.ofEpochMilli(session.startedAt)
                         .atZone(ZoneOffset.UTC)
-                        .toLocalDateTime()),
+                        .toLocalDateTime(),
+                ),
                 style = MaterialTheme.typography.bodyMedium,
             )
             Text(
@@ -525,6 +526,11 @@ private fun SessionRow(session: ReadingSessionEntity) {
     }
 }
 
+// File-level DateTimeFormatters: thread-safe and created exactly once per
+// process instead of per recomposition (DateTimeFormatter.ofPattern is not
+// cheap). DateTimeFormatter itself is immutable and documented as thread-safe.
+private val SESSION_FMT: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm", Locale("ru"))
+private val DATE_FMT: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy", Locale("ru"))
+
 private fun formatDate(epochMs: Long): String =
-    DateTimeFormatter.ofPattern("dd.MM.yyyy", Locale("ru"))
-        .format(Instant.ofEpochMilli(epochMs).atZone(ZoneOffset.UTC).toLocalDate())
+    DATE_FMT.format(Instant.ofEpochMilli(epochMs).atZone(ZoneOffset.UTC).toLocalDate())

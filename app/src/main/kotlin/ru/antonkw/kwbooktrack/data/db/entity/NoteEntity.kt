@@ -19,6 +19,7 @@ import androidx.room.PrimaryKey
     indices = [
         Index(value = ["book_id"]),
         Index(value = ["created_at"]),
+        Index(value = ["kind"]),
     ],
 )
 data class NoteEntity(

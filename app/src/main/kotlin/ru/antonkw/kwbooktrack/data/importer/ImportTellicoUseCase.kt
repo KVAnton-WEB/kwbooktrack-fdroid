@@ -1,5 +1,6 @@
 package ru.antonkw.kwbooktrack.data.importer
 
+import android.util.Log
 import ru.antonkw.kwbooktrack.data.db.entity.NoteEntity
 import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
@@ -71,6 +72,10 @@ class ImportTellicoUseCase @Inject constructor(
         val sourceDir = options.coverSourceDir ?: return 0
         val outputDir = options.coverOutputDir ?: return 0
         val src = File(sourceDir, coverRel)
+        // Confine reads to sourceDir: malicious CSV with "../" segments must not escape it.
+        val sourceRoot = runCatching { sourceDir.canonicalPath }.getOrNull() ?: return 0
+        val resolved = runCatching { src.canonicalPath }.getOrNull() ?: return 0
+        if (!resolved.startsWith(sourceRoot + File.separator) && resolved != sourceRoot) return 0
         if (!src.exists() || !src.isFile) return 0
         val ext = src.extension.ifEmpty { "jpg" }
         val destDir = File(outputDir, "covers").apply { mkdirs() }
@@ -82,9 +87,16 @@ class ImportTellicoUseCase @Inject constructor(
                 bookRepository.update(existing.copy(coverPath = dest.absolutePath))
             }
             1
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            // Don't swallow OOM / SecurityException silently — surface them
+            // so a malicious CSV with a broken cover path doesn't pretend success.
+            Log.w(TAG, "cover copy failed for bookId=$bookId src=$src", e)
             0
         }
+    }
+
+    private companion object {
+        const val TAG = "ImportTellico"
     }
 
     private suspend fun persistNotes(

@@ -32,9 +32,13 @@ fun PhotoGalleryDialog(
     initialIndex: Int,
     onDismiss: () -> Unit,
 ) {
-    // No empty-list guard here — callers (NoteDetailScreen, NoteEditorScreen) already
-    // gate the dialog on `photos.isNotEmpty()`. A guard here would fire `onDismiss()`
-    // during composition, which is a Compose side-effect anti-pattern.
+    if (photos.isEmpty()) {
+        // Defensive: callers gate on isNotEmpty(), but a future caller or a race
+        // could still hit this with an empty list. Avoid IndexOutOfBoundsException
+        // from coerceIn(0, -1) → photos[-1]. Don't auto-dismiss — that fires
+        // onDismiss() during composition, which is a Compose anti-pattern.
+        return
+    }
     val pagerState = rememberPagerState(initialPage = initialIndex.coerceIn(0, photos.lastIndex)) { photos.size }
     Dialog(
         onDismissRequest = onDismiss,

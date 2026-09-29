@@ -16,8 +16,8 @@ android {
         applicationId = "ru.antonkw.kwbooktrack"
         minSdk = 31
         targetSdk = 34
-        versionCode = 1
-        versionName = "0.1.0"
+versionCode = 2
+    versionName = "0.2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -26,6 +26,10 @@ android {
             isMinifyEnabled = false
         }
         release {
+            // Ponytail: minify is off because there is no signing config — the
+            // release variant isn't shippable yet. Before v0.2: enable minify,
+            // add a signingConfig from a Gradle property, and verify the ProGuard
+            // rules below are actually applied (currently dead weight).
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -99,12 +103,14 @@ dependencies {
 
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
+    implementation(libs.room.paging)
     ksp(libs.room.compiler)
 
     implementation(libs.commons.csv)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.coil.compose)
     implementation(libs.zxing.android.embedded)
+    implementation(libs.androidx.paging.common)
 
     debugImplementation(libs.compose.ui.tooling)
 

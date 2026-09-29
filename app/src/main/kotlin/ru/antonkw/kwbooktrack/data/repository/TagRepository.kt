@@ -16,9 +16,7 @@ class TagRepository @Inject constructor(
     suspend fun findOrCreate(name: String): Long {
         val normalized = name.trim().trimStart('#')
         if (normalized.isEmpty()) return -1
-        val existing = tagDao.findByName(normalized)
-        if (existing != null) return existing.id
-        return tagDao.insert(TagEntity(name = normalized))
+        return tagDao.findOrCreate(normalized)
     }
 
     suspend fun attachToBook(bookId: Long, tagId: Long) {

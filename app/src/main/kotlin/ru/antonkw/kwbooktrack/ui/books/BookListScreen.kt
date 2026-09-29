@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.Add
@@ -234,9 +235,11 @@ fun BookListScreen(
                     if (s.books.isEmpty()) {
                         CenterBox {
                             Text(
-                                text = if (query.isBlank() && !filter.isActive) stringResource(R.string.empty_library)
-                                else if (!filter.isActive) stringResource(R.string.empty_search, query)
-                                else stringResource(R.string.empty_library),
+                                text = when {
+                                    !query.isBlank() -> stringResource(R.string.empty_search, query)
+                                    filter.isActive -> stringResource(R.string.empty_no_matches)
+                                    else -> stringResource(R.string.empty_library)
+                                },
                                 style = MaterialTheme.typography.bodyMedium,
                             )
                         }
@@ -247,7 +250,7 @@ fun BookListScreen(
                             verticalArrangement = Arrangement.spacedBy(12.dp),
                             modifier = Modifier.fillMaxSize(),
                         ) {
-                            items(rows, key = { row -> row.firstOrNull()?.book?.id ?: 0L }) { row ->
+                            itemsIndexed(rows, key = { i, row -> "${row.firstOrNull()?.book?.id ?: 0L}_$i" }) { i, row ->
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()

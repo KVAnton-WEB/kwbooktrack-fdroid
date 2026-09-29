@@ -72,7 +72,7 @@ fun TellicoImportScreen(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Icon(Icons.Filled.FileDownload, contentDescription = null)
-                Text("  Выбрать ZIP-файл")
+                Text("  " + stringResource(R.string.tellico_import_pick_zip))
             }
 
             if (state.inProgress) {
@@ -88,7 +88,7 @@ fun TellicoImportScreen(
                         Text(stringResource(R.string.tellico_import_skipped_format, r.skipped))
                         Text(stringResource(R.string.tellico_import_covers_format, r.coversCopied))
                         Text(stringResource(R.string.tellico_import_notes_format, r.notesImported))
-                        if (r.dryRun) Text("(dry-run)")
+                        if (r.dryRun) Text(stringResource(R.string.tellico_import_dry_run))
                     }
                 }
             }

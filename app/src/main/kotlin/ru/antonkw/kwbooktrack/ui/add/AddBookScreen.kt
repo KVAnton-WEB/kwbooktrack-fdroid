@@ -80,8 +80,18 @@ fun AddBookScreen(
     var showDiscardDialog by remember { mutableStateOf(false) }
     var pendingBack by remember { mutableStateOf(false) }
 
+    // A new book with even a single keystroke in title/author/etc. is worth
+    // prompting for — silently dropping user input on back was the old behaviour.
+    val hasUserInput = remember(state.title, state.author, state.isbn, state.pageCount,
+        state.year, state.publisher, state.genre, state.purchaseDate, state.purchasePrice) {
+        state.title.isNotBlank() || state.author.isNotBlank() || state.isbn.isNotBlank() ||
+            state.pageCount.isNotBlank() || state.year.isNotBlank() ||
+            state.publisher.isNotBlank() || state.genre.isNotBlank() ||
+            state.purchaseDate.isNotBlank() || state.purchasePrice.isNotBlank() ||
+            state.coverPath != null || state.rating != null
+    }
     val handleBack = {
-        if (viewModel.isEditing && viewModel.isDirty) {
+        if (viewModel.isDirty && (viewModel.isEditing || hasUserInput)) {
             showDiscardDialog = true
         } else {
             onBack()
@@ -384,7 +394,7 @@ private fun CoverPreview(
                 .clickable(onClick = onPick),
             contentAlignment = Alignment.Center,
         ) {
-            if (!coverPath.isNullOrBlank() && File(coverPath).exists()) {
+            if (!coverPath.isNullOrBlank()) {
                 AsyncImage(
                     model = File(coverPath),
                     contentDescription = stringResource(R.string.label_cover),
@@ -410,11 +420,11 @@ private fun CoverPreview(
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             OutlinedButton(onClick = onPick) {
                 Icon(Icons.Filled.AddPhotoAlternate, contentDescription = null)
-                Text("  Выбрать обложку")
+                Text("  " + stringResource(R.string.action_pick_cover))
             }
             OutlinedButton(onClick = onCamera) {
                 Icon(Icons.Filled.PhotoCamera, contentDescription = null)
-                Text("  Сделать фото")
+                Text("  " + stringResource(R.string.action_take_photo))
             }
             if (!coverPath.isNullOrBlank()) {
                 TextButton(onClick = onClear) { Text(stringResource(R.string.action_clear_cover)) }

@@ -19,6 +19,7 @@ import ru.antonkw.kwbooktrack.data.TestDb
 import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.db.entity.BookSource
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
+import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -31,7 +32,12 @@ class AddBookViewModelTest {
     fun setUp() {
         Dispatchers.setMain(dispatcher)
         db = TestDb.createInMemory(ApplicationProvider.getApplicationContext())
-        bookRepository = BookRepository(db.bookDao(), db.tagDao(), ru.antonkw.kwbooktrack.data.NoOpCoverStorage)
+        bookRepository = BookRepository(
+            db.bookDao(),
+            db.tagDao(),
+            ru.antonkw.kwbooktrack.data.NoOpCoverStorage,
+            PhotoRepository(db.photoDao(), ru.antonkw.kwbooktrack.data.NoOpPhotoStorage),
+        )
     }
 
     @After

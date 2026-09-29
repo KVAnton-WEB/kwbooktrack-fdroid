@@ -2,7 +2,6 @@ package ru.antonkw.kwbooktrack.data.stats
 
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
-import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
 import ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity
 import java.time.LocalDate
 
@@ -54,12 +53,5 @@ class StatsCalculatorTest {
         )
         val stats = StatsCalculator.compute(sessions, emptyList())
         assertThat(stats.totalMinutes).isEqualTo(30)
-    }
-
-    @Test
-    fun statusFilterWorksForMonthlyBooks() {
-        // Just smoke test that BookStatus.FINISHED is used for filtering (the ViewModel does this,
-        // not the calculator itself).
-        assertThat(BookStatus.FINISHED.name).isEqualTo("FINISHED")
     }
 }

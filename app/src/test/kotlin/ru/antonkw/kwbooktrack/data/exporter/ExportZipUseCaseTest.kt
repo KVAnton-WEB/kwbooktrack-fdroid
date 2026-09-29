@@ -12,11 +12,13 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import ru.antonkw.kwbooktrack.data.NoOpCoverStorage
+import ru.antonkw.kwbooktrack.data.NoOpPhotoStorage
 import ru.antonkw.kwbooktrack.data.TestDb
 import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
+import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
 import java.io.File
 import java.io.StringReader
 import java.nio.file.Files
@@ -37,7 +39,12 @@ class ExportZipUseCaseTest {
     @Before
     fun setUp() {
         db = TestDb.createInMemory(ApplicationProvider.getApplicationContext())
-        repo = BookRepository(db.bookDao(), db.tagDao(), NoOpCoverStorage)
+        repo = BookRepository(
+            db.bookDao(),
+            db.tagDao(),
+            NoOpCoverStorage,
+            PhotoRepository(db.photoDao(), NoOpPhotoStorage),
+        )
         useCase = ExportZipUseCase(
             bookRepository = repo,
             noteDao = db.noteDao(),
@@ -45,6 +52,7 @@ class ExportZipUseCaseTest {
             photoDao = db.photoDao(),
             tagDao = db.tagDao(),
             versionProvider = versionProvider,
+            database = db,
         )
         tempDir = Files.createTempDirectory("kwbooktrack-export-").toFile()
     }

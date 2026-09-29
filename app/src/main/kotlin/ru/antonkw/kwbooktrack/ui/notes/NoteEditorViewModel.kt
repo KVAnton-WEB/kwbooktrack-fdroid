@@ -43,8 +43,11 @@ class NoteEditorViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
 ) : ViewModel() {
 
-    private val bookId: Long = savedStateHandle.get<Long>(KEY_BOOK_ID) ?: -1L
     private val noteId: Long = savedStateHandle.get<Long>(KEY_NOTE_ID) ?: 0L
+    // For new notes (noteId == 0L) the bookId comes from the nav route;
+    // for edits the route only carries noteId, so we resolve bookId from the
+    // existing NoteEntity to avoid detaching the note from its book on save.
+    private var bookId: Long = savedStateHandle.get<Long>(KEY_BOOK_ID) ?: -1L
 
     private val _state = MutableStateFlow(NoteEditorState())
     val state: StateFlow<NoteEditorState> = _state.asStateFlow()
@@ -53,6 +56,7 @@ class NoteEditorViewModel @Inject constructor(
         if (noteId > 0L) {
             viewModelScope.launch {
                 val note = noteRepository.findById(noteId)
+                if (note != null) bookId = note.bookId
                 val photos = photoRepository.observeByNote(noteId).first()
                 _state.value = _state.value.copy(
                     pageText = note?.page?.toString() ?: "",

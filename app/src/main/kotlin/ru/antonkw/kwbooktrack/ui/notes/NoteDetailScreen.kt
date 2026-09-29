@@ -68,6 +68,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import ru.antonkw.kwbooktrack.data.db.entity.NoteEntity
 import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
@@ -107,8 +108,14 @@ class NoteDetailViewModel @Inject constructor(
     private val _deleted = MutableStateFlow(false)
     val deleted: StateFlow<Boolean> = _deleted.asStateFlow()
 
+    // Holds the in-flight combine().collect so we can cancel it before launching a new
+    // load() — otherwise rapid navigation between notes leaks subscriptions and the
+    // latest emission wins by accident instead of deterministically.
+    private var loadJob: Job? = null
+
     fun load(noteId: Long) {
-        viewModelScope.launch {
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
             val note = noteRepository.findById(noteId) ?: run {
                 _state.value = NoteDetailUiState.NotFound
                 return@launch
@@ -267,7 +274,9 @@ private fun NoteDetailContent(state: NoteDetailUiState.Loaded, onOpenBook: (Long
                 .clickable { onOpenBook(state.note.bookId) },
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            if (!state.coverPath.isNullOrBlank() && java.io.File(state.coverPath).exists()) {
+            // AsyncImage falls back to the error branch when the file is missing;
+            // no File.exists() on the UI thread.
+            if (!state.coverPath.isNullOrBlank()) {
                 AsyncImage(
                     model = java.io.File(state.coverPath),
                     contentDescription = state.bookTitle,

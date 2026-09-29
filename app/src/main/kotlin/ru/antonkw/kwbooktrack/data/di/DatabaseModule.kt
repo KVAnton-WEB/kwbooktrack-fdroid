@@ -2,6 +2,7 @@ package ru.antonkw.kwbooktrack.data.di
 
 import android.content.Context
 import androidx.room.Room
+import androidx.room.RoomDatabase
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -23,6 +24,10 @@ object DatabaseModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): KwBooktrackDatabase =
         Room.databaseBuilder(context, KwBooktrackDatabase::class.java, KwBooktrackDatabase.NAME)
+            // WAL lets readers proceed while a long import is writing — without
+            // it, observeAll() in BookListScreen blocks on the writer's
+            // transaction and the UI freezes until the import finishes.
+            .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
             // Авто-миграции 1→2 и 2→3 объявлены в KwBooktrackDatabase.
             // fallbackToDestructiveMigration намеренно не используется:
             // первое же обновление схемы после релиза должно пройти

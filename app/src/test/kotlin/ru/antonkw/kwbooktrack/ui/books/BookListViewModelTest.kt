@@ -16,6 +16,7 @@ import org.robolectric.RobolectricTestRunner
 import ru.antonkw.kwbooktrack.data.TestDb
 import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
+import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
 import ru.antonkw.kwbooktrack.data.repository.SessionRepository
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -30,7 +31,12 @@ class BookListViewModelTest {
     fun setUp() {
         Dispatchers.setMain(dispatcher)
         db = TestDb.createInMemory(ApplicationProvider.getApplicationContext())
-        repository = BookRepository(db.bookDao(), db.tagDao(), ru.antonkw.kwbooktrack.data.NoOpCoverStorage)
+        repository = BookRepository(
+            db.bookDao(),
+            db.tagDao(),
+            ru.antonkw.kwbooktrack.data.NoOpCoverStorage,
+            PhotoRepository(db.photoDao(), ru.antonkw.kwbooktrack.data.NoOpPhotoStorage),
+        )
         sessionRepository = SessionRepository(db.readingSessionDao())
     }
 

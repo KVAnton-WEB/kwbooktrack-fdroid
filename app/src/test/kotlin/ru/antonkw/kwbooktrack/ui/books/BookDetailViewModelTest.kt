@@ -17,6 +17,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import ru.antonkw.kwbooktrack.data.TestDb
+import ru.antonkw.kwbooktrack.data.NoOpPhotoStorage
+import ru.antonkw.kwbooktrack.data.NoOpCoverStorage
 import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
@@ -39,10 +41,10 @@ class BookDetailViewModelTest {
     fun setUp() {
         Dispatchers.setMain(dispatcher)
         db = TestDb.createInMemory(ApplicationProvider.getApplicationContext())
-        bookRepository = BookRepository(db.bookDao(), db.tagDao(), ru.antonkw.kwbooktrack.data.NoOpCoverStorage)
+        photoRepository = PhotoRepository(db.photoDao(), NoOpPhotoStorage)
+        bookRepository = BookRepository(db.bookDao(), db.tagDao(), ru.antonkw.kwbooktrack.data.NoOpCoverStorage, photoRepository)
         sessionRepository = SessionRepository(db.readingSessionDao())
         noteRepository = NoteRepository(db.noteDao(), ru.antonkw.kwbooktrack.data.NoOpPhotoStorage)
-        photoRepository = PhotoRepository(db.photoDao())
     }
 
     @After
@@ -59,6 +61,7 @@ class BookDetailViewModelTest {
             sessionRepository,
             noteRepository,
             photoRepository,
+            NoOpPhotoStorage,
         )
         assertThat(viewModel.uiState.value.book).isNull()
     }
@@ -73,6 +76,7 @@ class BookDetailViewModelTest {
             sessionRepository,
             noteRepository,
             photoRepository,
+            NoOpPhotoStorage,
         )
         viewModel.setCurrentPage(150)
 
@@ -91,6 +95,7 @@ class BookDetailViewModelTest {
             sessionRepository,
             noteRepository,
             photoRepository,
+            NoOpPhotoStorage,
         )
         viewModel.setCurrentPage(50)
 
@@ -109,6 +114,7 @@ class BookDetailViewModelTest {
             sessionRepository,
             noteRepository,
             photoRepository,
+            NoOpPhotoStorage,
         )
         viewModel.markFinished(rating = 5)
 
@@ -122,6 +128,7 @@ class BookDetailViewModelTest {
     fun deleteBookCascadesSessionsAndNotes() = runTest(dispatcher) {
         val bookId = bookRepository.insert(sampleBook("Dune", pageCount = 500))
         viewModelForBook(bookId).setCurrentPage(120)
+        advanceUntilIdle()
         noteRepository.insert(
             ru.antonkw.kwbooktrack.data.db.entity.NoteEntity(
                 bookId = bookId,
@@ -148,6 +155,7 @@ class BookDetailViewModelTest {
         sessionRepository,
         noteRepository,
         photoRepository,
+        NoOpPhotoStorage,
     )
 
     private fun sampleBook(
