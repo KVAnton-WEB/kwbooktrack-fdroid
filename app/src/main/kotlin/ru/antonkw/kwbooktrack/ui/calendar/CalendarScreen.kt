@@ -1,0 +1,265 @@
+package ru.antonkw.kwbooktrack.ui.calendar
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import ru.antonkw.kwbooktrack.ui.common.MonthYearPickerDialog
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.stringArrayResource
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil.compose.AsyncImage
+import java.io.File
+import java.time.Instant
+import java.time.LocalDate
+import java.time.YearMonth
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+import ru.antonkw.kwbooktrack.R
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CalendarScreen(
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+    viewModel: CalendarViewModel = hiltViewModel(),
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val month by viewModel.month.collectAsStateWithLifecycle()
+    val today = remember { LocalDate.now() }
+    val maxYm = remember(today) { YearMonth.of(today.year, today.month) }
+
+    var showDatePicker by remember { mutableStateOf(false) }
+
+    Scaffold(
+        modifier = modifier,
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.calendar_title)) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        Column(
+            modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.calendar_prompt),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(
+                    onClick = viewModel::goToPreviousMonth,
+                    enabled = true,
+                ) {
+                    Icon(Icons.Filled.ChevronLeft, contentDescription = stringResource(R.string.calendar_prev_month))
+                }
+                TextButton(
+                    onClick = { showDatePicker = true },
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(
+                        text = month.format(
+                            remember { DateTimeFormatter.ofPattern("MMMM yyyy", Locale("ru")) }
+                        ),
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+                }
+                IconButton(
+                    onClick = viewModel::goToNextMonth,
+                    enabled = month < maxYm,
+                ) {
+                    Icon(
+                        Icons.Filled.ChevronRight,
+                        contentDescription = stringResource(R.string.calendar_next_month),
+                        tint = if (month < maxYm) MaterialTheme.colorScheme.onSurface
+                               else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                    )
+                }
+            }
+            TextButton(
+                onClick = { viewModel.goToMonth(maxYm) },
+                enabled = month < maxYm,
+                modifier = Modifier.align(Alignment.End),
+            ) { Text(stringResource(R.string.calendar_today)) }
+
+            Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                val weekdays = stringArrayResource(R.array.weekdays_short)
+                weekdays.forEachIndexed { idx, label ->
+                    Text(
+                        text = label,
+                        modifier = Modifier.weight(1f),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontWeight = FontWeight.Medium,
+                    )
+                }
+            }
+
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(7),
+                contentPadding = PaddingValues(0.dp),
+                horizontalArrangement = Arrangement.spacedBy(0.dp),
+                verticalArrangement = Arrangement.spacedBy(0.dp),
+                modifier = Modifier.fillMaxSize().padding(top = 4.dp),
+            ) {
+                items(uiState.days.size) { idx ->
+                    val day = uiState.days[idx]
+                    DayCell(day = day)
+                }
+            }
+        }
+    }
+
+    if (showDatePicker) {
+        MonthYearPickerDialog(
+            initial = month,
+            max = maxYm,
+            onDismiss = { showDatePicker = false },
+            onConfirm = { ym ->
+                viewModel.goToMonth(ym)
+                showDatePicker = false
+            },
+        )
+    }
+}
+
+@Composable
+private fun DayCell(day: CalendarDay?) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(140.dp)
+            .padding(2.dp),
+        verticalArrangement = Arrangement.Top,
+        horizontalAlignment = Alignment.Start,
+    ) {
+        if (day == null) {
+            androidx.compose.foundation.layout.Spacer(modifier = Modifier.fillMaxSize())
+        } else {
+            Text(
+                text = day.date.dayOfMonth.toString(),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(2.dp),
+            )
+            when {
+                day.books.isEmpty() -> {
+                    androidx.compose.foundation.layout.Spacer(modifier = Modifier.fillMaxSize())
+                }
+                day.books.size == 1 -> {
+                    val book = day.books.first()
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f, fill = true)
+                            .padding(vertical = 1.dp),
+                    ) {
+                        CoverTile(book, fillHeight = true)
+                    }
+                }
+                else -> {
+                    val perTileHeight = (110.dp / day.books.size.coerceAtMost(3))
+                    day.books.take(3).forEach { book ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(perTileHeight)
+                                .padding(vertical = 1.dp),
+                        ) {
+                            CoverTile(book, fillHeight = true)
+                        }
+                    }
+                }
+            }
+            if (day.books.isNotEmpty() && day.books.first().rating != null) {
+                Row(modifier = Modifier.fillMaxWidth().padding(top = 2.dp)) {
+                    repeat(day.books.first().rating!!) {
+                        Icon(
+                            imageVector = Icons.Filled.Star,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.tertiary,
+                            modifier = Modifier.size(10.dp),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CoverTile(book: CalendarBook, fillHeight: Boolean) {
+    if (!book.coverPath.isNullOrBlank() && File(book.coverPath).exists()) {
+        AsyncImage(
+            model = File(book.coverPath),
+            contentDescription = book.title,
+            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+            modifier = Modifier.fillMaxSize(),
+        )
+    } else {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = book.title.take(8),
+                style = MaterialTheme.typography.labelSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 2.dp),
+            )
+        }
+    }
+}
+
+private fun androidx.compose.foundation.lazy.grid.LazyGridScope.items(count: Int, itemContent: @Composable (Int) -> Unit) {
+    repeat(count) { idx -> item { itemContent(idx) } }
+}

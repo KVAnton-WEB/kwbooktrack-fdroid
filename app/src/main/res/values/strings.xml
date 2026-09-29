@@ -1,0 +1,293 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">kwbooktrack</string>
+
+    <!-- About -->
+    <string name="about_title">About the app</string>
+    <string name="about_back">Back</string>
+    <string name="about_version">Version</string>
+    <string name="about_library">Library</string>
+    <string name="about_total_books">Total books: %1$d</string>
+    <string name="about_finished_books">Finished: %1$d of %2$d (%3$d%%)</string>
+    <string name="about_book_deleted_fallback">(book deleted)</string>
+
+    <!-- Common -->
+    <string name="action_back">Назад</string>
+    <string name="action_cancel">Отмена</string>
+    <string name="action_ok">ОК</string>
+    <string name="action_save">Сохранить</string>
+    <string name="action_delete">Удалить</string>
+    <string name="action_reset">Сброс</string>
+    <string name="action_copy">Копировать</string>
+    <string name="action_share">Поделиться</string>
+    <string name="note_copied">Скопировано</string>
+    <string name="action_apply">Применить</string>
+    <string name="action_edit">Редактировать</string>
+    <string name="action_rate">Оценить</string>
+    <string name="dialog_rate_title">Оцените книгу</string>
+    <string name="label_purchased_on">Куплено: %1$s</string>
+    <string name="label_finished_on">Прочитано: %1$s</string>
+    <string name="label_section_review">Рецензия</string>
+    <string name="cd_scan_isbn">Сканировать ISBN</string>
+    <string name="cd_calendar">Календарь</string>
+    <string name="cd_add_book">Добавить книгу</string>
+    <string name="cd_open_notes">Заметки и цитаты</string>
+    <string name="cd_about">О приложении</string>
+    <string name="cd_choose_period">Выбрать период</string>
+    <string name="cd_clear_query">Очистить поиск</string>
+    <string name="cd_back">Назад</string>
+
+    <!-- Book list -->
+    <string name="book_list_title">kwbooktrack — книги</string>
+    <string name="action_stats">Статистика</string>
+    <string name="action_grid">Сетка</string>
+    <string name="action_list">Список</string>
+    <string name="notes_search_hint">Поиск по заметкам…</string>
+    <string name="notes_no_results">Ничего не найдено по «%1$s»</string>
+    <string name="action_import_tellico">Импорт Tellico</string>
+    <string name="search_hint">Поиск по названию, автору, ISBN…</string>
+    <string name="empty_library">Библиотека пуста — добавьте первую книгу</string>
+    <string name="empty_search">Ничего не найдено по «%1$s»</string>
+    <string name="label_period">Период</string>
+    <string name="label_type">Тип</string>
+    <string name="matches_count">Количество совпадений: %1$d</string>
+    <string name="scan_prompt">Наведите камеру на штрихкод книги</string>
+
+    <!-- Period labels -->
+    <string name="period_all">За всё время</string>
+    <string name="period_year">%1$d год</string>
+    <string name="period_year_month">%1$d · %2$s</string>
+
+    <!-- Filter types -->
+    <string name="filter_all">Все</string>
+    <string name="filter_wishlist">К прочтению</string>
+    <string name="filter_reading">В процессе</string>
+    <string name="filter_finished">Прочитано</string>
+    <string name="filter_purchased">Куплено</string>
+
+    <!-- Month names -->
+    <string name="month_jan">янв</string>
+    <string name="month_feb">фев</string>
+    <string name="month_mar">мар</string>
+    <string name="month_apr">апр</string>
+    <string name="month_may">май</string>
+    <string name="month_jun">июн</string>
+    <string name="month_jul">июл</string>
+    <string name="month_aug">авг</string>
+    <string name="month_sep">сен</string>
+    <string name="month_oct">окт</string>
+    <string name="month_nov">ноя</string>
+    <string name="month_dec">дек</string>
+
+    <!-- Book detail -->
+    <string name="book_detail_fallback_title">Книга</string>
+    <string name="label_progress">Прогресс</string>
+    <string name="progress_format">%1$d / %2$d стр. · %3$d%%</string>
+    <string name="progress_no_page_count">Всего страниц не указано</string>
+    <string name="pages_remaining">Осталось %1$d стр.</string>
+    <string name="label_current_page">Текущая страница</string>
+    <string name="action_log_session">Записать</string>
+    <string name="action_i_finished">Я прочитал</string>
+    <string name="cd_save_current_page">Сохранить текущую страницу</string>
+    <string name="error_page_exceeds_total">Страниц в книге: %1$d</string>
+    <string name="action_mark_finished">Завершить</string>
+    <string name="action_add_note">Добавить заметку</string>
+    <string name="label_sessions_count">Журнал чтения (%1$d)</string>
+    <string name="empty_sessions">Пока нет сессий. Введите текущую страницу, чтобы начать.</string>
+    <string name="session_end_page">стр. %1$d</string>
+    <string name="session_no_page">—</string>
+    <string name="label_meta_isbn">ISBN</string>
+    <string name="label_meta_pages">Стр.</string>
+    <string name="label_meta_language">Язык</string>
+    <string name="label_meta_year">Год</string>
+    <string name="label_meta_publisher">Издательство</string>
+    <string name="label_meta_genre">Жанр</string>
+    <string name="label_meta_rating">Оценка</string>
+    <string name="label_meta_purchase_date">Дата покупки</string>
+    <string name="label_meta_purchase_price">Цена</string>
+    <string name="label_meta_started">Начал</string>
+    <string name="label_meta_finished">Закончил</string>
+    <string name="label_section_about">О книге</string>
+    <string name="label_section_reading_log">Журнал чтения</string>
+    <string name="label_section_notes">Заметки и цитаты</string>
+    <string name="rating_value">%1$d / 5</string>
+    <string name="price_value">%1$.2f ₽</string>
+
+    <!-- Note editor -->
+    <string name="note_editor_title">Заметка</string>
+    <string name="label_page_optional">Страница (опционально)</string>
+    <string name="label_note_body">Заметка</string>
+    <string name="action_attach_photo">Прикрепить фото</string>
+    <string name="photos_attached">Прикреплено фото: %1$d</string>
+    <string name="action_save_note">Сохранить как заметку</string>
+    <string name="action_save_quote">Сохранить как цитату</string>
+    <string name="note_kind_note">Заметка</string>
+    <string name="note_kind_quote">Цитата</string>
+    <string name="note_kind_review">Рецензия</string>
+    <string name="note_kind_unknown">—</string>
+
+    <!-- Notes list -->
+    <string name="notes_list_title">Заметки и цитаты</string>
+    <string name="notes_filter_all">Все</string>
+    <string name="notes_filter_notes">Заметки</string>
+    <string name="notes_filter_quotes">Цитаты</string>
+    <string name="empty_notes">Заметок пока нет.</string>
+    <string name="book_label">Книга</string>
+
+    <!-- Note detail -->
+    <string name="note_detail_title">Заметка</string>
+    <string name="note_metadata_format">%1$s · стр. %2$d</string>
+    <string name="note_metadata_no_page">%1$s</string>
+
+    <!-- Add book -->
+    <string name="add_book_title">Новая книга</string>
+    <string name="edit_book_title">Редактировать книгу</string>
+    <string name="label_title">Название</string>
+    <string name="label_author">Автор</string>
+    <string name="label_isbn">ISBN (13 цифр)</string>
+    <string name="label_page_count">Страниц</string>
+    <string name="label_year">Год</string>
+    <string name="label_publisher">Издательство</string>
+    <string name="label_genre">Жанр</string>
+    <string name="label_purchase_date">Дата покупки (dd.MM.yyyy)</string>
+    <string name="label_purchase_price">Цена</string>
+    <string name="label_cover">Обложка</string>
+    <string name="action_pick_cover">Выбрать обложку</string>
+    <string name="action_take_photo">Сделать фото</string>
+    <string name="action_clear_cover">Убрать обложку</string>
+    <string name="validation_title_required">Введите название</string>
+    <string name="saved">Сохранено</string>
+    <string name="action_save_changes">Сохранить изменения</string>
+    <string name="action_discard">Не сохранять</string>
+    <string name="dialog_unsaved_title">Несохранённые изменения</string>
+    <string name="dialog_unsaved_message">Сохранить изменения или выйти без сохранения?</string>
+    <string name="error_no_camera">Нет доступа к камере</string>
+
+    <!-- Notes -->
+    <string name="empty_notes_detailed">Нет заметок. Добавьте цитаты или мысли в детальном экране книги.</string>
+    <string name="note_not_found">Заметка не найдена</string>
+    <string name="note_page_label">стр. %1$d</string>
+    <string name="note_created_label">Создано: %1$s</string>
+    <string name="dialog_delete_note_title">Удалить заметку?</string>
+    <string name="dialog_delete_note_message">Заметка и связанные фотографии будут удалены без возможности восстановления.</string>
+    <string name="dialog_delete_book_title">Удалить книгу?</string>
+    <string name="dialog_delete_book_message">Книга и все связанные данные будут удалены без возможности восстановления.</string>
+
+    <!-- Tellico -->
+    <string name="tellico_import_description">Импортируйте ZIP-архив с экспортом из Tellico (CSV + Books_files/*.jpg). Обложки будут автоматически скопированы в библиотеку обложек.</string>
+    <string name="tellico_import_done">Импорт завершён</string>
+    <string name="tellico_import_total_format">Записей в CSV: %1$d</string>
+    <string name="tellico_import_imported_format">Импортировано книг: %1$d</string>
+    <string name="tellico_import_skipped_format">Пропущено: %1$d</string>
+    <string name="tellico_import_label_covers">Обложек скопировано: %1$d</string>
+    <string name="tellico_import_label_notes">Заметок/цитат/рецензий: %1$d</string>
+    <string name="tellico_import_error_read">Не удалось прочитать файл</string>
+    <string name="tellico_import_error_unknown">Неизвестная ошибка</string>
+
+    <!-- Picker -->
+    <string name="dialog_choose_month">Выбрать месяц</string>
+    <string name="label_month">Месяц</string>
+
+    <!-- Stats tabs -->
+    <string name="stats_tab_months">Месяцы</string>
+    <string name="stats_tab_years">Годы</string>
+    <string name="stats_label_pages">Страницы</string>
+    <string name="stats_label_books">Книги</string>
+    <string name="stats_chart_pages_by_month">Страниц по месяцам — %1$s</string>
+    <string name="stats_chart_pages_by_year">Страниц по годам</string>
+    <string name="stats_chart_finished_by_month">Завершено книг по месяцам — %1$s</string>
+    <string name="stats_chart_finished_by_year">Завершено книг по годам</string>
+    <string name="stats_label_all_years">По годам</string>
+
+    <!-- Calendar -->
+    <string name="calendar_prompt">Сколько вы прочитали в этом месяце?</string>
+    <string name="calendar_prev_month">Предыдущий месяц</string>
+    <string name="calendar_next_month">Следующий месяц</string>
+    <string name="calendar_today">К текущему</string>
+
+    <!-- Weekdays -->
+    <string name="weekday_mon">Пн</string>
+    <string name="weekday_tue">Вт</string>
+    <string name="weekday_wed">Ср</string>
+    <string name="weekday_thu">Чт</string>
+    <string name="weekday_fri">Пт</string>
+    <string name="weekday_sat">Сб</string>
+    <string name="weekday_sun">Вс</string>
+
+    <!-- Weekdays short (Monday=1) -->
+    <string-array name="weekdays_short">
+        <item>@string/weekday_mon</item>
+        <item>@string/weekday_tue</item>
+        <item>@string/weekday_wed</item>
+        <item>@string/weekday_thu</item>
+        <item>@string/weekday_fri</item>
+        <item>@string/weekday_sat</item>
+        <item>@string/weekday_sun</item>
+    </string-array>
+
+    <!-- Months long (1=Январь) -->
+    <string-array name="months_long">
+        <item>Январь</item>
+        <item>Февраль</item>
+        <item>Март</item>
+        <item>Апрель</item>
+        <item>Май</item>
+        <item>Июнь</item>
+        <item>Июль</item>
+        <item>Август</item>
+        <item>Сентябрь</item>
+        <item>Октябрь</item>
+        <item>Ноябрь</item>
+        <item>Декабрь</item>
+    </string-array>
+
+    <!-- Months short (1=Янв) -->
+    <string-array name="months_short">
+        <item>Янв</item>
+        <item>Фев</item>
+        <item>Мар</item>
+        <item>Апр</item>
+        <item>Май</item>
+        <item>Июн</item>
+        <item>Июл</item>
+        <item>Авг</item>
+        <item>Сен</item>
+        <item>Окт</item>
+        <item>Ноя</item>
+        <item>Дек</item>
+    </string-array>
+
+    <!-- Calendar -->
+    <string name="calendar_title">Календарь чтения</string>
+    <string name="calendar_empty">За этот день сессий нет.</string>
+    <string name="calendar_pages_format">%1$d стр.</string>
+    <string name="calendar_minutes_format">%1$d мин</string>
+    <string name="calendar_total_format">%1$d стр. · %2$d мин</string>
+
+    <!-- Statistics -->
+    <string name="stats_title">Статистика</string>
+    <string name="stats_summary">Сводка</string>
+    <string name="stats_sessions">Сессий: %1$d</string>
+    <string name="stats_pages">Страниц: %1$d</string>
+    <string name="stats_minutes">Минут: %1$d</string>
+    <string name="stats_daily">Прочитано по дням</string>
+    <string name="stats_no_data">Пока нет данных — добавьте сессии чтения в книге.</string>
+    <string name="stats_daily_entry">%1$s    %2$d стр.</string>
+    <string name="stats_monthly">Завершено по месяцам</string>
+    <string name="stats_no_finished">Пока ни одной завершённой книги.</string>
+    <string name="stats_monthly_entry">%1$d-%2$02d    %3$d кн.</string>
+
+    <!-- Tellico importer -->
+    <string name="tellico_import_title">Импорт Tellico</string>
+    <string name="tellico_import_pick_csv">Выбрать CSV-файл</string>
+    <string name="tellico_import_run">Запустить импорт</string>
+    <string name="tellico_import_running">Идёт импорт…</string>
+    <string name="tellico_import_result_format">Импортировано: %1$d, пропущено: %2$d</string>
+    <string name="tellico_import_covers_format">Обложек скопировано: %1$d</string>
+    <string name="tellico_import_notes_format">Заметок добавлено: %1$d</string>
+    <string name="tellico_import_dry_run">Пробный прогон (без записи)</string>
+    <string name="tellico_import_error">Ошибка импорта</string>
+
+    <!-- Common errors -->
+    <string name="error_generic">Что-то пошло не так</string>
+</resources>

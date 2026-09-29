@@ -1,0 +1,290 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">kwbooktrack</string>
+
+    <!-- About -->
+    <string name="about_title">О приложении</string>
+    <string name="about_back">Назад</string>
+    <string name="about_version">Версия</string>
+    <string name="about_library">Библиотека</string>
+    <string name="about_total_books">Всего книг: %1$d</string>
+    <string name="about_finished_books">Прочитано: %1$d из %2$d (%3$d%%)</string>
+    <string name="about_book_deleted_fallback">(книга удалена)</string>
+
+    <!-- Common -->
+    <string name="action_back">Back</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_ok">OK</string>
+    <string name="action_save">Save</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_reset">Reset</string>
+    <string name="action_copy">Copy</string>
+    <string name="action_share">Share</string>
+    <string name="note_copied">Copied</string>
+    <string name="action_apply">Apply</string>
+    <string name="action_edit">Edit</string>
+    <string name="action_rate">Rate</string>
+    <string name="dialog_rate_title">Rate this book</string>
+    <string name="label_purchased_on">Purchased: %1$s</string>
+    <string name="label_finished_on">Finished: %1$s</string>
+    <string name="label_section_review">Review</string>
+    <string name="cd_scan_isbn">Scan ISBN</string>
+    <string name="cd_calendar">Calendar</string>
+    <string name="cd_add_book">Add book</string>
+    <string name="cd_open_notes">Notes and quotes</string>
+    <string name="cd_about">About the app</string>
+    <string name="notes_search_hint">Search notes…</string>
+    <string name="notes_no_results">Nothing found for «%1$s»</string>
+    <string name="cd_choose_period">Choose period</string>
+    <string name="cd_clear_query">Clear search</string>
+    <string name="cd_back">Back</string>
+
+    <!-- Book list -->
+    <string name="book_list_title">kwbooktrack — books</string>
+    <string name="action_stats">Statistics</string>
+    <string name="action_grid">Grid</string>
+    <string name="action_list">List</string>
+    <string name="action_import_tellico">Import Tellico</string>
+    <string name="search_hint">Search by title, author, ISBN…</string>
+    <string name="empty_library">Library is empty — add your first book</string>
+    <string name="empty_search">Nothing found for «%1$s»</string>
+    <string name="label_period">Period</string>
+    <string name="label_type">Type</string>
+    <string name="matches_count">Matches: %1$d</string>
+    <string name="scan_prompt">Point the camera at the book barcode</string>
+
+    <!-- Period labels -->
+    <string name="period_all">All time</string>
+    <string name="period_year">Year %1$d</string>
+    <string name="period_year_month">%1$d · %2$s</string>
+
+    <!-- Filter types -->
+    <string name="filter_all">All</string>
+    <string name="filter_wishlist">Wishlist</string>
+    <string name="filter_reading">Reading</string>
+    <string name="filter_finished">Finished</string>
+    <string name="filter_purchased">Purchased</string>
+
+    <!-- Month names -->
+    <string name="month_jan">Jan</string>
+    <string name="month_feb">Feb</string>
+    <string name="month_mar">Mar</string>
+    <string name="month_apr">Apr</string>
+    <string name="month_may">May</string>
+    <string name="month_jun">Jun</string>
+    <string name="month_jul">Jul</string>
+    <string name="month_aug">Aug</string>
+    <string name="month_sep">Sep</string>
+    <string name="month_oct">Oct</string>
+    <string name="month_nov">Nov</string>
+    <string name="month_dec">Dec</string>
+
+    <!-- Book detail -->
+    <string name="book_detail_fallback_title">Book</string>
+    <string name="label_progress">Progress</string>
+    <string name="progress_format">%1$d / %2$d pp. · %3$d%%</string>
+    <string name="progress_no_page_count">Page count not provided</string>
+    <string name="pages_remaining">%1$d pp. remaining</string>
+    <string name="label_current_page">Current page</string>
+    <string name="action_log_session">Log</string>
+    <string name="action_i_finished">I finished</string>
+    <string name="cd_save_current_page">Save current page</string>
+    <string name="error_page_exceeds_total">Pages in book: %1$d</string>
+    <string name="action_mark_finished">Mark finished</string>
+    <string name="action_add_note">Add note</string>
+    <string name="label_sessions_count">Reading log (%1$d)</string>
+    <string name="empty_sessions">No sessions yet — enter the current page to start.</string>
+    <string name="session_end_page">p. %1$d</string>
+    <string name="session_no_page">—</string>
+    <string name="label_meta_isbn">ISBN</string>
+    <string name="label_meta_pages">Pages</string>
+    <string name="label_meta_language">Language</string>
+    <string name="label_meta_year">Year</string>
+    <string name="label_meta_publisher">Publisher</string>
+    <string name="label_meta_genre">Genre</string>
+    <string name="label_meta_rating">Rating</string>
+    <string name="label_meta_purchase_date">Purchase date</string>
+    <string name="label_meta_purchase_price">Price</string>
+    <string name="label_meta_started">Started</string>
+    <string name="label_meta_finished">Finished</string>
+    <string name="label_section_about">About</string>
+    <string name="label_section_reading_log">Reading log</string>
+    <string name="label_section_notes">Notes and quotes</string>
+    <string name="rating_value">%1$d / 5</string>
+    <string name="price_value">%1$.2f ₽</string>
+
+    <!-- Note editor -->
+    <string name="note_editor_title">Note</string>
+    <string name="label_page_optional">Page (optional)</string>
+    <string name="label_note_body">Note</string>
+    <string name="action_attach_photo">Attach photo</string>
+    <string name="photos_attached">Photos attached: %1$d</string>
+    <string name="action_save_note">Save as note</string>
+    <string name="action_save_quote">Save as quote</string>
+    <string name="note_kind_note">Note</string>
+    <string name="note_kind_quote">Quote</string>
+    <string name="note_kind_review">Review</string>
+    <string name="note_kind_unknown">—</string>
+
+    <!-- Notes list -->
+    <string name="notes_list_title">Notes and quotes</string>
+    <string name="notes_filter_all">All</string>
+    <string name="notes_filter_notes">Notes</string>
+    <string name="notes_filter_quotes">Quotes</string>
+    <string name="empty_notes">No notes yet.</string>
+    <string name="book_label">Book</string>
+
+    <!-- Note detail -->
+    <string name="note_detail_title">Note</string>
+    <string name="note_metadata_format">%1$s · p. %2$d</string>
+    <string name="note_metadata_no_page">%1$s</string>
+
+    <!-- Add book -->
+    <string name="add_book_title">New book</string>
+    <string name="edit_book_title">Edit book</string>
+    <string name="label_title">Title</string>
+    <string name="label_author">Author</string>
+    <string name="label_isbn">ISBN (13 digits)</string>
+    <string name="label_page_count">Pages</string>
+    <string name="label_year">Year</string>
+    <string name="label_publisher">Publisher</string>
+    <string name="label_genre">Genre</string>
+    <string name="label_purchase_date">Purchase date (yyyy-MM-dd)</string>
+    <string name="label_purchase_price">Price</string>
+    <string name="label_cover">Cover</string>
+    <string name="action_pick_cover">Pick cover</string>
+    <string name="action_take_photo">Take photo</string>
+    <string name="action_clear_cover">Remove cover</string>
+    <string name="validation_title_required">Title is required</string>
+    <string name="saved">Saved</string>
+    <string name="action_save_changes">Save changes</string>
+    <string name="action_discard">Discard</string>
+    <string name="dialog_unsaved_title">Unsaved changes</string>
+    <string name="dialog_unsaved_message">Save changes or exit without saving?</string>
+    <string name="error_no_camera">Camera permission denied</string>
+
+    <!-- Notes -->
+    <string name="empty_notes_detailed">No notes yet. Add quotes or thoughts from the book detail screen.</string>
+    <string name="note_not_found">Note not found</string>
+    <string name="note_page_label">p. %1$d</string>
+    <string name="note_created_label">Created: %1$s</string>
+    <string name="dialog_delete_note_title">Delete note?</string>
+    <string name="dialog_delete_note_message">The note and its attached photos will be permanently deleted.</string>
+    <string name="dialog_delete_book_title">Delete book?</string>
+    <string name="dialog_delete_book_message">The book and all related data will be permanently deleted.</string>
+
+    <!-- Tellico -->
+    <string name="tellico_import_description">Import the ZIP archive exported from Tellico (CSV + Books_files/*.jpg). Covers will be copied to the cover library automatically.</string>
+    <string name="tellico_import_done">Import complete</string>
+    <string name="tellico_import_total_format">CSV rows: %1$d</string>
+    <string name="tellico_import_imported_format">Books imported: %1$d</string>
+    <string name="tellico_import_skipped_format">Skipped: %1$d</string>
+    <string name="tellico_import_label_covers">Covers copied: %1$d</string>
+    <string name="tellico_import_label_notes">Notes / quotes / reviews: %1$d</string>
+    <string name="tellico_import_error_read">Failed to read file</string>
+    <string name="tellico_import_error_unknown">Unknown error</string>
+
+    <!-- Picker -->
+    <string name="dialog_choose_month">Choose month</string>
+    <string name="label_month">Month</string>
+
+    <!-- Stats tabs -->
+    <string name="stats_tab_months">Months</string>
+    <string name="stats_tab_years">Years</string>
+    <string name="stats_label_pages">Pages</string>
+    <string name="stats_label_books">Books</string>
+    <string name="stats_chart_pages_by_month">Pages per month — %1$s</string>
+    <string name="stats_chart_pages_by_year">Pages per year</string>
+    <string name="stats_chart_finished_by_month">Books finished per month — %1$s</string>
+    <string name="stats_chart_finished_by_year">Books finished per year</string>
+    <string name="stats_label_all_years">By year</string>
+
+    <!-- Calendar -->
+    <string name="calendar_prompt">How much did you read this month?</string>
+    <string name="calendar_prev_month">Previous month</string>
+    <string name="calendar_next_month">Next month</string>
+    <string name="calendar_today">Today</string>
+
+    <!-- Weekdays -->
+    <string name="weekday_mon">Mon</string>
+    <string name="weekday_tue">Tue</string>
+    <string name="weekday_wed">Wed</string>
+    <string name="weekday_thu">Thu</string>
+    <string name="weekday_fri">Fri</string>
+    <string name="weekday_sat">Sat</string>
+    <string name="weekday_sun">Sun</string>
+
+    <string-array name="weekdays_short">
+        <item>@string/weekday_mon</item>
+        <item>@string/weekday_tue</item>
+        <item>@string/weekday_wed</item>
+        <item>@string/weekday_thu</item>
+        <item>@string/weekday_fri</item>
+        <item>@string/weekday_sat</item>
+        <item>@string/weekday_sun</item>
+    </string-array>
+
+    <string-array name="months_long">
+        <item>January</item>
+        <item>February</item>
+        <item>March</item>
+        <item>April</item>
+        <item>May</item>
+        <item>June</item>
+        <item>July</item>
+        <item>August</item>
+        <item>September</item>
+        <item>October</item>
+        <item>November</item>
+        <item>December</item>
+    </string-array>
+
+    <string-array name="months_short">
+        <item>Jan</item>
+        <item>Feb</item>
+        <item>Mar</item>
+        <item>Apr</item>
+        <item>May</item>
+        <item>Jun</item>
+        <item>Jul</item>
+        <item>Aug</item>
+        <item>Sep</item>
+        <item>Oct</item>
+        <item>Nov</item>
+        <item>Dec</item>
+    </string-array>
+
+    <!-- Calendar -->
+    <string name="calendar_title">Reading calendar</string>
+    <string name="calendar_empty">No sessions on this day.</string>
+    <string name="calendar_pages_format">%1$d pp.</string>
+    <string name="calendar_minutes_format">%1$d min</string>
+    <string name="calendar_total_format">%1$d pp. · %2$d min</string>
+
+    <!-- Statistics -->
+    <string name="stats_title">Statistics</string>
+    <string name="stats_summary">Summary</string>
+    <string name="stats_sessions">Sessions: %1$d</string>
+    <string name="stats_pages">Pages: %1$d</string>
+    <string name="stats_minutes">Minutes: %1$d</string>
+    <string name="stats_daily">Pages per day</string>
+    <string name="stats_no_data">No data yet — add reading sessions in a book.</string>
+    <string name="stats_daily_entry">%1$s    %2$d pp.</string>
+    <string name="stats_monthly">Books finished by month</string>
+    <string name="stats_no_finished">No finished books yet.</string>
+    <string name="stats_monthly_entry">%1$d-%2$02d    %3$d books</string>
+
+    <!-- Tellico importer -->
+    <string name="tellico_import_title">Import Tellico</string>
+    <string name="tellico_import_pick_csv">Pick CSV file</string>
+    <string name="tellico_import_run">Run import</string>
+    <string name="tellico_import_running">Importing…</string>
+    <string name="tellico_import_result_format">Imported: %1$d, skipped: %2$d</string>
+    <string name="tellico_import_covers_format">Covers copied: %1$d</string>
+    <string name="tellico_import_notes_format">Notes added: %1$d</string>
+    <string name="tellico_import_dry_run">Dry run (no writes)</string>
+    <string name="tellico_import_error">Import error</string>
+
+    <!-- Common errors -->
+    <string name="error_generic">Something went wrong</string>
+</resources>

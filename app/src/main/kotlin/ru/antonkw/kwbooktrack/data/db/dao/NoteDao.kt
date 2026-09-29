@@ -1,0 +1,52 @@
+package ru.antonkw.kwbooktrack.data.db.dao
+
+import androidx.room.Dao
+import androidx.room.Delete
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import androidx.room.RawQuery
+import androidx.room.Update
+import androidx.sqlite.db.SupportSQLiteQuery
+import kotlinx.coroutines.flow.Flow
+import ru.antonkw.kwbooktrack.data.db.entity.NoteEntity
+import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
+
+@Dao
+interface NoteDao {
+    @Query("SELECT * FROM notes ORDER BY created_at DESC")
+    fun observeAll(): Flow<List<NoteEntity>>
+
+    @Query("SELECT * FROM notes WHERE book_id = :bookId ORDER BY created_at DESC")
+    fun observeByBook(bookId: Long): Flow<List<NoteEntity>>
+
+    @Query("SELECT * FROM notes WHERE kind = :kind ORDER BY created_at DESC")
+    fun observeByKind(kind: NoteKind): Flow<List<NoteEntity>>
+
+    @Query("SELECT * FROM notes ORDER BY RANDOM() LIMIT 1")
+    suspend fun randomOne(): NoteEntity?
+
+    @Query("SELECT * FROM notes WHERE id = :id LIMIT 1")
+    suspend fun findById(id: Long): NoteEntity?
+
+    @RawQuery(observedEntities = [NoteEntity::class])
+    fun rawSearch(query: SupportSQLiteQuery): Flow<List<NoteEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(note: NoteEntity): Long
+
+    @Update
+    suspend fun update(note: NoteEntity): Int
+
+    @Delete
+    suspend fun delete(note: NoteEntity): Int
+
+    @Query("DELETE FROM notes WHERE book_id = :bookId")
+    suspend fun deleteForBook(bookId: Long): Int
+
+    @Query("SELECT COUNT(*) FROM notes")
+    suspend fun count(): Int
+
+    @Query("SELECT COUNT(*) FROM notes WHERE kind = :kind")
+    suspend fun countByKind(kind: NoteKind): Int
+}
