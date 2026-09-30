@@ -347,12 +347,15 @@ private fun NoteDetailContent(state: NoteDetailUiState.Loaded, onOpenBook: (Long
             state.note.page?.let {
                 Text(stringResource(R.string.note_page_label, it), style = MaterialTheme.typography.labelLarge)
             }
-            Text(
-                text = state.note.bodyMd,
-                style = if (state.note.kind == NoteKind.QUOTE)
+            // Rendered Markdown body — replaces the previous plain Text so
+            // headings/lists/links show up properly. Editor screen still shows
+            // the raw markdown source.
+            ru.antonkw.kwbooktrack.ui.common.MarkdownText(
+                markdown = state.note.bodyMd,
+                textColor = MaterialTheme.colorScheme.onSurface,
+                textStyle = if (state.note.kind == NoteKind.QUOTE)
                     MaterialTheme.typography.bodyLarge.copy(fontStyle = FontStyle.Italic)
                 else MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.fillMaxWidth(),
             )
             Text(
                 text = stringResource(

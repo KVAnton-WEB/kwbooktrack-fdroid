@@ -16,12 +16,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -85,8 +88,14 @@ fun NoteEditorScreen(
             )
         },
     ) { padding ->
+        val loadedKind by viewModel.loadedKind.collectAsStateWithLifecycle()
+        val isReviewFlow = loadedKind == NoteKind.REVIEW
         Column(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(16.dp)
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             OutlinedTextField(
@@ -104,6 +113,23 @@ fun NoteEditorScreen(
                 minLines = 6,
                 modifier = Modifier.fillMaxWidth(),
             )
+
+            // Live preview — markdown support means what the user types here is
+            // rendered with headings/lists/links on the detail screen.
+            if (state.body.isNotBlank()) {
+                Text(
+                    text = stringResource(R.string.note_editor_preview),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    ru.antonkw.kwbooktrack.ui.common.MarkdownText(
+                        markdown = state.body,
+                        textStyle = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(12.dp),
+                    )
+                }
+            }
 
             OutlinedButton(
                 onClick = {
@@ -127,20 +153,30 @@ fun NoteEditorScreen(
                 )
             }
 
-            Button(
-                onClick = { viewModel.save(NoteKind.NOTE) },
-                enabled = state.canSaveAsNote,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(stringResource(R.string.action_save_note))
-            }
+            if (isReviewFlow) {
+                Button(
+                    onClick = { viewModel.save(NoteKind.REVIEW) },
+                    enabled = state.canSaveAsNote,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(R.string.action_save_review))
+                }
+            } else {
+                Button(
+                    onClick = { viewModel.save(NoteKind.NOTE) },
+                    enabled = state.canSaveAsNote,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(R.string.action_save_note))
+                }
 
-            Button(
-                onClick = { viewModel.save(NoteKind.QUOTE) },
-                enabled = state.canSaveAsQuote,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(stringResource(R.string.action_save_quote))
+                Button(
+                    onClick = { viewModel.save(NoteKind.QUOTE) },
+                    enabled = state.canSaveAsQuote,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(R.string.action_save_quote))
+                }
             }
         }
     }

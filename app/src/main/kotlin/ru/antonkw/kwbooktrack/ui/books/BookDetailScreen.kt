@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.NoteAdd
+import androidx.compose.material.icons.filled.RateReview
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -72,6 +73,7 @@ import java.util.Locale
 fun BookDetailScreen(
     onBack: () -> Unit,
     onAddNote: (Long) -> Unit = {},
+    onAddReview: (Long) -> Unit = {},
     onEditBook: (Long) -> Unit = {},
     onOpenNote: (Long) -> Unit = {},
     onDeleted: () -> Unit = {},
@@ -331,15 +333,32 @@ fun BookDetailScreen(
                         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                     ) {
                         Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-                            Text(stringResource(R.string.label_section_review), style = MaterialTheme.typography.titleMedium)
                             Text(
-                                text = review.bodyMd,
-                                style = MaterialTheme.typography.bodyMedium,
+                                text = stringResource(R.string.label_section_review),
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                            // Markdown body — opens the full note on tap.
+                            ru.antonkw.kwbooktrack.ui.common.MarkdownText(
+                                markdown = review.bodyMd,
+                                textStyle = MaterialTheme.typography.bodyMedium,
                                 modifier = Modifier.padding(top = 8.dp),
-                                maxLines = 8,
-                                overflow = TextOverflow.Ellipsis,
                             )
                         }
+                    }
+                }
+            } else {
+                // No review yet — surface the entry point so users don't have
+                // to dig into the add-note FAB just to write one.
+                item {
+                    OutlinedButton(
+                        onClick = { onAddReview(book.id) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.Filled.RateReview, contentDescription = null)
+                        Text(
+                            text = "  " + stringResource(R.string.action_write_review),
+                            style = MaterialTheme.typography.labelLarge,
+                        )
                     }
                 }
             }

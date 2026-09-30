@@ -156,6 +156,9 @@
     <string name="action_pick_cover">Выбрать обложку</string>
     <string name="action_take_photo">Сделать фото</string>
     <string name="action_clear_cover">Убрать обложку</string>
+    <string name="action_write_review">Написать рецензию</string>
+    <string name="action_save_review">Сохранить рецензию</string>
+    <string name="note_editor_preview">Предпросмотр</string>
     <string name="validation_title_required">Введите название</string>
     <string name="saved">Сохранено</string>
     <string name="action_save_changes">Сохранить изменения</string>

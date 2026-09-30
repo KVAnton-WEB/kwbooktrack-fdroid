@@ -15,6 +15,7 @@ import ru.antonkw.kwbooktrack.ui.importer.TellicoImportScreen
 import ru.antonkw.kwbooktrack.ui.notes.NoteDetailScreen
 import ru.antonkw.kwbooktrack.ui.notes.NoteEditorScreen
 import ru.antonkw.kwbooktrack.ui.notes.NotesListScreen
+import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
 import ru.antonkw.kwbooktrack.ui.stats.StatisticsScreen
 
 object Routes {
@@ -28,10 +29,12 @@ object Routes {
     const val ABOUT = "about"
     const val BOOK_DETAIL = "books/{bookId}"
     const val NOTE_EDITOR = "books/{bookId}/notes/new"
+    const val NOTE_EDITOR_REVIEW = "books/{bookId}/notes/new?kind=REVIEW"
     const val NOTE_EDIT = "notes/{noteId}/edit"
     const val NOTE_DETAIL = "notes/{noteId}"
     fun bookDetail(bookId: Long) = "books/$bookId"
     fun noteEditor(bookId: Long) = "books/$bookId/notes/new"
+    fun noteEditorReview(bookId: Long) = "books/$bookId/notes/new?kind=REVIEW"
     fun noteEdit(noteId: Long) = "notes/$noteId/edit"
     fun editBook(bookId: Long) = "books/$bookId/edit"
     fun noteDetail(noteId: Long) = "notes/$noteId"
@@ -104,6 +107,7 @@ fun KwBooktrackNavHost() {
             BookDetailScreen(
                 onBack = { navController.popBackStack() },
                 onAddNote = { bookId -> navController.navigate(Routes.noteEditor(bookId)) },
+                onAddReview = { bookId -> navController.navigate(Routes.noteEditorReview(bookId)) },
                 onEditBook = { bookId -> navController.navigate(Routes.editBook(bookId)) },
                 onOpenNote = { noteId -> navController.navigate(Routes.noteDetail(noteId)) },
                 onDeleted = { navController.popBackStack() },
@@ -112,6 +116,18 @@ fun KwBooktrackNavHost() {
         composable(
             route = Routes.NOTE_EDITOR,
             arguments = listOf(navArgument("bookId") { type = NavType.LongType }),
+        ) {
+            NoteEditorScreen(onBack = { navController.popBackStack() })
+        }
+        composable(
+            route = Routes.NOTE_EDITOR_REVIEW,
+            arguments = listOf(
+                navArgument("bookId") { type = NavType.LongType },
+                navArgument("kind") {
+                    type = NavType.StringType
+                    defaultValue = NoteKind.REVIEW.name
+                },
+            ),
         ) {
             NoteEditorScreen(onBack = { navController.popBackStack() })
         }

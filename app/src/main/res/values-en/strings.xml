@@ -156,6 +156,9 @@
     <string name="action_pick_cover">Pick cover</string>
     <string name="action_take_photo">Take photo</string>
     <string name="action_clear_cover">Remove cover</string>
+    <string name="action_write_review">Write review</string>
+    <string name="action_save_review">Save review</string>
+    <string name="note_editor_preview">Preview</string>
     <string name="validation_title_required">Title is required</string>
     <string name="saved">Saved</string>
     <string name="action_save_changes">Save changes</string>

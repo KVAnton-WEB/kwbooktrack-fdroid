@@ -16,8 +16,8 @@ android {
         applicationId = "ru.antonkw.kwbooktrack"
         minSdk = 31
         targetSdk = 34
-versionCode = 3
-    versionName = "0.2.1"
+versionCode = 4
+    versionName = "0.3.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -111,6 +111,7 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.zxing.android.embedded)
     implementation(libs.androidx.paging.common)
+    implementation(libs.markwon.core)
 
     debugImplementation(libs.compose.ui.tooling)
 

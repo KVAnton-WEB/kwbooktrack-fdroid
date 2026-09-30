@@ -49,6 +49,17 @@ class NoteEditorViewModel @Inject constructor(
     // existing NoteEntity to avoid detaching the note from its book on save.
     private var bookId: Long = savedStateHandle.get<Long>(KEY_BOOK_ID) ?: -1L
 
+    // Pre-selected note kind from the nav route (e.g. REVIEW for the
+    // "Write review" entry point). Edits always keep the existing kind —
+    // when noteId > 0 the loaded value below overrides this.
+    private val initialKind: NoteKind = savedStateHandle.get<String>(KEY_KIND)
+        ?.let { runCatching { NoteKind.valueOf(it) }.getOrNull() } ?: NoteKind.NOTE
+
+    // Holds the kind of an existing note being edited. Null until the
+    // note has been loaded; null for new notes (use initialKind instead).
+    private val _loadedKind = MutableStateFlow<NoteKind?>(null)
+    val loadedKind: StateFlow<NoteKind?> = _loadedKind.asStateFlow()
+
     private val _state = MutableStateFlow(NoteEditorState())
     val state: StateFlow<NoteEditorState> = _state.asStateFlow()
 
@@ -56,7 +67,10 @@ class NoteEditorViewModel @Inject constructor(
         if (noteId > 0L) {
             viewModelScope.launch {
                 val note = noteRepository.findById(noteId)
-                if (note != null) bookId = note.bookId
+                if (note != null) {
+                    bookId = note.bookId
+                    _loadedKind.value = note.kind
+                }
                 val photos = photoRepository.observeByNote(noteId).first()
                 _state.value = _state.value.copy(
                     pageText = note?.page?.toString() ?: "",
@@ -102,9 +116,10 @@ class NoteEditorViewModel @Inject constructor(
         )
     }
 
-    fun save(kind: NoteKind = NoteKind.NOTE) {
+    fun save(kind: NoteKind? = null) {
+        val effectiveKind = kind ?: _loadedKind.value ?: initialKind
         val s = _state.value
-        if (kind == NoteKind.QUOTE && s.body.isBlank()) return
+        if (effectiveKind == NoteKind.QUOTE && s.body.isBlank()) return
         if (!s.canSaveAsNote) return
         viewModelScope.launch {
             val now = System.currentTimeMillis()
@@ -113,7 +128,7 @@ class NoteEditorViewModel @Inject constructor(
                 bookId = bookId,
                 page = s.pageText.toIntOrNull(),
                 bodyMd = s.body,
-                kind = kind,
+                kind = effectiveKind,
                 createdAt = if (noteId > 0L) {
                     noteRepository.findById(noteId)?.createdAt ?: now
                 } else now,
@@ -157,5 +172,6 @@ class NoteEditorViewModel @Inject constructor(
     companion object {
         const val KEY_BOOK_ID = "bookId"
         const val KEY_NOTE_ID = "noteId"
+        const val KEY_KIND = "kind"
     }
 }
