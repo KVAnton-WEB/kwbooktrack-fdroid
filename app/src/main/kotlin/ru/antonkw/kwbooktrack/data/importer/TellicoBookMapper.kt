@@ -40,6 +40,24 @@ class TellicoBookMapper @Inject constructor() {
             finishedAt = parseDate(field(record, "Дата прочтения")),
             purchaseDate = parseDate(field(record, "Дата покупки")),
             purchasePrice = parsePrice(field(record, "Цена покупки")),
+            // v5 — extended Tellico fields. nullable() / takeUnless keeps the
+            // import idempotent: an empty CSV cell doesn't overwrite existing
+            // values (per #10/mergeWith semantics) — but here we're inserting
+            // a new row, so empty strings simply become NULL.
+            binding = nullable(record, "Переплёт"),
+            purchasePlace = nullable(record, "Место покупки"),
+            series = nullable(record, "Серия"),
+            seriesNumber = nullable(record, "Номер серии"),
+            condition = nullable(record, "Состояние"),
+            translator = nullable(record, "Переводчик"),
+            printYear = field(record, "Год сдачи в печать")?.toIntOrNull(),
+            printPages = field(record, "Усл. печ. л.")?.toIntOrNull(),
+            originalLanguage = nullable(record, "Язык оригинала"),
+            originalTitle = nullable(record, "Оригинальное название"),
+            annotation = nullable(record, "Аннотация"),
+            isGift = parseBool(record, "Подарок"),
+            isLent = parseBool(record, "Одолжено"),
+            isSold = parseBool(record, "Продано?"),
             createdAt = now,
             updatedAt = now,
             source = BookSource.TELLICO,
@@ -58,6 +76,17 @@ class TellicoBookMapper @Inject constructor() {
 
     private fun field(record: CSVRecord, name: String): String? =
         if (record.isMapped(name)) record.get(name)?.trim() else null
+
+    /** Like [field], but converts blank strings to null so the DB column
+     *  stays NULL instead of carrying an empty-string marker. */
+    private fun nullable(record: CSVRecord, name: String): String? =
+        field(record, name)?.takeUnless { it.isBlank() }
+
+    /** Tellico stores booleans as localized strings ("Да", "Нет", "true"). */
+    private fun parseBool(record: CSVRecord, name: String): Boolean {
+        val raw = field(record, name)?.lowercase() ?: return false
+        return raw in setOf("true", "yes", "да", "1", "yes", "y")
+    }
 
     private fun isRead(record: CSVRecord): Boolean {
         val flag = field(record, "Прочитано")?.lowercase() ?: return false

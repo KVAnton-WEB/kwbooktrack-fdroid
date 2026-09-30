@@ -59,8 +59,37 @@ data class BookEntity(
     val purchaseDate: Long? = null,
     @ColumnInfo(name = "purchase_price")
     val purchasePrice: Double? = null,
-    @ColumnInfo(name = "title_search", defaultValue = "")
+    @ColumnInfo(name = "title_search")
     val titleSearch: String = "",
-    @ColumnInfo(name = "author_search", defaultValue = "")
+    @ColumnInfo(name = "author_search")
     val authorSearch: String = "",
+    // --- v5: extended Tellico fields ---
+    @ColumnInfo(name = "binding")
+    val binding: String? = null,
+    @ColumnInfo(name = "purchase_place")
+    val purchasePlace: String? = null,
+    @ColumnInfo(name = "series")
+    val series: String? = null,
+    @ColumnInfo(name = "series_number")
+    val seriesNumber: String? = null,
+    @ColumnInfo(name = "condition")
+    val condition: String? = null,
+    @ColumnInfo(name = "translator")
+    val translator: String? = null,
+    @ColumnInfo(name = "print_year")
+    val printYear: Int? = null,
+    @ColumnInfo(name = "print_pages")
+    val printPages: Int? = null,
+    @ColumnInfo(name = "original_language")
+    val originalLanguage: String? = null,
+    @ColumnInfo(name = "original_title")
+    val originalTitle: String? = null,
+    @ColumnInfo(name = "annotation")
+    val annotation: String? = null,
+    @ColumnInfo(name = "is_gift")
+    val isGift: Boolean = false,
+    @ColumnInfo(name = "is_lent")
+    val isLent: Boolean = false,
+    @ColumnInfo(name = "is_sold")
+    val isSold: Boolean = false,
 )

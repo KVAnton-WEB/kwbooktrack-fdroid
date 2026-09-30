@@ -111,6 +111,20 @@ class ExportZipUseCase @Inject constructor(
                     csvField(book.status.name),
                     csvField(epochToDate(book.startedAt)),
                     csvField(epochToDate(book.finishedAt)),
+                    csvField(book.binding.orEmpty()),
+                    csvField(book.purchasePlace.orEmpty()),
+                    csvField(book.series.orEmpty()),
+                    csvField(book.seriesNumber.orEmpty()),
+                    csvField(book.condition.orEmpty()),
+                    csvField(book.translator.orEmpty()),
+                    csvField(book.printYear?.toString().orEmpty()),
+                    csvField(book.printPages?.toString().orEmpty()),
+                    csvField(book.originalLanguage.orEmpty()),
+                    csvField(book.originalTitle.orEmpty()),
+                    csvField(book.annotation.orEmpty()),
+                    csvField(if (book.isGift) "1" else ""),
+                    csvField(if (book.isLent) "1" else ""),
+                    csvField(if (book.isSold) "1" else ""),
                 ).joinToString(";")
                 zip.write(line.toByteArray(StandardCharsets.UTF_8))
                 zip.write("\n".toByteArray(StandardCharsets.UTF_8))
@@ -151,7 +165,7 @@ class ExportZipUseCase @Inject constructor(
 
     companion object {
         private val JSON = Json { prettyPrint = false }
-        const val BOOKS_HEADER = "title;subtitle;author;isbn13;page_count;language;genre;publisher;year;cover_path;rating;status;started_at;finished_at"
+        const val BOOKS_HEADER = "title;subtitle;author;isbn13;page_count;language;genre;publisher;year;cover_path;rating;status;started_at;finished_at;binding;purchase_place;series;series_number;condition;translator;print_year;print_pages;original_language;original_title;annotation;is_gift;is_lent;is_sold"
     }
 }
 

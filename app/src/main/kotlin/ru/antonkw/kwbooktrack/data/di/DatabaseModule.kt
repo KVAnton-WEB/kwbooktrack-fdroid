@@ -28,6 +28,14 @@ object DatabaseModule {
             // it, observeAll() in BookListScreen blocks on the writer's
             // transaction and the UI freezes until the import finishes.
             .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
+            // Explicit migrations for every step — AutoMigration needs a
+            // checked-in json per step, which we don't ship.
+            .addMigrations(
+                ru.antonkw.kwbooktrack.data.db.migration.Migrate1To2,
+                ru.antonkw.kwbooktrack.data.db.migration.Migrate2To3,
+                ru.antonkw.kwbooktrack.data.db.migration.Migrate3To4,
+                ru.antonkw.kwbooktrack.data.db.migration.Migrate4To5,
+            )
             // Авто-миграции 1→2 и 2→3 объявлены в KwBooktrackDatabase.
             // fallbackToDestructiveMigration намеренно не используется:
             // первое же обновление схемы после релиза должно пройти

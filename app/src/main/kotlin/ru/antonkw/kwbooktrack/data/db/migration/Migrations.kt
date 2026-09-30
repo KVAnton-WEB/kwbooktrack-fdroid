@@ -1,25 +1,27 @@
 package ru.antonkw.kwbooktrack.data.db.migration
 
-import androidx.room.DeleteTable
-import androidx.room.migration.AutoMigrationSpec
+import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 /**
- * Миграция v1 → v2.
+ * Migration v1 → v2.
  *
- * Room автодетектит добавление колонок `title_search` / `author_search` (NOT NULL с DEFAULT ''),
- * но не умеет сам удалить virtual table FTS4 и связанные триггеры, которые были в v1
- * и пропали в v2 — поэтому AutoMigrationSpec указан явно.
+ * Adds the `title_search` / `author_search` columns (NOT NULL DEFAULT '')
+ * that the v2 BookEntity introduced for fast LIKE searches, and tears
+ * down the FTS4 virtual table + content-sync triggers that v1 used to
+ * keep those columns populated. Room can't auto-drop the triggers
+ * because their existence isn't visible from the schema diff.
  */
-@DeleteTable.Entries(
-    DeleteTable(tableName = "books_fts"),
-)
-class Migrate1To2 : AutoMigrationSpec {
-    override fun onPostMigrate(db: SupportSQLiteDatabase) {
-        // v1 schema created six FTS4 content-sync triggers (BEFORE/AFTER ×
-        // INSERT/UPDATE/DELETE); the v1→v2 migration only drops the virtual
-        // table itself. Any orphaned trigger would block future DDL on the
-        // `books` table. Drop them all by name pattern from sqlite_master.
+val Migrate1To2: Migration = object : Migration(1, 2) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // Add the lowercase search columns Room auto-detects would have added.
+        db.execSQL("ALTER TABLE books ADD COLUMN title_search TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE books ADD COLUMN author_search TEXT NOT NULL DEFAULT ''")
+        // Drop the FTS4 virtual table that v1 maintained.
+        db.execSQL("DROP TABLE IF EXISTS books_fts")
+        // Drop any orphaned FTS content-sync triggers left on the books table
+        // (BEFORE/AFTER × INSERT/UPDATE/DELETE = up to six). Pattern from
+        // sqlite_master so we don't have to know exact names.
         db.query(
             "SELECT name FROM sqlite_master WHERE type = 'trigger' AND tbl_name = 'books' AND name LIKE 'room_fts_content_sync_books_fts_%'",
         ).use { cursor ->

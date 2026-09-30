@@ -87,6 +87,7 @@ fun BookDetailScreen(
     var notesQuery by remember { mutableStateOf("") }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showFinishDialog by remember { mutableStateOf(false) }
+    var showInfoDialog by remember { mutableStateOf(false) }
     var tempRating by remember { mutableStateOf(0) }
     val book = state.book
 
@@ -110,6 +111,13 @@ fun BookDetailScreen(
                     Text(stringResource(R.string.action_cancel))
                 }
             },
+        )
+    }
+
+    if (showInfoDialog && book != null) {
+        ru.antonkw.kwbooktrack.ui.common.BookInfoDialog(
+            book = book,
+            onDismiss = { showInfoDialog = false },
         )
     }
 
@@ -205,6 +213,43 @@ fun BookDetailScreen(
                                 }
                             }
                         }
+                    }
+                }
+            }
+
+            // v5: surface the new Tellico fields the user already cares about
+            // (binding, subtitle, series). All other new fields live behind
+            // the "Show all details" dialog — they clutter the main view.
+            val v5Line = listOfNotNull(
+                book.subtitle,
+                book.series?.let { s -> book.seriesNumber?.let { n -> "$s #$n" } ?: s },
+                book.binding,
+            )
+            if (v5Line.isNotEmpty()) {
+                item {
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                text = v5Line.joinToString(" · "),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            OutlinedButton(
+                                onClick = { showInfoDialog = true },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text(stringResource(R.string.book_info_show_all))
+                            }
+                        }
+                    }
+                }
+            } else {
+                item {
+                    OutlinedButton(
+                        onClick = { showInfoDialog = true },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(stringResource(R.string.book_info_show_all))
                     }
                 }
             }

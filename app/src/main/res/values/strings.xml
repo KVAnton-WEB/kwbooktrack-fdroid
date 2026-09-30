@@ -17,6 +17,26 @@
     <string name="about_finished_books">Finished: %1$d of %2$d (%3$d%%)</string>
     <string name="about_book_deleted_fallback">(book deleted)</string>
 
+    <!-- Book fields (v5) -->
+    <string name="field_binding">Переплёт</string>
+    <string name="field_purchase_place">Место покупки</string>
+    <string name="field_series">Серия</string>
+    <string name="field_series_number">Номер серии</string>
+    <string name="field_condition">Состояние</string>
+    <string name="field_translator">Переводчик</string>
+    <string name="field_print_year">Год сдачи в печать</string>
+    <string name="field_print_pages">Усл. печ. л.</string>
+    <string name="field_original_language">Язык оригинала</string>
+    <string name="field_original_title">Оригинальное название</string>
+    <string name="field_annotation">Аннотация</string>
+    <string name="field_is_gift">Подарок</string>
+    <string name="field_is_lent">Одолжено</string>
+    <string name="field_is_sold">Продано</string>
+    <string name="book_info_show_all">Все детали</string>
+    <string name="book_info_dialog_title">Информация о книге</string>
+    <string name="book_info_dialog_close">Закрыть</string>
+    <string name="book_info_copied">Скопировано: %1$s</string>
+
     <!-- Common -->
     <string name="action_back">Назад</string>
     <string name="action_cancel">Отмена</string>
@@ -154,6 +174,8 @@
     <string name="label_isbn">ISBN (13 цифр)</string>
     <string name="label_page_count">Страниц</string>
     <string name="label_year">Год</string>
+    <string name="label_price">Цена</string>
+    <string name="label_started_on">Начато: %1$s</string>
     <string name="label_publisher">Издательство</string>
     <string name="label_genre">Жанр</string>
     <string name="label_purchase_date">Дата покупки (dd.MM.yyyy)</string>

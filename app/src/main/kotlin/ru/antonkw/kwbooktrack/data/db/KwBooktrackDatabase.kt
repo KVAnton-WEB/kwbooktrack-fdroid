@@ -27,18 +27,15 @@ import ru.antonkw.kwbooktrack.data.db.migration.Migrate1To2
         TagEntity::class,
         BookTagCrossRef::class,
     ],
-    version = 4,
-    exportSchema = true,
-    autoMigrations = [
-        // v1 → v2: добавлены title_search / author_search (Room автодетектит),
-        // плюс spec, потому что v1 содержал FTS4 virtual table и триггеры,
-        // которые нужно явно удалить.
-        AutoMigration(from = 1, to = 2, spec = Migrate1To2::class),
-        // v2 → v3: добавлены nullable purchase_date / purchase_price — чистый auto.
-        AutoMigration(from = 2, to = 3),
-        // v3 → v4: Index on notes(kind) for observeByKind / countByKind.
-        AutoMigration(from = 3, to = 4),
-    ],
+    version = 5,
+    // Schema export is disabled: all transitions are explicit Migrations
+    // wired into DatabaseModule via .addMigrations(...), so Room doesn't
+    // need a checked-in json file per step. The previous
+    // 1.json / 2.json / 3.json / 4.json stay around for reference but
+    // aren't read by the build.
+    exportSchema = false,
+    // No autoMigrations — every step is a hand-written ALTER TABLE.
+    autoMigrations = [],
 )
 @TypeConverters(Converters::class)
 abstract class KwBooktrackDatabase : RoomDatabase() {

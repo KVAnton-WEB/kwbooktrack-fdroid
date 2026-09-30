@@ -17,6 +17,26 @@
     <string name="about_finished_books">Finished: %1$d of %2$d (%3$d%%)</string>
     <string name="about_book_deleted_fallback">(book deleted)</string>
 
+    <!-- Book fields (v5) -->
+    <string name="field_binding">Binding</string>
+    <string name="field_purchase_place">Purchase place</string>
+    <string name="field_series">Series</string>
+    <string name="field_series_number">Series number</string>
+    <string name="field_condition">Condition</string>
+    <string name="field_translator">Translator</string>
+    <string name="field_print_year">Print year</string>
+    <string name="field_print_pages">Print pages</string>
+    <string name="field_original_language">Original language</string>
+    <string name="field_original_title">Original title</string>
+    <string name="field_annotation">Annotation</string>
+    <string name="field_is_gift">Gift</string>
+    <string name="field_is_lent">Lent out</string>
+    <string name="field_is_sold">Sold</string>
+    <string name="book_info_show_all">Show all details</string>
+    <string name="book_info_dialog_title">Book information</string>
+    <string name="book_info_dialog_close">Close</string>
+    <string name="book_info_copied">Copied: %1$s</string>
+
     <!-- Common -->
     <string name="action_back">Back</string>
     <string name="action_cancel">Cancel</string>
@@ -154,6 +174,8 @@
     <string name="label_isbn">ISBN (13 digits)</string>
     <string name="label_page_count">Pages</string>
     <string name="label_year">Year</string>
+    <string name="label_price">Price</string>
+    <string name="label_started_on">Started: %1$s</string>
     <string name="label_publisher">Publisher</string>
     <string name="label_genre">Genre</string>
     <string name="label_purchase_date">Purchase date (yyyy-MM-dd)</string>
