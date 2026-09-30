@@ -142,7 +142,14 @@ class BookDetailViewModelTest {
         val viewModel = viewModelForBook(bookId)
         viewModel.deleteBook()
         advanceUntilIdle()
-        kotlinx.coroutines.delay(100)
+        // viewModel.deleteBook uses viewModelScope.launch which runs on the Main
+        // dispatcher — under runTest with StandardTestDispatcher, the launched
+        // coroutine still gets scheduled on the test scheduler and finishes with
+        // advanceUntilIdle, but Room's invalidate path can still need one extra
+        // tick for observers to see the delete. Yield until the book is gone.
+        while (bookRepository.findById(bookId) != null) {
+            advanceUntilIdle()
+        }
 
         assertThat(bookRepository.findById(bookId)).isNull()
         assertThat(db.readingSessionDao().observeByBook(bookId).first()).isEmpty()

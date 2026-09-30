@@ -2,6 +2,7 @@ package ru.antonkw.kwbooktrack.ui.books
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -149,11 +150,14 @@ fun BookDetailScreen(
             return@Scaffold
         }
 
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
+        val detailListState = androidx.compose.foundation.lazy.rememberLazyListState()
+        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+            LazyColumn(
+                state = detailListState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
             item {
                 Card {
                     Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
@@ -420,6 +424,11 @@ fun BookDetailScreen(
 
             // Padding снизу чтобы FAB не перекрывал последний элемент
             item { Spacer(modifier = Modifier.height(72.dp)) }
+            }
+            ru.antonkw.kwbooktrack.ui.common.VerticalDraggableScrollbar(
+                state = detailListState,
+                modifier = Modifier.align(Alignment.CenterEnd),
+            )
         }
     }
 }

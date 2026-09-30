@@ -243,44 +243,55 @@ fun BookListScreen(
                                 style = MaterialTheme.typography.bodyMedium,
                             )
                         }
-                    } else if (isGrid) {
-                        val rows = remember(s.books) { s.books.chunked(3) }
-                        LazyColumn(
-                            contentPadding = PaddingValues(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                            modifier = Modifier.fillMaxSize(),
-                        ) {
-                            itemsIndexed(rows, key = { i, row -> "${row.firstOrNull()?.book?.id ?: 0L}_$i" }) { i, row ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(IntrinsicSize.Max),
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    } else {
+                        val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            if (isGrid) {
+                                val rows = remember(s.books) { s.books.chunked(3) }
+                                LazyColumn(
+                                    state = listState,
+                                    contentPadding = PaddingValues(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                                    modifier = Modifier.fillMaxSize(),
                                 ) {
-                                    row.forEach { item ->
-                                        BookCoverCard(
-                                            item = item,
-                                            onClick = { onBookClick(item.book.id) },
+                                    itemsIndexed(rows, key = { i, row -> "${row.firstOrNull()?.book?.id ?: 0L}_$i" }) { i, row ->
+                                        Row(
                                             modifier = Modifier
-                                                .weight(1f)
-                                                .fillMaxHeight(),
-                                        )
+                                                .fillMaxWidth()
+                                                .height(IntrinsicSize.Max),
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                        ) {
+                                            row.forEach { item ->
+                                                BookCoverCard(
+                                                    item = item,
+                                                    onClick = { onBookClick(item.book.id) },
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .fillMaxHeight(),
+                                                )
+                                            }
+                                            repeat(3 - row.size) {
+                                                Box(modifier = Modifier.weight(1f))
+                                            }
+                                        }
                                     }
-                                    repeat(3 - row.size) {
-                                        Box(modifier = Modifier.weight(1f))
+                                }
+                            } else {
+                                LazyColumn(
+                                    state = listState,
+                                    contentPadding = PaddingValues(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.fillMaxSize(),
+                                ) {
+                                    items(s.books, key = { it.book.id }) {
+                                        BookListCard(it, onClick = { onBookClick(it.book.id) })
                                     }
                                 }
                             }
-                        }
-                    } else {
-                        LazyColumn(
-                            contentPadding = PaddingValues(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.fillMaxSize(),
-                        ) {
-                            items(s.books, key = { it.book.id }) {
-                                BookListCard(it, onClick = { onBookClick(it.book.id) })
-                            }
+                            ru.antonkw.kwbooktrack.ui.common.VerticalDraggableScrollbar(
+                                state = listState,
+                                modifier = Modifier.align(Alignment.CenterEnd),
+                            )
                         }
                     }
                 }

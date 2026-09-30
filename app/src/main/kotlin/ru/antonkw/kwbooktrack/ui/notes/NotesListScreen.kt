@@ -96,17 +96,25 @@ fun NotesListScreen(
                             )
                         }
                     } else {
-                        LazyColumn(
-                            contentPadding = PaddingValues(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.fillMaxSize(),
-                        ) {
-                            items(s.items, key = { it.note.id }) { item ->
-                                NoteListRow(
-                                    item = item,
-                                    onClick = { onOpenNote(item.note.id) },
-                                )
+                        val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            LazyColumn(
+                                state = listState,
+                                contentPadding = PaddingValues(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.fillMaxSize(),
+                            ) {
+                                items(s.items, key = { it.note.id }) { item ->
+                                    NoteListRow(
+                                        item = item,
+                                        onClick = { onOpenNote(item.note.id) },
+                                    )
+                                }
                             }
+                            ru.antonkw.kwbooktrack.ui.common.VerticalDraggableScrollbar(
+                                state = listState,
+                                modifier = Modifier.align(Alignment.CenterEnd),
+                            )
                         }
                     }
                 }
