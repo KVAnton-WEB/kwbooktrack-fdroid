@@ -10,9 +10,9 @@
     <string name="about_backup_title">Резервные копии</string>
     <string name="about_backup_description">Экспорт библиотеки в ZIP-архив с CSV и обложками, либо импорт ранее сохранённого архива.</string>
     <string name="action_export">Экспорт</string>
-    <string name="action_import">Импорт</string>
     <string name="export_success_format">Экспорт готов: %1$d книг, %2$d фото</string>
     <string name="export_failed_format">Не удалось экспортировать: %1$s</string>
+    <string name="export_failed_unknown">Не удалось экспортировать: неизвестная ошибка</string>
     <string name="about_total_books">Total books: %1$d</string>
     <string name="about_finished_books">Finished: %1$d of %2$d (%3$d%%)</string>
     <string name="about_book_deleted_fallback">(book deleted)</string>

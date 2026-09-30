@@ -1,12 +1,10 @@
 package ru.antonkw.kwbooktrack.ui.about
 
-import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -122,7 +120,3 @@ class AboutExportViewModelTest {
         assertThat(sink.toByteArray().copyOf(2).toString(Charsets.UTF_8)).isEqualTo("PK")
     }
 }
-
-// Suppress unused import warning — Uri is imported for type clarity even
-// when the surviving tests don't reference it directly.
-@Suppress("unused") private val keepUriImport: Uri? = null

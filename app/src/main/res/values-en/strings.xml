@@ -3,19 +3,19 @@
     <string name="app_name">kwbooktrack</string>
 
     <!-- About -->
-    <string name="about_title">О приложении</string>
-    <string name="about_back">Назад</string>
-    <string name="about_version">Версия</string>
-    <string name="about_library">Библиотека</string>
+    <string name="about_title">About</string>
+    <string name="about_back">Back</string>
+    <string name="about_version">Version</string>
+    <string name="about_library">Library</string>
     <string name="about_backup_title">Backup</string>
     <string name="about_backup_description">Export your library to a ZIP archive with CSV and covers, or import a previously saved archive.</string>
     <string name="action_export">Export</string>
-    <string name="action_import">Import</string>
     <string name="export_success_format">Export ready: %1$d books, %2$d photos</string>
     <string name="export_failed_format">Export failed: %1$s</string>
-    <string name="about_total_books">Всего книг: %1$d</string>
-    <string name="about_finished_books">Прочитано: %1$d из %2$d (%3$d%%)</string>
-    <string name="about_book_deleted_fallback">(книга удалена)</string>
+    <string name="export_failed_unknown">Export failed: unknown error</string>
+    <string name="about_total_books">Total books: %1$d</string>
+    <string name="about_finished_books">Finished: %1$d of %2$d (%3$d%%)</string>
+    <string name="about_book_deleted_fallback">(book deleted)</string>
 
     <!-- Common -->
     <string name="action_back">Back</string>

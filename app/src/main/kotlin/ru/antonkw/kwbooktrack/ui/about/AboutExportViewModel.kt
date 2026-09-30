@@ -19,7 +19,7 @@ import javax.inject.Inject
 data class AboutExportState(
     val inProgress: Boolean = false,
     val lastManifest: ExportManifest? = null,
-    val error: String? = null,
+    val error: Throwable? = null,
 )
 
 /**
@@ -48,7 +48,12 @@ class AboutExportViewModel @Inject constructor(
             _state.value = if (outcome.isSuccess) {
                 AboutExportState(lastManifest = outcome.getOrNull())
             } else {
-                AboutExportState(error = outcome.exceptionOrNull()?.message)
+                // Keep the Throwable itself — UI shows the message when present
+                // and falls back to a localized "unknown error" string when it
+                // isn't. Some SecurityException paths and third-party libs
+                // ship null messages; rendering nothing on those would be the
+                // worst possible feedback.
+                AboutExportState(error = outcome.exceptionOrNull())
             }
         }
     }

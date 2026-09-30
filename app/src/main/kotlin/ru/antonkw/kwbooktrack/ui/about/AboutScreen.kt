@@ -107,7 +107,10 @@ fun AboutScreen(
     }
     LaunchedEffect(exportState.error) {
         val err = exportState.error ?: return@LaunchedEffect
-        snackbarHostState.showSnackbar(context.getString(R.string.export_failed_format, err))
+        val text = err.message?.let { msg ->
+            context.getString(R.string.export_failed_format, msg)
+        } ?: context.getString(R.string.export_failed_unknown)
+        snackbarHostState.showSnackbar(text)
         exportViewModel.acknowledge()
     }
 
@@ -180,20 +183,14 @@ fun AboutScreen(
                         } else {
                             Icon(Icons.Filled.FileUpload, contentDescription = null)
                         }
-                        Text(
-                            text = "  " + stringResource(R.string.action_export),
-                            modifier = Modifier.padding(start = 4.dp),
-                        )
+                        Text(text = stringResource(R.string.action_export))
                     }
                     OutlinedButton(
                         onClick = onImportClick,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Icon(Icons.Filled.FileDownload, contentDescription = null)
-                        Text(
-                            text = "  " + stringResource(R.string.action_import),
-                            modifier = Modifier.padding(start = 4.dp),
-                        )
+                        Text(text = stringResource(R.string.action_import_tellico))
                     }
                 }
             }
