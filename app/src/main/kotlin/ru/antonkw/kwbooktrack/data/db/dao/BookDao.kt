@@ -103,6 +103,11 @@ interface BookDao {
  * Merge for imports: keep the existing row's non-null fields when the
  * incoming value is null/default. Source is preserved so re-importing via
  * Tellico does not overwrite Bookmory-sourced rows (and vice versa).
+ *
+ * Booleans are not merged — Tellico's `Подарок` cell is "да"/"нет"/blank,
+ * and "да"→true is the only state we care about. A re-import with a blank
+ * cell writes the import-side default (false), which is the desired
+ * "lost in source → drop the flag" semantics.
  */
 private fun BookEntity.mergeWith(existing: BookEntity): BookEntity = copy(
     id = existing.id,
@@ -123,4 +128,21 @@ private fun BookEntity.mergeWith(existing: BookEntity): BookEntity = copy(
     source = existing.source,
     purchaseDate = purchaseDate ?: existing.purchaseDate,
     purchasePrice = purchasePrice ?: existing.purchasePrice,
+    // v5 — every nullable field falls back to the existing value so an
+    // empty CSV cell (Bookmory importer, malformed row, omitted column)
+    // doesn't overwrite a field the user set by hand.
+    binding = binding ?: existing.binding,
+    purchasePlace = purchasePlace ?: existing.purchasePlace,
+    series = series ?: existing.series,
+    seriesNumber = seriesNumber ?: existing.seriesNumber,
+    condition = condition ?: existing.condition,
+    translator = translator ?: existing.translator,
+    printYear = printYear ?: existing.printYear,
+    printPages = printPages ?: existing.printPages,
+    originalLanguage = originalLanguage ?: existing.originalLanguage,
+    originalTitle = originalTitle ?: existing.originalTitle,
+    annotation = annotation ?: existing.annotation,
+    isGift = isGift.takeIf { it } ?: existing.isGift,
+    isLent = isLent.takeIf { it } ?: existing.isLent,
+    isSold = isSold.takeIf { it } ?: existing.isSold,
 )

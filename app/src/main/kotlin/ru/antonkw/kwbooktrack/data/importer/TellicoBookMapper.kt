@@ -26,7 +26,7 @@ class TellicoBookMapper @Inject constructor() {
         val now = System.currentTimeMillis()
         val book = BookEntity(
             title = title.ifEmpty { "(без названия)" },
-            subtitle = field(record, "Подзаголовок")?.takeUnless { it.isEmpty() },
+            subtitle = nullable(record, "Подзаголовок"),
             author = author.ifEmpty { "(автор неизвестен)" },
             isbn13 = normalizeIsbn(field(record, "ISBN#")),
             pageCount = field(record, "Количество страниц")?.toIntOrNull(),
@@ -85,7 +85,7 @@ class TellicoBookMapper @Inject constructor() {
     /** Tellico stores booleans as localized strings ("Да", "Нет", "true"). */
     private fun parseBool(record: CSVRecord, name: String): Boolean {
         val raw = field(record, name)?.lowercase() ?: return false
-        return raw in setOf("true", "yes", "да", "1", "yes", "y")
+        return raw in setOf("true", "yes", "да", "1", "y")
     }
 
     private fun isRead(record: CSVRecord): Boolean {

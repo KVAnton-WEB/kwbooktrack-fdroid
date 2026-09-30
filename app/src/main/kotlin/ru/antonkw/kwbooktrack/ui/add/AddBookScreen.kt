@@ -83,12 +83,27 @@ fun AddBookScreen(
 
     // A new book with even a single keystroke in title/author/etc. is worth
     // prompting for — silently dropping user input on back was the old behaviour.
-    val hasUserInput = remember(state.title, state.author, state.isbn, state.pageCount,
-        state.year, state.publisher, state.genre, state.purchaseDate, state.purchasePrice) {
+    // v5 — also covers the new v5 string/boolean fields and the v3 rating, so
+    // a user filling only the new checkboxes still gets the discard prompt.
+    val hasUserInput = remember(
+        state.title, state.author, state.isbn, state.pageCount,
+        state.year, state.publisher, state.genre, state.purchaseDate, state.purchasePrice,
+        state.subtitle, state.binding, state.series, state.seriesNumber,
+        state.condition, state.translator, state.printYear, state.printPages,
+        state.originalLanguage, state.originalTitle, state.annotation, state.purchasePlace,
+        state.isGift, state.isLent, state.isSold, state.coverPath, state.rating,
+    ) {
         state.title.isNotBlank() || state.author.isNotBlank() || state.isbn.isNotBlank() ||
             state.pageCount.isNotBlank() || state.year.isNotBlank() ||
             state.publisher.isNotBlank() || state.genre.isNotBlank() ||
             state.purchaseDate.isNotBlank() || state.purchasePrice.isNotBlank() ||
+            state.subtitle.isNotBlank() || state.binding.isNotBlank() ||
+            state.series.isNotBlank() || state.seriesNumber.isNotBlank() ||
+            state.condition.isNotBlank() || state.translator.isNotBlank() ||
+            state.printYear.isNotBlank() || state.printPages.isNotBlank() ||
+            state.originalLanguage.isNotBlank() || state.originalTitle.isNotBlank() ||
+            state.annotation.isNotBlank() || state.purchasePlace.isNotBlank() ||
+            state.isGift || state.isLent || state.isSold ||
             state.coverPath != null || state.rating != null
     }
     val handleBack = {
