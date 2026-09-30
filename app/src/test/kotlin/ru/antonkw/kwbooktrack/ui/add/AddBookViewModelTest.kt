@@ -101,4 +101,92 @@ class AddBookViewModelTest {
         val books = db.bookDao().observeAll().first()
         assertThat(books.first().isbn13).isNull() // only 13-digit ISBNs are stored
     }
+
+    @Test
+    fun v5ExtendedFieldsRoundtripThroughSave() = runTest(dispatcher) {
+        // v5 — confirm the AddBookViewModel setters and save() roundtrip
+        // the full new field set: subtitles, series, gift/lent/sold, etc.
+        val vm = AddBookViewModel(
+            androidx.lifecycle.SavedStateHandle(),
+            bookRepository,
+            ApplicationProvider.getApplicationContext(),
+        )
+        vm.setTitle("Hyperion")
+        vm.setAuthor("Dan Simmons")
+        vm.setSubtitle("Песни Гипериона")
+        vm.setBinding("Твёрдый")
+        vm.setSeries("Гиперион")
+        vm.setSeriesNumber("1")
+        vm.setCondition("Новое")
+        vm.setTranslator("А. Клементьев")
+        vm.setPrintYear("2018")
+        vm.setPrintPages("32")
+        vm.setOriginalLanguage("en")
+        vm.setOriginalTitle("Hyperion")
+        vm.setAnnotation("Далёкое будущее...")
+        vm.setPurchasePlace("Лабиринт")
+        vm.setIsGift(true)
+        vm.setIsLent(false)
+        vm.setIsSold(false)
+        vm.save()
+        advanceUntilIdle()
+
+        val book = db.bookDao().observeAll().first().first()
+        assertThat(book.subtitle).isEqualTo("Песни Гипериона")
+        assertThat(book.binding).isEqualTo("Твёрдый")
+        assertThat(book.series).isEqualTo("Гиперион")
+        assertThat(book.seriesNumber).isEqualTo("1")
+        assertThat(book.condition).isEqualTo("Новое")
+        assertThat(book.translator).isEqualTo("А. Клементьев")
+        assertThat(book.printYear).isEqualTo(2018)
+        assertThat(book.printPages).isEqualTo(32)
+        assertThat(book.originalLanguage).isEqualTo("en")
+        assertThat(book.originalTitle).isEqualTo("Hyperion")
+        assertThat(book.annotation).isEqualTo("Далёкое будущее...")
+        assertThat(book.purchasePlace).isEqualTo("Лабиринт")
+        assertThat(book.isGift).isTrue()
+        assertThat(book.isLent).isFalse()
+        assertThat(book.isSold).isFalse()
+    }
+
+    @Test
+    fun emptyV5FieldsCollapseToNullOnSave() = runTest(dispatcher) {
+        // The "user clears the field" path: setters write "" to state, but
+        // save() must map "" → null so the column stays NULL instead of
+        // carrying an empty-string marker.
+        val vm = AddBookViewModel(
+            androidx.lifecycle.SavedStateHandle(),
+            bookRepository,
+            ApplicationProvider.getApplicationContext(),
+        )
+        vm.setTitle("Foo")
+        vm.setAuthor("Bar")
+        vm.setSubtitle("")
+        vm.setSeries("   ")
+        vm.save()
+        advanceUntilIdle()
+
+        val book = db.bookDao().observeAll().first().first()
+        assertThat(book.subtitle).isNull()
+        assertThat(book.series).isNull()
+    }
+
+    @Test
+    fun printYearAndPrintPagesParseInt() = runTest(dispatcher) {
+        val vm = AddBookViewModel(
+            androidx.lifecycle.SavedStateHandle(),
+            bookRepository,
+            ApplicationProvider.getApplicationContext(),
+        )
+        vm.setTitle("Foo")
+        vm.setAuthor("Bar")
+        vm.setPrintYear("20abc18")
+        vm.setPrintPages("3.2")
+        vm.save()
+        advanceUntilIdle()
+
+        val book = db.bookDao().observeAll().first().first()
+        assertThat(book.printYear).isEqualTo(2018)
+        assertThat(book.printPages).isEqualTo(32)
+    }
 }

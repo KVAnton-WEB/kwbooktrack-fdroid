@@ -39,6 +39,22 @@ data class AddBookState(
     val coverPath: String? = null,
     val purchaseDate: String = "",
     val purchasePrice: String = "",
+    // --- v5: extended Tellico fields ---
+    val subtitle: String = "",
+    val binding: String = "",
+    val series: String = "",
+    val seriesNumber: String = "",
+    val condition: String = "",
+    val translator: String = "",
+    val printYear: String = "",
+    val printPages: String = "",
+    val originalLanguage: String = "",
+    val originalTitle: String = "",
+    val annotation: String = "",
+    val purchasePlace: String = "",
+    val isGift: Boolean = false,
+    val isLent: Boolean = false,
+    val isSold: Boolean = false,
     val saved: Boolean = false,
     val loading: Boolean = false,
 )
@@ -127,6 +143,21 @@ class AddBookViewModel @Inject constructor(
                         coverPath = book.coverPath,
                         purchaseDate = book.purchaseDate?.let { formatDate(it) }.orEmpty(),
                         purchasePrice = book.purchasePrice?.let { formatPrice(it) }.orEmpty(),
+                        subtitle = book.subtitle.orEmpty(),
+                        binding = book.binding.orEmpty(),
+                        series = book.series.orEmpty(),
+                        seriesNumber = book.seriesNumber.orEmpty(),
+                        condition = book.condition.orEmpty(),
+                        translator = book.translator.orEmpty(),
+                        printYear = book.printYear?.toString().orEmpty(),
+                        printPages = book.printPages?.toString().orEmpty(),
+                        originalLanguage = book.originalLanguage.orEmpty(),
+                        originalTitle = book.originalTitle.orEmpty(),
+                        annotation = book.annotation.orEmpty(),
+                        purchasePlace = book.purchasePlace.orEmpty(),
+                        isGift = book.isGift,
+                        isLent = book.isLent,
+                        isSold = book.isSold,
                         loading = false,
                     )
                 } else {
@@ -149,6 +180,21 @@ class AddBookViewModel @Inject constructor(
         val cleaned = value.replace(',', '.').filter { it.isDigit() || it == '.' }
         _state.value = _state.value.copy(purchasePrice = cleaned)
     }
+    fun setSubtitle(value: String) { _state.value = _state.value.copy(subtitle = value) }
+    fun setBinding(value: String) { _state.value = _state.value.copy(binding = value) }
+    fun setSeries(value: String) { _state.value = _state.value.copy(series = value) }
+    fun setSeriesNumber(value: String) { _state.value = _state.value.copy(seriesNumber = value) }
+    fun setCondition(value: String) { _state.value = _state.value.copy(condition = value) }
+    fun setTranslator(value: String) { _state.value = _state.value.copy(translator = value) }
+    fun setPrintYear(value: String) { _state.value = _state.value.copy(printYear = value.filter { it.isDigit() }) }
+    fun setPrintPages(value: String) { _state.value = _state.value.copy(printPages = value.filter { it.isDigit() }) }
+    fun setOriginalLanguage(value: String) { _state.value = _state.value.copy(originalLanguage = value) }
+    fun setOriginalTitle(value: String) { _state.value = _state.value.copy(originalTitle = value) }
+    fun setAnnotation(value: String) { _state.value = _state.value.copy(annotation = value) }
+    fun setPurchasePlace(value: String) { _state.value = _state.value.copy(purchasePlace = value) }
+    fun setIsGift(value: Boolean) { _state.value = _state.value.copy(isGift = value) }
+    fun setIsLent(value: Boolean) { _state.value = _state.value.copy(isLent = value) }
+    fun setIsSold(value: Boolean) { _state.value = _state.value.copy(isSold = value) }
 
     fun attachCover(uri: Uri) {
         viewModelScope.launch {
@@ -205,6 +251,8 @@ class AddBookViewModel @Inject constructor(
             val now = System.currentTimeMillis()
             val purchaseDate = parseDateInput(s.purchaseDate)
             val purchasePrice = parsePriceInput(s.purchasePrice)
+            val printYear = s.printYear.toIntOrNull()
+            val printPages = s.printPages.toIntOrNull()
             if (isEditing) {
                 val existing = bookRepository.findById(editingBookId) ?: return@launch
                 val finalCoverPath = renameCoverToBookId(existing.id, s.coverPath)
@@ -221,6 +269,24 @@ class AddBookViewModel @Inject constructor(
                         coverPath = finalCoverPath ?: existing.coverPath,
                         purchaseDate = purchaseDate,
                         purchasePrice = purchasePrice,
+                        // v5 — explicit fields. takeUnless(blank) collapses empty
+                        // strings to null so the row's NULL is preserved when
+                        // the user clears the field.
+                        subtitle = s.subtitle.takeUnless { it.isBlank() },
+                        binding = s.binding.takeUnless { it.isBlank() },
+                        series = s.series.takeUnless { it.isBlank() },
+                        seriesNumber = s.seriesNumber.takeUnless { it.isBlank() },
+                        condition = s.condition.takeUnless { it.isBlank() },
+                        translator = s.translator.takeUnless { it.isBlank() },
+                        printYear = printYear,
+                        printPages = printPages,
+                        originalLanguage = s.originalLanguage.takeUnless { it.isBlank() },
+                        originalTitle = s.originalTitle.takeUnless { it.isBlank() },
+                        annotation = s.annotation.takeUnless { it.isBlank() },
+                        purchasePlace = s.purchasePlace.takeUnless { it.isBlank() },
+                        isGift = s.isGift,
+                        isLent = s.isLent,
+                        isSold = s.isSold,
                         updatedAt = now,
                     ),
                 )
@@ -240,6 +306,21 @@ class AddBookViewModel @Inject constructor(
                     source = BookSource.MANUAL,
                     purchaseDate = purchaseDate,
                     purchasePrice = purchasePrice,
+                    subtitle = s.subtitle.takeUnless { it.isBlank() },
+                    binding = s.binding.takeUnless { it.isBlank() },
+                    series = s.series.takeUnless { it.isBlank() },
+                    seriesNumber = s.seriesNumber.takeUnless { it.isBlank() },
+                    condition = s.condition.takeUnless { it.isBlank() },
+                    translator = s.translator.takeUnless { it.isBlank() },
+                    printYear = printYear,
+                    printPages = printPages,
+                    originalLanguage = s.originalLanguage.takeUnless { it.isBlank() },
+                    originalTitle = s.originalTitle.takeUnless { it.isBlank() },
+                    annotation = s.annotation.takeUnless { it.isBlank() },
+                    purchasePlace = s.purchasePlace.takeUnless { it.isBlank() },
+                    isGift = s.isGift,
+                    isLent = s.isLent,
+                    isSold = s.isSold,
                 )
                 val newId = bookRepository.insert(tempBook)
                 val finalCoverPath = renameCoverToBookId(newId, s.coverPath)

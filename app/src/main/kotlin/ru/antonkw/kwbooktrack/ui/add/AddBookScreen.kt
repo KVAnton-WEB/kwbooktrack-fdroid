@@ -35,6 +35,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.core.content.ContextCompat
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -318,6 +319,140 @@ fun AddBookScreen(
                 }
             }
 
+            // v5: extra fields in a single Card so the form doesn't grow taller
+            // than the screen. Most users won't fill these; power users can.
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    OutlinedTextField(
+                        value = state.subtitle,
+                        onValueChange = viewModel::setSubtitle,
+                        label = { Text(stringResource(R.string.field_subtitle)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    OutlinedTextField(
+                        value = state.originalTitle,
+                        onValueChange = viewModel::setOriginalTitle,
+                        label = { Text(stringResource(R.string.field_original_title)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        OutlinedTextField(
+                            value = state.series,
+                            onValueChange = viewModel::setSeries,
+                            label = { Text(stringResource(R.string.field_series)) },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                        )
+                        OutlinedTextField(
+                            value = state.seriesNumber,
+                            onValueChange = viewModel::setSeriesNumber,
+                            label = { Text(stringResource(R.string.field_series_number)) },
+                            singleLine = true,
+                            modifier = Modifier.weight(0.5f),
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        OutlinedTextField(
+                            value = state.binding,
+                            onValueChange = viewModel::setBinding,
+                            label = { Text(stringResource(R.string.field_binding)) },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                        )
+                        OutlinedTextField(
+                            value = state.condition,
+                            onValueChange = viewModel::setCondition,
+                            label = { Text(stringResource(R.string.field_condition)) },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        OutlinedTextField(
+                            value = state.translator,
+                            onValueChange = viewModel::setTranslator,
+                            label = { Text(stringResource(R.string.field_translator)) },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                        )
+                        OutlinedTextField(
+                            value = state.originalLanguage,
+                            onValueChange = viewModel::setOriginalLanguage,
+                            label = { Text(stringResource(R.string.field_original_language)) },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        OutlinedTextField(
+                            value = state.printYear,
+                            onValueChange = viewModel::setPrintYear,
+                            label = { Text(stringResource(R.string.field_print_year)) },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                        )
+                        OutlinedTextField(
+                            value = state.printPages,
+                            onValueChange = viewModel::setPrintPages,
+                            label = { Text(stringResource(R.string.field_print_pages)) },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    OutlinedTextField(
+                        value = state.purchasePlace,
+                        onValueChange = viewModel::setPurchasePlace,
+                        label = { Text(stringResource(R.string.field_purchase_place)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    OutlinedTextField(
+                        value = state.annotation,
+                        onValueChange = viewModel::setAnnotation,
+                        label = { Text(stringResource(R.string.field_annotation)) },
+                        minLines = 2,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                    ) {
+                        CheckboxWithLabel(
+                            checked = state.isGift,
+                            onCheckedChange = viewModel::setIsGift,
+                            label = stringResource(R.string.field_is_gift),
+                        )
+                        CheckboxWithLabel(
+                            checked = state.isLent,
+                            onCheckedChange = viewModel::setIsLent,
+                            label = stringResource(R.string.field_is_lent),
+                        )
+                        CheckboxWithLabel(
+                            checked = state.isSold,
+                            onCheckedChange = viewModel::setIsSold,
+                            label = stringResource(R.string.field_is_sold),
+                        )
+                    }
+                }
+            }
+
             Button(
                 onClick = { viewModel.save() },
                 enabled = state.title.isNotBlank(),
@@ -326,6 +461,22 @@ fun AddBookScreen(
                 Text(stringResource(if (viewModel.isEditing) R.string.action_save_changes else R.string.action_save))
             }
         }
+    }
+}
+
+@Composable
+private fun CheckboxWithLabel(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    label: String,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Checkbox(checked = checked, onCheckedChange = onCheckedChange)
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.padding(start = 4.dp),
+        )
     }
 }
 

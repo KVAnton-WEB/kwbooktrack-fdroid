@@ -93,6 +93,63 @@ class TellicoBookMapperTest {
         assertThat(book.rating).isNull()
     }
 
+    @Test
+    fun mapsExtendedTellicoFields() {
+        // v5 — all the new fields parsed from a representative row.
+        val record = csvRecord(
+            "Заголовок" to "Hyperion",
+            "Автор" to "Dan Simmons",
+            "Подзаголовок" to "Песни Гипериона",
+            "Переплёт" to "Твёрдый",
+            "Место покупки" to "Лабиринт",
+            "Цена покупки" to "1299",
+            "Серия" to "Гиперион",
+            "Номер серии" to "1",
+            "Состояние" to "Новое",
+            "Переводчик" to "А. Клементьев",
+            "Подарок" to "да",
+            "Одолжено" to "нет",
+            "Продано?" to "нет",
+            "Аннотация" to "Далёкое будущее...",
+            "Дата прочтения" to "01.01.2025",
+            "Усл. печ. л." to "32",
+            "Язык оригинала" to "en",
+            "Оригинальное название" to "Hyperion",
+            "Год сдачи в печать" to "2018",
+        )
+
+        val book = TellicoBookMapper().map(record)!!.book
+        assertThat(book.subtitle).isEqualTo("Песни Гипериона")
+        assertThat(book.binding).isEqualTo("Твёрдый")
+        assertThat(book.purchasePlace).isEqualTo("Лабиринт")
+        assertThat(book.purchasePrice).isEqualTo(1299.0)
+        assertThat(book.series).isEqualTo("Гиперион")
+        assertThat(book.seriesNumber).isEqualTo("1")
+        assertThat(book.condition).isEqualTo("Новое")
+        assertThat(book.translator).isEqualTo("А. Клементьев")
+        assertThat(book.isGift).isTrue()
+        assertThat(book.isLent).isFalse()
+        assertThat(book.isSold).isFalse()
+        assertThat(book.annotation).isEqualTo("Далёкое будущее...")
+        assertThat(book.printPages).isEqualTo(32)
+        assertThat(book.originalLanguage).isEqualTo("en")
+        assertThat(book.originalTitle).isEqualTo("Hyperion")
+        assertThat(book.printYear).isEqualTo(2018)
+    }
+
+    @Test
+    fun extendedFieldsAreNullWhenCellsEmpty() {
+        val record = csvRecord(
+            "Заголовок" to "Foo",
+            "Автор" to "Bar",
+        )
+        val book = TellicoBookMapper().map(record)!!.book
+        assertThat(book.binding).isNull()
+        assertThat(book.series).isNull()
+        assertThat(book.isGift).isFalse()
+        assertThat(book.printYear).isNull()
+    }
+
     private fun csvRecord(vararg pairs: Pair<String, String>): CSVRecord {
         val headers = pairs.map { it.first }
         val values = pairs.map { (k, v) -> if (v.contains(';') || v.contains('"')) "\"$v\"" else v }

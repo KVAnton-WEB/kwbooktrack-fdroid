@@ -18,6 +18,7 @@
     <string name="about_book_deleted_fallback">(book deleted)</string>
 
     <!-- Book fields (v5) -->
+    <string name="field_subtitle">Подзаголовок</string>
     <string name="field_binding">Переплёт</string>
     <string name="field_purchase_place">Место покупки</string>
     <string name="field_series">Серия</string>

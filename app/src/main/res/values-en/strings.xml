@@ -18,6 +18,7 @@
     <string name="about_book_deleted_fallback">(book deleted)</string>
 
     <!-- Book fields (v5) -->
+    <string name="field_subtitle">Subtitle</string>
     <string name="field_binding">Binding</string>
     <string name="field_purchase_place">Purchase place</string>
     <string name="field_series">Series</string>
