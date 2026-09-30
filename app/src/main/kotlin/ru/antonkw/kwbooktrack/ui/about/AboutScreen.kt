@@ -1,23 +1,37 @@
 package ru.antonkw.kwbooktrack.ui.about
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.FileUpload
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -64,13 +78,42 @@ class AboutViewModel @Inject constructor(
 @Composable
 fun AboutScreen(
     onBack: () -> Unit,
+    onImportClick: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: AboutViewModel = hiltViewModel(),
+    exportViewModel: AboutExportViewModel = hiltViewModel(),
 ) {
     val info by viewModel.info.collectAsStateWithLifecycle()
+    val exportState by exportViewModel.state.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
+
+    // SAF CreateDocument — let the user pick where the backup goes (Drive,
+    // Downloads, SD card). Default name carries a timestamp so two exports
+    // in the same minute don't silently overwrite each other.
+    val exportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/zip"),
+    ) { uri ->
+        if (uri != null) exportViewModel.exportToUri(uri)
+    }
+
+    val exportSuccessFormat = stringResource(R.string.export_success_format)
+    LaunchedEffect(exportState.lastManifest) {
+        val m = exportState.lastManifest ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(
+            exportSuccessFormat.format(m.counts.books, m.counts.photos),
+        )
+        exportViewModel.acknowledge()
+    }
+    LaunchedEffect(exportState.error) {
+        val err = exportState.error ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(context.getString(R.string.export_failed_format, err))
+        exportViewModel.acknowledge()
+    }
 
     Scaffold(
         modifier = modifier,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.about_title)) },
@@ -104,6 +147,54 @@ fun AboutScreen(
                         stringResource(R.string.about_finished_books, info.finishedBooks, info.totalBooks, percent),
                         style = MaterialTheme.typography.bodyLarge,
                     )
+                }
+            }
+            // Backup & Restore — these actions are infrequent and used to
+            // crowd the main screen's top bar; hide them behind the About tab.
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.about_backup_title),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Text(
+                        text = stringResource(R.string.about_backup_description),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Button(
+                        onClick = {
+                            exportLauncher.launch(AboutExportViewModel.suggestedFilename())
+                        },
+                        enabled = !exportState.inProgress,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        if (exportState.inProgress) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                            )
+                        } else {
+                            Icon(Icons.Filled.FileUpload, contentDescription = null)
+                        }
+                        Text(
+                            text = "  " + stringResource(R.string.action_export),
+                            modifier = Modifier.padding(start = 4.dp),
+                        )
+                    }
+                    OutlinedButton(
+                        onClick = onImportClick,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.Filled.FileDownload, contentDescription = null)
+                        Text(
+                            text = "  " + stringResource(R.string.action_import),
+                            modifier = Modifier.padding(start = 4.dp),
+                        )
+                    }
                 }
             }
         }

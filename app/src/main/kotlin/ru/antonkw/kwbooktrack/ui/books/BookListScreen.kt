@@ -28,7 +28,6 @@ import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MenuBook
@@ -84,7 +83,6 @@ fun BookListScreen(
     onOpenStats: () -> Unit = {},
     onAddBook: () -> Unit = {},
     onOpenCalendar: () -> Unit = {},
-    onOpenImport: () -> Unit = {},
     onOpenNotes: () -> Unit = {},
     onOpenAbout: () -> Unit = {},
     modifier: Modifier = Modifier,
@@ -121,9 +119,6 @@ fun BookListScreen(
                     }
                     IconButton(onClick = onOpenStats) {
                         Icon(Icons.Filled.BarChart, contentDescription = stringResource(R.string.action_stats))
-                    }
-                    IconButton(onClick = onOpenImport) {
-                        Icon(Icons.Filled.FileDownload, contentDescription = stringResource(R.string.action_import_tellico))
                     }
                     IconButton(onClick = onOpenNotes) {
                         Icon(Icons.Filled.Notes, contentDescription = stringResource(R.string.cd_open_notes))

@@ -50,7 +50,6 @@ fun KwBooktrackNavHost() {
                 onOpenStats = { navController.navigate(Routes.STATS) },
                 onAddBook = { navController.navigate(Routes.ADD_BOOK) },
                 onOpenCalendar = { navController.navigate(Routes.CALENDAR) },
-                onOpenImport = { navController.navigate(Routes.IMPORT) },
                 onOpenNotes = { navController.navigate(Routes.NOTES) },
                 onOpenAbout = { navController.navigate(Routes.ABOUT) },
             )
@@ -80,7 +79,10 @@ fun KwBooktrackNavHost() {
             )
         }
         composable(Routes.ABOUT) {
-            AboutScreen(onBack = { navController.popBackStack() })
+            AboutScreen(
+                onBack = { navController.popBackStack() },
+                onImportClick = { navController.navigate(Routes.IMPORT) },
+            )
         }
         composable(
             route = Routes.NOTE_DETAIL,

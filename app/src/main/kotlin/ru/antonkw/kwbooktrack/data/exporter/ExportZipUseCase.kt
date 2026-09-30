@@ -14,6 +14,7 @@ import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import java.io.BufferedOutputStream
 import java.io.File
 import java.io.FileOutputStream
+import java.io.OutputStream
 import java.nio.charset.StandardCharsets
 import java.time.Instant
 import java.time.ZoneOffset
@@ -50,7 +51,15 @@ class ExportZipUseCase @Inject constructor(
     private val versionProvider: AppVersionProvider,
     private val database: KwBooktrackDatabase,
 ) {
-    suspend operator fun invoke(outputFile: File): ExportManifest {
+    /** File-based export — kept for the existing ImportKwBooktrackZipUseCase round-trip tests. */
+    suspend operator fun invoke(outputFile: File): ExportManifest =
+        invoke(FileOutputStream(outputFile))
+
+    /**
+     * Stream-based export — preferred for UI flows that route through a
+     * SAF `CreateDocument` URI and write straight into the user-chosen target.
+     */
+    suspend operator fun invoke(output: OutputStream): ExportManifest {
         // Single transaction so the books list and the per-table counts are
         // taken from the same logical snapshot — without this, a write that
         // lands between observeAll().first() and the count() calls makes the
@@ -76,7 +85,7 @@ class ExportZipUseCase @Inject constructor(
             counts = snapshot.counts,
         )
 
-        ZipOutputStream(BufferedOutputStream(FileOutputStream(outputFile))).use { zip ->
+        ZipOutputStream(BufferedOutputStream(output)).use { zip ->
             // manifest.json
             zip.putNextEntry(ZipEntry("manifest.json"))
             zip.write(JSON.encodeToString(ExportManifest.serializer(), manifest).toByteArray(StandardCharsets.UTF_8))
