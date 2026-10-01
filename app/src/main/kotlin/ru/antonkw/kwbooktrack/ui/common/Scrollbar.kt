@@ -14,9 +14,8 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -28,8 +27,10 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
 
 /**
  * Material 3-styled vertical scrollbar for a [LazyListState].
@@ -63,10 +64,13 @@ fun VerticalListScrollbar(
     val trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f)
     val thumbColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.65f)
 
-    // Cached scroll geometry; recomputed only when the list mutates or scrolls.
-    val metrics by remember(listState) {
-        derivedStateOf { listState.scrollMetrics() }
+    // snapshotFlow listens to every snapshot apply against listState. This is
+    // the most reliable trigger — deriveStateOf wouldn't fire on plain
+    // Int property updates because Compose can't track them.
+    val metricsFlow = remember(listState) {
+        snapshotFlow { listState.scrollMetrics() }.distinctUntilChanged()
     }
+    val metrics by metricsFlow.collectAsState(initial = listState.scrollMetrics())
 
     // If the content fits the viewport there's nothing to scroll.
     if (!metrics.hasOverflow) return
