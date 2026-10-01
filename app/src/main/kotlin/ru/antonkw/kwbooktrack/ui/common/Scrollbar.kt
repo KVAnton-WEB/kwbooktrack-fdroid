@@ -2,163 +2,217 @@ package ru.antonkw.kwbooktrack.ui.common
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
-import kotlin.math.roundToInt
+import androidx.compose.runtime.rememberCoroutineScope
 
 /**
- * Metrics describing where the thumb of a [VerticalDraggableScrollbar] should sit.
+ * Material 3-styled vertical scrollbar for a [LazyListState].
  *
- * Sizes are in raw pixels (LazyListState works in pixels). [thumbFraction] is the
- * proportion of the track the thumb occupies (clamped to a sensible minimum so
- * the user can still grab it). [scrollFraction] is the proportion of the total
- * scrollable content that has been scrolled past — `0` at the top, `1` at the
- * bottom. Both fractions are `0` when the list doesn't overflow.
- */
-data class ScrollbarMetrics(
-    val scrollFraction: Float,
-    val thumbFraction: Float,
-)
-
-/**
- * Compute the [ScrollbarMetrics] from a [LazyListState]. Uses the average of the
- * currently-visible items' sizes to estimate the total scrollable height —
- * accurate enough for a thumb; cheap (no extra layout pass).
- */
-fun LazyListState.scrollMetrics(): ScrollbarMetrics {
-    val info = layoutInfo
-    val total = info.totalItemsCount
-    if (total == 0) return ScrollbarMetrics(0f, 1f)
-    val visible = info.visibleItemsInfo
-    val viewportSize = (info.viewportEndOffset - info.viewportStartOffset).toFloat()
-    if (visible.isEmpty() || viewportSize <= 0f) return ScrollbarMetrics(0f, 1f)
-
-    val avgSize = visible.sumOf { it.size }.toFloat() / visible.size
-    val totalSize = avgSize * total
-    if (totalSize <= viewportSize) return ScrollbarMetrics(0f, 1f)
-
-    val first = visible.first()
-    val scrolledInFirst = -first.offset + info.viewportStartOffset + firstVisibleItemScrollOffset
-    val scrollOffset = first.index * avgSize + scrolledInFirst
-    val fraction = (scrollOffset / (totalSize - viewportSize)).coerceIn(0f, 1f)
-    // Thumb takes at least 8% of the track so the user can grab it on long lists.
-    val thumb = (viewportSize / totalSize).coerceIn(0.08f, 1f)
-    return ScrollbarMetrics(fraction, thumb)
-}
-
-/**
- * Vertical scrollbar with a draggable thumb. Place it as a sibling of the
- * [androidx.compose.foundation.lazy.LazyColumn] inside a `Box(fillMaxSize)` and
- * align it to [Alignment.CenterEnd]. Drag the thumb with a finger; tap the
- * track to jump the list to that position.
+ * Layout: the bar lives in its own column on the right edge — pair it
+ * with `LazyColumn(modifier = …padding(end = width))` so content doesn't
+ * slide under the thumb. The bar is hidden entirely when the content
+ * fits the viewport (no scroll possible).
+ *
+ * Geometry comes from [LazyListState.layoutInfo]:
+ * - `viewportStartOffset` is the exact pixel scroll position of the list.
+ * - `avgItemPx` (mean of visible items' heights) estimates the rest.
+ * - Thumb position = `viewportStartOffset / (totalSize − viewportSize)`.
+ *
+ * Interaction:
+ * - Tap the track → jump the list so the thumb centres on the tap.
+ * - Drag the thumb → 1:1 thumb motion; the list scrolls to match.
+ *
+ * ponytail: Compose Foundation's `rememberScrollbarState` /
+ * `Modifier.verticalScrollbar` API didn't ship in our Foundation 1.7.2;
+ * the next-best standard option is `androidx.compose.material` (M1) which
+ * we deliberately don't pull in. So the scrollbar lives here.
  */
 @Composable
-fun VerticalDraggableScrollbar(
-    state: LazyListState,
+fun VerticalListScrollbar(
+    listState: LazyListState,
     modifier: Modifier = Modifier,
-    trackColor: Color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f),
-    thumbColor: Color = MaterialTheme.colorScheme.primary.copy(alpha = 0.45f),
-    thumbWidth: androidx.compose.ui.unit.Dp = 6.dp,
+    width: Dp = 8.dp,
 ) {
-    val metrics by remember(state) { derivedStateOf { state.scrollMetrics() } }
     val density = LocalDensity.current
-    var trackHeightPx by remember { mutableStateOf(1f) }
-    val scope = rememberCoroutineScope()
-    val itemCount = state.layoutInfo.totalItemsCount
-    val visibleInfo = state.layoutInfo
-    val avgItemPx = remember(visibleInfo, itemCount) {
-        if (itemCount == 0 || visibleInfo.visibleItemsInfo.isEmpty()) 1f
-        else visibleInfo.visibleItemsInfo.sumOf { it.size }.toFloat() / visibleInfo.visibleItemsInfo.size
+    val trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f)
+    val thumbColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.65f)
+
+    // Cached scroll geometry; recomputed only when the list mutates or scrolls.
+    val metrics by remember(listState) {
+        derivedStateOf { listState.scrollMetrics() }
     }
-    val minThumbPx = with(density) { 24.dp.toPx() }
 
-    val thumbHeightPx = (metrics.thumbFraction * trackHeightPx).coerceAtLeast(minThumbPx)
-    val scrollableTrackPx = (trackHeightPx - thumbHeightPx).coerceAtLeast(0f)
-    val thumbOffsetPx = (metrics.scrollFraction * scrollableTrackPx).coerceIn(0f, scrollableTrackPx)
+    // If the content fits the viewport there's nothing to scroll.
+    if (!metrics.hasOverflow) return
 
-    if (itemCount == 0) return
+    var trackHeightPx by remember { mutableIntStateOf(0) }
+    val minThumbPx = with(density) { 24.dp.toPx().toInt() }
+    val thumbHeightPx = (metrics.thumbFraction * trackHeightPx)
+        .toInt()
+        .coerceAtLeast(minThumbPx)
+    val scrollableTrackPx = (trackHeightPx - thumbHeightPx).coerceAtLeast(1)
+    val thumbOffsetPx = (metrics.scrollFraction * scrollableTrackPx).toInt()
+        .coerceIn(0, scrollableTrackPx)
 
-    // Convert a touch Y on the track (0..trackHeightPx) to a target scroll
-    // offset in the LazyList (0..avgItemPx * (itemCount - 1)).
-    fun jumpToTouchY(touchY: Float) {
-        if (scrollableTrackPx <= 0f || itemCount == 0) return
-        val ratio = (touchY / scrollableTrackPx).coerceIn(0f, 1f)
-        val newScrollPx = ratio * avgItemPx * (itemCount - 1)
-        val newIndex = (newScrollPx / avgItemPx).toInt().coerceIn(0, itemCount - 1)
-        val offsetInItem = (newScrollPx - newIndex * avgItemPx).toInt()
-        scope.launch {
-            state.scrollToItem(newIndex, offsetInItem)
-        }
+    val scope = rememberCoroutineScope()
+
+    // Drag anchor: touch Y in world origin (0 == top of track) captured at
+    // dragStart, plus the thumb's track-relative offset at that moment.
+    // Subtracting them from the current touch Y gives a clean track-relative
+    // delta independent of where on the thumb the drag began.
+    var dragAnchor by remember { mutableStateOf<DragAnchor?>(null) }
+    val isDragging = dragAnchor != null
+    val effectiveThumbOffset = dragAnchor?.let { anchor ->
+        (anchor.thumbOffsetAtStart + (anchor.touchYCurrent - anchor.touchYAtStart)).toInt()
+            .coerceIn(0, scrollableTrackPx)
+    } ?: thumbOffsetPx
+
+    fun jumpToTrackY(trackY: Float) {
+        val ratio = ((trackY - thumbHeightPx / 2f) / scrollableTrackPx).coerceIn(0f, 1f)
+        val totalScrollable = (metrics.totalScrollPx - metrics.viewportPx).coerceAtLeast(0f)
+        val targetScrollPx = ratio * totalScrollable
+        val info = listState.layoutInfo
+        val avgItemPx = metrics.avgItemPx
+        val newIndex = (targetScrollPx / avgItemPx)
+            .toInt()
+            .coerceIn(0, (info.totalItemsCount - 1).coerceAtLeast(0))
+        // Don't let offsetInItem push past the next item's start.
+        val targetItem = info.visibleItemsInfo.firstOrNull { it.index == newIndex }
+            ?: info.visibleItemsInfo.firstOrNull()
+        val itemSize = targetItem?.size ?: avgItemPx.toInt()
+        val maxOffset = (itemSize - 1).coerceAtLeast(0)
+        val offsetInItem = (targetScrollPx - newIndex * avgItemPx).toInt()
+            .coerceIn(0, maxOffset)
+        scope.launch { listState.scrollToItem(newIndex, offsetInItem) }
     }
 
     Box(
         modifier = modifier
             .fillMaxHeight()
-            .widthIn(min = 24.dp)
-            .width(thumbWidth + 8.dp)
-            .onSizeChanged { trackHeightPx = it.height.toFloat() },
+            .width(width)
+            .onSizeChanged { trackHeightPx = it.height }
+            .background(trackColor, RoundedCornerShape(width / 2))
+            .pointerInput(listState) {
+                // Tap on the track (outside the thumb) jumps the list.
+                detectTapGestures { offset ->
+                    jumpToTrackY(offset.y)
+                }
+            },
+        contentAlignment = Alignment.TopCenter,
     ) {
-        // Track background.
         Box(
             modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .padding(end = 4.dp)
-                .width(thumbWidth)
-                .fillMaxHeight()
-                .background(trackColor, RoundedCornerShape(thumbWidth / 2)),
-        )
-        // Thumb — draggable, full click target on the right edge so a finger
-        // doesn't have to land precisely on the thin pill.
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(end = 4.dp)
                 .fillMaxWidth()
-                .offset { IntOffset(0, thumbOffsetPx.roundToInt()) }
-                .pointerInput(state, itemCount, avgItemPx, scrollableTrackPx) {
+                .padding(horizontal = 1.dp)
+                .offset(y = with(density) { effectiveThumbOffset.toDp() })
+                .height(with(density) { thumbHeightPx.toDp() })
+                .background(
+                    if (isDragging) MaterialTheme.colorScheme.primary else thumbColor,
+                    RoundedCornerShape(width / 2),
+                )
+                .pointerInput(listState) {
                     detectDragGestures(
                         onDragStart = { offset ->
-                            // Re-anchor the thumb to where the finger landed
-                            // so a grab anywhere on the column works.
-                            jumpToTouchY(offset.y)
+                            // Translate the thumb-local offset (in this Box's
+                            // space) back to track coordinates, then anchor.
+                            val touchYTrack = effectiveThumbOffset + offset.y
+                            dragAnchor = DragAnchor(
+                                touchYAtStart = touchYTrack,
+                                touchYCurrent = touchYTrack,
+                                thumbOffsetAtStart = effectiveThumbOffset,
+                            )
+                            // And jump to where the user grabbed, so the
+                            // list position matches the new thumb spot.
+                            jumpToTrackY(touchYTrack)
                         },
+                        onDragEnd = { dragAnchor = null },
+                        onDragCancel = { dragAnchor = null },
                         onDrag = { change, _ ->
                             change.consume()
-                            jumpToTouchY(change.position.y)
+                            dragAnchor = dragAnchor?.copy(touchYCurrent = dragAnchor!!.touchYAtStart + change.position.y)
                         },
                     )
                 },
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight()
-                    .background(thumbColor, RoundedCornerShape(thumbWidth / 2)),
-            )
-        }
+        )
     }
 }
+
+private data class DragAnchor(
+    val touchYAtStart: Float,
+    val touchYCurrent: Float,
+    val thumbOffsetAtStart: Int,
+)
+
+/** Cached scroll geometry; recomputed only when the list mutates or scrolls. */
+private fun LazyListState.scrollMetrics(): ScrollMetrics {
+    val info = layoutInfo
+    val total = info.totalItemsCount
+    val visible = info.visibleItemsInfo
+    val viewportPx = (info.viewportEndOffset - info.viewportStartOffset).toFloat()
+    if (total == 0 || visible.isEmpty() || viewportPx <= 0f) {
+        return ScrollMetrics(
+            scrollFraction = 0f,
+            thumbFraction = 1f,
+            avgItemPx = 1f,
+            totalScrollPx = 0f,
+            viewportPx = viewportPx,
+            hasOverflow = false,
+        )
+    }
+    val visibleSum = visible.sumOf { it.size }
+    val avgItemPx = visibleSum.toFloat() / visible.size
+    val totalScrollPx = avgItemPx * total
+    // viewportStartOffset IS the scroll position of the list — use it
+    // directly, not firstVisibleItemScrollOffset (which is derived from it
+    // and would double-count when combined with firstVisibleItem.index).
+    val scrollPx = info.viewportStartOffset.toFloat()
+    val hasOverflow = totalScrollPx > viewportPx
+    val fraction = if (hasOverflow) {
+        (scrollPx / (totalScrollPx - viewportPx)).coerceIn(0f, 1f)
+    } else 0f
+    // Thumb takes at least 8% of the track so it's grabbable on long lists.
+    val thumbFraction = (viewportPx / totalScrollPx).coerceIn(0.08f, 1f)
+    return ScrollMetrics(
+        scrollFraction = fraction,
+        thumbFraction = thumbFraction,
+        avgItemPx = avgItemPx,
+        totalScrollPx = totalScrollPx,
+        viewportPx = viewportPx,
+        hasOverflow = hasOverflow,
+    )
+}
+
+private data class ScrollMetrics(
+    val scrollFraction: Float,
+    val thumbFraction: Float,
+    val avgItemPx: Float,
+    val totalScrollPx: Float,
+    val viewportPx: Float,
+    val hasOverflow: Boolean,
+)

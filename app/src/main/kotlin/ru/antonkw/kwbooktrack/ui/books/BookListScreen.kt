@@ -241,13 +241,18 @@ fun BookListScreen(
                     } else {
                         val listState = androidx.compose.foundation.lazy.rememberLazyListState()
                         Box(modifier = Modifier.fillMaxSize()) {
+                            // padding(end = scrollbarWidth) reserves the lane so
+                            // the rightmost card row doesn't slide under the bar.
+                            val scrollbarWidth = 8.dp
                             if (isGrid) {
                                 val rows = remember(s.books) { s.books.chunked(3) }
                                 LazyColumn(
                                     state = listState,
                                     contentPadding = PaddingValues(16.dp),
                                     verticalArrangement = Arrangement.spacedBy(12.dp),
-                                    modifier = Modifier.fillMaxSize(),
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(end = scrollbarWidth),
                                 ) {
                                     itemsIndexed(rows, key = { i, row -> "${row.firstOrNull()?.book?.id ?: 0L}_$i" }) { i, row ->
                                         Row(
@@ -276,16 +281,19 @@ fun BookListScreen(
                                     state = listState,
                                     contentPadding = PaddingValues(16.dp),
                                     verticalArrangement = Arrangement.spacedBy(8.dp),
-                                    modifier = Modifier.fillMaxSize(),
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(end = scrollbarWidth),
                                 ) {
                                     items(s.books, key = { it.book.id }) {
                                         BookListCard(it, onClick = { onBookClick(it.book.id) })
                                     }
                                 }
                             }
-                            ru.antonkw.kwbooktrack.ui.common.VerticalDraggableScrollbar(
-                                state = listState,
+                            ru.antonkw.kwbooktrack.ui.common.VerticalListScrollbar(
+                                listState = listState,
                                 modifier = Modifier.align(Alignment.CenterEnd),
+                                width = scrollbarWidth,
                             )
                         }
                     }

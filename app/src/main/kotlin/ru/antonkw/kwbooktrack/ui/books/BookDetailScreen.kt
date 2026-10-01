@@ -162,9 +162,12 @@ fun BookDetailScreen(
 
         val detailListState = androidx.compose.foundation.lazy.rememberLazyListState()
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+            // padding(end = 8.dp) reserves the right lane for the scrollbar.
             LazyColumn(
                 state = detailListState,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(end = 8.dp),
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
@@ -489,9 +492,10 @@ fun BookDetailScreen(
             // Padding снизу чтобы FAB не перекрывал последний элемент
             item { Spacer(modifier = Modifier.height(72.dp)) }
             }
-            ru.antonkw.kwbooktrack.ui.common.VerticalDraggableScrollbar(
-                state = detailListState,
+            ru.antonkw.kwbooktrack.ui.common.VerticalListScrollbar(
+                listState = detailListState,
                 modifier = Modifier.align(Alignment.CenterEnd),
+                width = 8.dp,
             )
         }
     }

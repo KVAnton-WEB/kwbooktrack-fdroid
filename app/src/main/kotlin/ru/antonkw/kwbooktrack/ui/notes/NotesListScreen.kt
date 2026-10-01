@@ -98,11 +98,14 @@ fun NotesListScreen(
                     } else {
                         val listState = androidx.compose.foundation.lazy.rememberLazyListState()
                         Box(modifier = Modifier.fillMaxSize()) {
+                            val scrollbarWidth = 8.dp
                             LazyColumn(
                                 state = listState,
                                 contentPadding = PaddingValues(16.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp),
-                                modifier = Modifier.fillMaxSize(),
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(end = scrollbarWidth),
                             ) {
                                 items(s.items, key = { it.note.id }) { item ->
                                     NoteListRow(
@@ -111,9 +114,10 @@ fun NotesListScreen(
                                     )
                                 }
                             }
-                            ru.antonkw.kwbooktrack.ui.common.VerticalDraggableScrollbar(
-                                state = listState,
+                            ru.antonkw.kwbooktrack.ui.common.VerticalListScrollbar(
+                                listState = listState,
                                 modifier = Modifier.align(Alignment.CenterEnd),
+                                width = scrollbarWidth,
                             )
                         }
                     }
