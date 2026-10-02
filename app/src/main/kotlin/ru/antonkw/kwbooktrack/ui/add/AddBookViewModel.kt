@@ -78,6 +78,16 @@ class AddBookViewModel @Inject constructor(
     // replace _state before the dirty check ran.
     private val initialSnapshot: AddBookState = _state.value
 
+    // The path of the cover that is *currently* persisted for the book being
+    // edited (or null in add-mode). Used to distinguish the "real" persisted
+    // cover from temp copies made by attachCover() — temp copies are safe to
+    // unlink on cancel, the persisted cover is not. Without this distinction
+    // onCleared()/attachCover()/clearCover() would happily delete the
+    // book's actual cover when the user hits Back or Discard (and even on
+    // Save, because state.coverPath doesn't track renameCoverToBookId()).
+    // Mutated only from init() and save() — read from the cleanup paths.
+    private var originalCoverPath: String? = null
+
     // Per-suggestion flows: only the field they depend on is `distinctUntilChanged`d
     // so typing in `author` doesn't recompute `genreSuggestions` and vice versa.
     private val authorField = _state.map { it.author }.distinctUntilChanged()
@@ -131,6 +141,7 @@ class AddBookViewModel @Inject constructor(
             viewModelScope.launch {
                 val book = bookRepository.findById(editingBookId)
                 if (book != null) {
+                    originalCoverPath = book.coverPath
                     _state.value = AddBookState(
                         title = book.title,
                         author = book.author,
@@ -198,10 +209,13 @@ class AddBookViewModel @Inject constructor(
 
     fun attachCover(uri: Uri) {
         viewModelScope.launch {
-            // Drop the previously attached file before overwriting state —
-            // otherwise picking A then B leaks A in covers/ until the screen is
-            // dismissed. The final cover copy in save() does NOT delete the
-            // previous one because it's the same path (promoteToBook).
+            // Drop the previously attached *temp* file before overwriting state
+            // — otherwise picking A then B leaks A in covers/ until the screen
+            // is dismissed. BUT: skip the delete when `previous` is the book's
+            // currently-persisted cover (originalCoverPath), so that a Back /
+            // Discard after picking a new image doesn't also lose the original.
+            // The original is only released after save() promotes the new
+            // cover into its place.
             val previous = _state.value.coverPath
             val saved = withContext(Dispatchers.IO) {
                 runCatching {
@@ -218,14 +232,22 @@ class AddBookViewModel @Inject constructor(
                 }.getOrNull()
             }
             if (saved != null) {
-                if (previous != null && previous != saved) runCatching { File(previous).delete() }
+                if (previous != null && previous != saved && previous != originalCoverPath) {
+                    runCatching { File(previous).delete() }
+                }
                 _state.value = _state.value.copy(coverPath = saved)
             }
         }
     }
 
     fun clearCover() {
-        _state.value.coverPath?.let { File(it).delete() }
+        // Same protection as attachCover() / onCleared(): never unlink the
+        // currently-persisted cover when the user is editing — Discard must
+        // leave the book's actual file on disk so the cover survives the
+        // cancel. Only delete when clearing a temp selection.
+        if (_state.value.coverPath != null && _state.value.coverPath != originalCoverPath) {
+            _state.value.coverPath?.let { runCatching { File(it).delete() } }
+        }
         _state.value = _state.value.copy(coverPath = null)
     }
 
@@ -237,11 +259,14 @@ class AddBookViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
-        // The cover was promoted to covers/{bookId}.* on save, so by the time
-        // we reach here state.coverPath (if any) is either still a temp copy or
-        // never set. Safe to unlink — the persisted book cover is on a
-        // different path.
-        _state.value.coverPath?.let { runCatching { File(it).delete() } }
+        // Only unlink temp copies. The persisted book cover (originalCoverPath)
+        // is the source of truth — Back / Discard must never delete it. In
+        // edit-mode without cover changes state.coverPath == originalCoverPath
+        // so nothing happens; in add-mode originalCoverPath is null and any
+        // temp picked but not saved gets cleaned up here.
+        if (_state.value.coverPath != null && _state.value.coverPath != originalCoverPath) {
+            _state.value.coverPath?.let { runCatching { File(it).delete() } }
+        }
     }
 
     fun save(): Job? {
@@ -290,6 +315,16 @@ class AddBookViewModel @Inject constructor(
                         updatedAt = now,
                     ),
                 )
+                // The previous persisted cover (kept alive across the edit so
+                // Discard could roll it back) is now orphaned: renameCoverToBookId
+                // promoted the new selection into its slot. Drop it. (For the
+                // no-cover-change case renameCoverToBookId() returns the same
+                // path, so the inequality check skips the delete — we just
+                // refresh the recorded path to the post-rename value.)
+                if (originalCoverPath != null && originalCoverPath != finalCoverPath) {
+                    runCatching { File(originalCoverPath!!).delete() }
+                }
+                originalCoverPath = finalCoverPath
             } else {
                 val tempBook = BookEntity(
                     title = s.title,
@@ -327,6 +362,7 @@ class AddBookViewModel @Inject constructor(
                 if (finalCoverPath != null) {
                     bookRepository.update(tempBook.copy(id = newId, coverPath = finalCoverPath))
                 }
+                originalCoverPath = finalCoverPath
             }
             _state.value = s.copy(saved = true)
         }
