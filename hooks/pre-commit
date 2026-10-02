@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# Pre-commit hook: require versionName AND versionCode to change.
+# Spec: docs/superpowers/specs/2026-10-02-pre-commit-version-bump-design.md
+# Install (one-time per clone):
+#     git config core.hooksPath hooks
+
+set -u
+
+GRADLE="app/build.gradle.kts"
+ROOT="$(git rev-parse --show-toplevel)"
+FILE="$ROOT/$GRADLE"
+
+# Initial commit: no HEAD yet — nothing to compare against.
+git rev-parse --verify -q HEAD >/dev/null || exit 0
+
+# Bail if the file is missing in either side.
+if [[ ! -f "$FILE" ]] || ! git cat-file -e "HEAD:$GRADLE" 2>/dev/null; then
+  echo "✗ Pre-commit: $GRADLE missing from working tree or HEAD; hook disabled." >&2
+  exit 1
+fi
+
+CUR_RAW=$(git show    :"$GRADLE" 2>/dev/null || cat "$FILE")
+HEAD_RAW=$(git show HEAD:"$GRADLE" 2>/dev/null)
+
+extract_name () { printf '%s\n' "$1" | grep -oE 'versionName\s*=\s*"[^"]+"' | head -1 | grep -oE '"[^"]+"' | tr -d '"'; }
+extract_code () { printf '%s\n' "$1" | grep -oE 'versionCode\s*=\s*[0-9]+'      | head -1 | grep -oE '[0-9]+'; }
+
+CUR_NAME=$(extract_name "$CUR_RAW")
+HEAD_NAME=$(extract_name "$HEAD_RAW")
+CUR_CODE=$(extract_code "$CUR_RAW")
+HEAD_CODE=$(extract_code "$HEAD_RAW")
+
+if [[ "$CUR_NAME" != "$HEAD_NAME" && "$CUR_CODE" != "$HEAD_CODE" ]]; then
+  exit 0
+fi
+
+cat >&2 <<EOF
+✗ Pre-commit: versionName and versionCode must change in this commit.
+
+  versionName     "$HEAD_NAME" → "$CUR_NAME"
+  versionCode     $HEAD_CODE      → $CUR_CODE
+
+  Bump at least one in $GRADLE and \`git add\` it,
+  e.g.  versionCode = $((HEAD_CODE + 1)) / versionName = "<next>".
+
+  Override with \`git commit --no-verify\` only for deliberate no-bump
+  commits (rebase, history rewrite, doc-only).
+EOF
+exit 1
