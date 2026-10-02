@@ -90,6 +90,12 @@ class AddBookViewModel @Inject constructor(
     // Mutated only from init() and save() — read from the cleanup paths.
     private var originalCoverPath: String? = null
 
+    // True once the user explicitly hit "remove cover" on a book that had
+    // one. Needed because promoteToBook() returns null for BOTH "cleared"
+    // and "left alone", and save() needs to tell them apart to honour the
+    // removal. Cleared again by attachCover().
+    private var coverRemoved = false
+
     // Per-suggestion flows: only the field they depend on is `distinctUntilChanged`d
     // so typing in `author` doesn't recompute `genreSuggestions` and vice versa.
     private val authorField = _state.map { it.author }.distinctUntilChanged()
@@ -233,6 +239,7 @@ class AddBookViewModel @Inject constructor(
                 if (previous != null && previous != saved && previous != originalCoverPath) {
                     runCatching { File(previous).delete() }
                 }
+                coverRemoved = false
                 _state.value = _state.value.copy(coverPath = saved)
             }
         }
@@ -242,10 +249,13 @@ class AddBookViewModel @Inject constructor(
         // Same protection as attachCover() / onCleared(): never unlink the
         // currently-persisted cover when the user is editing — Discard must
         // leave the book's actual file on disk so the cover survives the
-        // cancel. Only delete when clearing a temp selection.
+        // cancel. Only delete when clearing a temp selection. The removal is
+        // recorded instead: save() unlinks the persisted file and nulls the
+        // row's coverPath then.
         if (_state.value.coverPath != null && _state.value.coverPath != originalCoverPath) {
             _state.value.coverPath?.let { runCatching { File(it).delete() } }
         }
+        coverRemoved = _state.value.coverPath != null
         _state.value = _state.value.copy(coverPath = null)
     }
 
@@ -255,7 +265,10 @@ class AddBookViewModel @Inject constructor(
         return FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", target)
     }
 
-    override fun onCleared() {
+    // Public (not protected) so tests can drive the Back / Discard path
+    // directly — the v0.5.9 "cover vanished" bug lived here and the only way
+    // to reach it from a unit test is to call it.
+    public override fun onCleared() {
         super.onCleared()
         // Only unlink temp copies. The persisted book cover (originalCoverPath)
         // is the source of truth — Back / Discard must never delete it. In
@@ -270,6 +283,9 @@ class AddBookViewModel @Inject constructor(
     fun save(): Job? {
         val s = _state.value
         if (s.title.isBlank()) return null
+        // Snapshot alongside [s]: clearCover() could flip the flag between the
+        // save() call and this coroutine actually running.
+        val removedCover = coverRemoved
         return viewModelScope.launch {
             val now = System.currentTimeMillis()
             val purchaseDate = parseDateInput(s.purchaseDate)
@@ -278,7 +294,17 @@ class AddBookViewModel @Inject constructor(
             val printPages = s.printPages.toIntOrNull()
             if (isEditing) {
                 val existing = bookRepository.findById(editingBookId) ?: return@launch
-                val finalCoverPath = coverStorage.promoteToBook(existing.id, s.coverPath)
+                // What the row will point at from now on. promoteToBook()
+                // returns null for both "left alone" and "cleared", so
+                // removedCover is what tells them apart — without it the
+                // ?: existing.coverPath fallback silently restored the cover
+                // the user had just removed.
+                val finalCoverPath: String? = if (removedCover) {
+                    coverStorage.deleteForBook(existing.id)
+                    null
+                } else {
+                    coverStorage.promoteToBook(existing.id, s.coverPath) ?: existing.coverPath
+                }
                 bookRepository.update(
                     existing.copy(
                         title = s.title,
@@ -289,7 +315,7 @@ class AddBookViewModel @Inject constructor(
                         publisher = s.publisher.takeUnless { it.isBlank() },
                         genre = s.genre.takeUnless { it.isBlank() },
                         rating = s.rating,
-                        coverPath = finalCoverPath ?: existing.coverPath,
+                        coverPath = finalCoverPath,
                         purchaseDate = purchaseDate,
                         purchasePrice = purchasePrice,
                         // v5 — explicit fields. takeUnless(blank) collapses empty
@@ -316,12 +342,11 @@ class AddBookViewModel @Inject constructor(
                 // The previous persisted cover (kept alive across the edit so
                 // Discard could roll it back) is now orphaned by the promotion:
                 // promoteToBook() moved the new selection into its slot at
-                // finalCoverPath. Skip when null (user cleared the cover; the
-                // null ?: existing.coverPath fallback below preserves the row's
-                // coverPath, leaving originalCoverPath as the persisted truth).
-                // Skip when src == target (no-cover-change edit; rename is a
-                // no-op and the original file is still the file at the same
-                // path).
+                // finalCoverPath. deleteForBook() above already unlinked it when
+                // the cover was removed. Both no-op cases — nothing picked, and a
+                // re-promote of the cover already at that path — resolve
+                // finalCoverPath to the path the row already had, so the file is
+                // still the file at the same path and there is nothing to unlink.
                 if (finalCoverPath != null && originalCoverPath != null && originalCoverPath != finalCoverPath) {
                     runCatching { File(originalCoverPath!!).delete() }
                 }

@@ -1,5 +1,8 @@
 package ru.antonkw.kwbooktrack.ui.add
 
+import android.app.Application
+import android.content.Context
+import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.Dispatchers
@@ -15,11 +18,17 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows
 import ru.antonkw.kwbooktrack.data.TestDb
 import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
+import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
 import ru.antonkw.kwbooktrack.data.db.entity.BookSource
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
+import ru.antonkw.kwbooktrack.data.storage.CoverStorage
+import ru.antonkw.kwbooktrack.data.storage.FileCoverStorage
+import java.io.ByteArrayInputStream
+import java.io.File
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -27,6 +36,15 @@ class AddBookViewModelTest {
     private lateinit var db: KwBooktrackDatabase
     private lateinit var bookRepository: BookRepository
     private val dispatcher = StandardTestDispatcher()
+
+    private val SEEDED_TITLE = "Dune"
+
+    /**
+     * The suspend Room writes inside save() run on Room's executor — a real
+     * thread the test scheduler can't advance — so `advanceUntilIdle()` can
+     * return before the row exists. Wait for it instead of racing it.
+     */
+    private suspend fun savedBook() = db.bookDao().observeAll().first { it.isNotEmpty() }.first()
 
     @Before
     fun setUp() {
@@ -56,9 +74,7 @@ class AddBookViewModelTest {
         vm.save()
         advanceUntilIdle()
 
-        val books = db.bookDao().observeAll().first()
-        assertThat(books).hasSize(1)
-        val book = books.first()
+        val book = savedBook()
         assertThat(book.title).isEqualTo("Dune")
         assertThat(book.author).isEqualTo("Frank Herbert")
         assertThat(book.isbn13).isEqualTo("9780441172719")
@@ -98,8 +114,7 @@ class AddBookViewModelTest {
         vm.save()
         advanceUntilIdle()
 
-        val books = db.bookDao().observeAll().first()
-        assertThat(books.first().isbn13).isNull() // only 13-digit ISBNs are stored
+        assertThat(savedBook().isbn13).isNull() // only 13-digit ISBNs are stored
     }
 
     @Test
@@ -132,7 +147,7 @@ class AddBookViewModelTest {
         vm.save()
         advanceUntilIdle()
 
-        val book = db.bookDao().observeAll().first().first()
+        val book = savedBook()
         assertThat(book.subtitle).isEqualTo("Песни Гипериона")
         assertThat(book.binding).isEqualTo("Твёрдый")
         assertThat(book.series).isEqualTo("Гиперион")
@@ -168,7 +183,7 @@ class AddBookViewModelTest {
         vm.save()
         advanceUntilIdle()
 
-        val book = db.bookDao().observeAll().first().first()
+        val book = savedBook()
         assertThat(book.subtitle).isNull()
         assertThat(book.series).isNull()
     }
@@ -188,8 +203,185 @@ class AddBookViewModelTest {
         vm.save()
         advanceUntilIdle()
 
-        val book = db.bookDao().observeAll().first().first()
+        val book = savedBook()
         assertThat(book.printYear).isEqualTo(2018)
         assertThat(book.printPages).isEqualTo(32)
     }
+    // --- cover lifecycle -------------------------------------------------
+    //
+    // These run against the real FileCoverStorage. The bugs they pin lived in
+    // the interaction between the ViewModel's cleanup paths (attachCover /
+    // clearCover / onCleared / save) and the files on disk, which the
+    // NoOpCoverStorage used above cannot exercise at all.
+    //
+    // Note the waits: the edit-mode init and attachCover() both suspend on
+    // Room's executor / Dispatchers.IO — real threads that the test scheduler
+    // can't advance — so `advanceUntilIdle()` returns before they finish.
+    // Wait for the observable effect instead (state emission / job join).
+
+    private val context: Context get() = ApplicationProvider.getApplicationContext()
+
+    private val coverStorage: CoverStorage get() = FileCoverStorage(context)
+
+    private val coversDir: File get() = File(context.filesDir, "covers").apply { mkdirs() }
+
+    /** Feeds a fake picked image through ContentResolver so attachCover can copy it. */
+    private fun pickedImage(
+        name: String = "picked.jpg",
+        bytes: ByteArray = byteArrayOf(0x11, 0x22),
+    ): Uri = Uri.parse("content://test/$name").also {
+        Shadows.shadowOf(ApplicationProvider.getApplicationContext<Application>().contentResolver)
+            .registerInputStream(it, ByteArrayInputStream(bytes))
+    }
+
+    private suspend fun pickCover(vm: AddBookViewModel, name: String = "picked.jpg") {
+        val before = vm.state.value.coverPath
+        vm.attachCover(pickedImage(name))
+        vm.state.first { it.coverPath != null && it.coverPath != before }
+    }
+
+    /** An edit-mode VM whose init coroutine has finished loading the book. */
+    private suspend fun editVm(bookId: Long): AddBookViewModel {
+        val vm = AddBookViewModel(
+            androidx.lifecycle.SavedStateHandle(mapOf("bookId" to bookId)),
+            bookRepository,
+            context,
+            coverStorage,
+        )
+        vm.state.first { it.title == SEEDED_TITLE }
+        return vm
+    }
+
+    /** A book whose cover lives at the canonical `covers/{id}.jpg`. */
+    private suspend fun bookWithCover(): Pair<Long, File> {
+        val now = System.currentTimeMillis()
+        val id = bookRepository.insert(
+            BookEntity(
+                title = SEEDED_TITLE,
+                author = "Frank Herbert",
+                createdAt = now,
+                updatedAt = now,
+            ),
+        )
+        val cover = File(coversDir, "$id.jpg").apply { writeBytes(byteArrayOf(0xCA.toByte())) }
+        bookRepository.update(bookRepository.findById(id)!!.copy(coverPath = cover.absolutePath))
+        return id to cover
+    }
+
+    private fun newBookVm() = AddBookViewModel(
+        androidx.lifecycle.SavedStateHandle(),
+        bookRepository,
+        context,
+        coverStorage,
+    )
+
+    private fun tempCovers(): List<File> =
+        coversDir.listFiles()?.filter { it.name.startsWith("cover_") }.orEmpty()
+
+    @Test
+    fun editModeBackWithoutSavingKeepsOriginalCover() = runTest(dispatcher) {
+        // v0.5.9 regression: onCleared() unlinked the *persisted* cover, so the
+        // row was left pointing at a file that no longer existed.
+        val (id, cover) = bookWithCover()
+        val vm = editVm(id)
+        pickCover(vm)
+        vm.onCleared()
+
+        assertThat(cover.exists()).isTrue()
+        assertThat(bookRepository.findById(id)!!.coverPath).isEqualTo(cover.absolutePath)
+        // The temp copy of the new pick is cleaned up; the original is not.
+        assertThat(tempCovers()).isEmpty()
+    }
+
+    @Test
+    fun editModeSaveWithoutCoverChangeKeepsCoverFile() = runTest(dispatcher) {
+        val (id, cover) = bookWithCover()
+        val vm = editVm(id)
+        vm.setTitle("Dune Messiah")
+        vm.save()?.join()
+
+        assertThat(cover.exists()).isTrue()
+        assertThat(bookRepository.findById(id)!!.coverPath).isEqualTo(cover.absolutePath)
+    }
+
+    @Test
+    fun editModeSaveWithNewCoverPromotesItAndDropsTheOldFile() = runTest(dispatcher) {
+        val (id, oldCover) = bookWithCover()
+        val vm = editVm(id)
+        pickCover(vm, "new.png")
+        vm.save()?.join()
+
+        val saved = bookRepository.findById(id)!!
+        assertThat(saved.coverPath).isEqualTo(File(coversDir, "$id.png").absolutePath)
+        assertThat(File(saved.coverPath!!).exists()).isTrue()
+        assertThat(oldCover.exists()).isFalse()
+        assertThat(tempCovers()).isEmpty()
+    }
+
+    @Test
+    fun clearCoverThenSaveDropsTheCoverFromRowAndDisk() = runTest(dispatcher) {
+        // Regression: save() did `coverPath = promoteToBook(...) ?: existing.coverPath`,
+        // and promoteToBook returns null both for "cleared" and for "untouched",
+        // so the removed cover came back.
+        val (id, cover) = bookWithCover()
+        val vm = editVm(id)
+        vm.clearCover()
+        assertThat(cover.exists()).isTrue() // Discard must still be able to roll back
+        vm.save()?.join()
+
+        assertThat(bookRepository.findById(id)!!.coverPath).isNull()
+        assertThat(cover.exists()).isFalse()
+    }
+
+    @Test
+    fun clearCoverThenDiscardKeepsTheFile() = runTest(dispatcher) {
+        val (id, cover) = bookWithCover()
+        val vm = editVm(id)
+        vm.clearCover()
+        vm.onCleared()
+
+        assertThat(cover.exists()).isTrue()
+        assertThat(bookRepository.findById(id)!!.coverPath).isEqualTo(cover.absolutePath)
+    }
+
+    @Test
+    fun editModeSaveWithClearedThenRepickedCoverKeepsTheNewOne() = runTest(dispatcher) {
+        val (id, oldCover) = bookWithCover()
+        val vm = editVm(id)
+        vm.clearCover()
+        // .png so the promoted file has a different name than the cleared
+        // covers/1.jpg — otherwise "old file gone" is trivially true.
+        pickCover(vm, "again.png")
+        vm.save()?.join()
+
+        val saved = bookRepository.findById(id)!!
+        assertThat(saved.coverPath).isEqualTo(File(coversDir, "$id.png").absolutePath)
+        assertThat(File(saved.coverPath!!).exists()).isTrue()
+        assertThat(oldCover.exists()).isFalse()
+    }
+
+    @Test
+    fun addModeSaveLeavesNoTempCoverBehind() = runTest(dispatcher) {
+        val vm = newBookVm()
+        vm.setTitle("Neuromancer")
+        pickCover(vm)
+        vm.save()?.join()
+        vm.onCleared()
+
+        val saved = savedBook()
+        assertThat(File(saved.coverPath!!).exists()).isTrue()
+        assertThat(tempCovers()).isEmpty()
+    }
+
+    @Test
+    fun addModeDiscardLeavesNoTempCoverBehind() = runTest(dispatcher) {
+        val vm = newBookVm()
+        vm.setTitle("Neuromancer")
+        pickCover(vm, "a.jpg")
+        pickCover(vm, "b.jpg")
+        vm.onCleared()
+
+        assertThat(tempCovers()).isEmpty()
+    }
+
 }

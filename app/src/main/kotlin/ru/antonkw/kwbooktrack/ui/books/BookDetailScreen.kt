@@ -161,15 +161,16 @@ fun BookDetailScreen(
         }
 
         val detailListState = androidx.compose.foundation.lazy.rememberLazyListState()
+        // padding(end = scrollbarTouchWidth) reserves the scrollbar's whole
+        // touch lane — the bar is the later sibling in this Box, so it wins
+        // hit-test there and content inside the lane would be untappable.
+        val scrollbarTouchWidth = 24.dp
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-            // padding(end = 16.dp) leaves an 8dp gap to the visual 8dp scrollbar
-            // thumb; the remaining 8dp inside the scrollbar's 24dp touch
-            // zone is invisible to LazyColumn (scrollbar sibling wins).
             LazyColumn(
                 state = detailListState,
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(end = 16.dp),
+                    .padding(end = scrollbarTouchWidth),
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
@@ -498,7 +499,7 @@ fun BookDetailScreen(
                 listState = detailListState,
                 modifier = Modifier.align(Alignment.CenterEnd),
                 width = 8.dp,
-                touchWidth = 24.dp,
+                touchWidth = scrollbarTouchWidth,
             )
         }
     }

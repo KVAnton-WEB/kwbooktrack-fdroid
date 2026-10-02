@@ -107,7 +107,10 @@ class NoteEditorViewModelTest {
         vm.save(NoteKind.QUOTE)
         advanceUntilIdle()
 
-        val quotes = db.noteDao().observeByKind(NoteKind.QUOTE).first()
+        // The insert inside save() suspends on Room's executor — a real thread
+        // the test scheduler can't advance — so advanceUntilIdle() above can
+        // return before the row is written. Wait for it instead of racing it.
+        val quotes = db.noteDao().observeByKind(NoteKind.QUOTE).first { it.isNotEmpty() }
         assertThat(quotes).hasSize(1)
         assertThat(quotes.first().kind).isEqualTo(NoteKind.QUOTE)
     }

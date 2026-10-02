@@ -26,7 +26,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -34,10 +33,13 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 /**
  * Material 3-styled vertical scrollbar for a [LazyListState].
  *
- * Layout: the bar lives in its own column on the right edge — pair it
- * with `LazyColumn(modifier = …padding(end = width))` so content doesn't
- * slide under the thumb. The bar is hidden entirely when the content
- * fits the viewport (no scroll possible).
+ * Layout: the bar occupies [touchWidth] on the right edge — pair it with
+ * `LazyColumn(modifier = …padding(end = touchWidth))` so content doesn't
+ * sit under the touch lane (the bar is the later sibling in the Box, so it
+ * wins hit-test in that strip and the content there would be untappable).
+ * Only the inner [width]-wide rectangle is painted, so the visual stays
+ * slim while the finger gets a full [touchWidth] lane. The bar is hidden
+ * entirely when the content fits the viewport (no scroll possible).
  *
  * Geometry comes from [LazyListState]:
  * - `avgItemPx` (mean of visible items' heights) estimates per-item size.
@@ -53,10 +55,14 @@ import kotlinx.coroutines.flow.distinctUntilChanged
  * - Thumb position = `scrollPx / (totalSize − viewportSize)`.
  *
  * Interaction:
- * - Tap the track → `scrollToItem` to jump so the thumb lands on the tap.
- * - Drag the thumb → 1:1 thumb motion; the list scrolls via `dispatchRawDelta`
- *   on every pointer event (light path; no full remeasure of the LazyColumn
- *   between ticks, no coroutine mutual-exclusion queue piling up).
+ * - Tap the track (not on the thumb) → `requestScrollToItem` to jump so the
+ *   thumb lands on the tap. A tap *on* the thumb is ignored — that region
+ *   belongs to the drag handler, and jumping there would shift the list
+ *   under a stationary finger.
+ * - Drag the thumb → 1:1 thumb motion from wherever it was grabbed; the list
+ *   scrolls via `dispatchRawDelta` on every pointer event (light path; no
+ *   full remeasure of the LazyColumn between ticks, no coroutine
+ *   mutual-exclusion queue piling up).
  *
  * ponytail: Compose Foundation's `rememberScrollbarState` /
  * `Modifier.verticalScrollbar` API didn't ship in our Foundation 1.7.2;
@@ -122,9 +128,8 @@ fun VerticalListScrollbar(
     Box(
         modifier = modifier
             .fillMaxHeight()
-            .width(width)
+            .width(touchWidth)
             .onSizeChanged { trackHeightPx = it.height }
-            .background(trackColor, RoundedCornerShape(width / 2))
             .pointerInput(listState, metrics.thumbFraction, thumbHeightPx, scrollableTrackPx) {
                 // Tap on the track (outside the thumb) jumps the list.
                 // Re-keyed on the geometry inputs so the captured
@@ -132,6 +137,12 @@ fun VerticalListScrollbar(
                 // the lambda are always current — the pointerInput block
                 // re-runs when any of them change.
                 detectTapGestures { offset ->
+                    // The drag handler owns the thumb's lane (24dp, inside this
+                    // 24dp-wide box); a tap there is a grab, not a jump.
+                    val thumbTop = thumbOffsetPxState.intValue.toFloat()
+                    if (offset.y in thumbTop..(thumbTop + thumbHeightPx)) {
+                        return@detectTapGestures
+                    }
                     val ratio = ((offset.y - thumbHeightPx / 2f) / scrollableTrackPx)
                         .coerceIn(0f, 1f)
                     val totalScrollable = (metrics.totalScrollPx - metrics.viewportPx)
@@ -154,19 +165,33 @@ fun VerticalListScrollbar(
                     // next frame. Perfect for a one-shot tap; the drag path
                     // below uses dispatchRawDelta instead because it has to
                     // scroll on every single pointer event without remeasure.
-                    requestScrollToItemIndex(listState, newIndex, offsetInItem)
+                    listState.requestScrollToItem(newIndex, offsetInItem)
                 }
             },
         contentAlignment = Alignment.TopEnd,
     ) {
+        // Track backdrop — the visible 8dp bar. Kept as its own child so the
+        // box itself can be `touchWidth` wide (the touch lane) without
+        // painting a 24dp bar.
         Box(
             modifier = Modifier
-                .width(touchWidth)
+                .align(Alignment.CenterEnd)
+                .width(width)
+                .fillMaxHeight()
+                .background(trackColor, RoundedCornerShape(width / 2)),
+        )
+        Box(
+            modifier = Modifier
+                // A Box child without a size modifier wraps its content — the
+                // only child is the 8dp thumb — so this must fill the lane.
+                .fillMaxWidth()
                 .align(Alignment.TopEnd)
                 .offset(y = thumbOffsetY)
                 .height(with(density) { thumbHeightPx.toDp() })
                 .pointerInput(listState) {
-                    var anchor: DragAnchor? = null
+                    // Thumb top at grab time; the drag is 1:1 from there, so the
+                    // finger's offset within the thumb doesn't matter.
+                    var thumbOffsetAtStart = 0f
                     // dragAmount in Compose's detectDragGestures is the
                     // *per-event* delta (positionChange = position - previousPosition),
                     // not the cumulative finger motion from the start of the drag.
@@ -176,26 +201,27 @@ fun VerticalListScrollbar(
                     // to the start each tick (v0.5.7 bug: thumb jumps on release).
                     var accumulatedDeltaY = 0f
                     detectDragGestures(
-                        onDragStart = { offset ->
-                            // touchYAtStart = thumb top + finger-to-thumb-top,
-                            // in track coordinates.
+                        onDragStart = {
                             accumulatedDeltaY = 0f
-                            anchor = DragAnchor(
-                                touchYAtStart = thumbOffsetPxState.intValue + offset.y,
-                                thumbOffsetAtStart = thumbOffsetPxState.intValue,
-                            )
+                            thumbOffsetAtStart = thumbOffsetPxState.intValue.toFloat()
                             isDragging = true
                         },
                         onDrag = { change, dragAmount ->
                             change.consume()
-                            val a = anchor ?: return@detectDragGestures
                             // The thumb's local origin is the touchBox's top-left
                             // (the touchBox only moves via the offset modifier, which
                             // we move synchronously below), so dragAmount == finger
                             // delta in track coords per event. Accumulate across
                             // events to get the thumb's 1:1 position under the finger.
                             accumulatedDeltaY += dragAmount.y
-                            val newOffset = (a.thumbOffsetAtStart + accumulatedDeltaY)
+                            // ponytail: the thumb is clamped to the track but the
+                            // list is only scrolled by the raw delta, so dragging
+                            // past either end leaves the thumb pinned while the
+                            // list stops — on release the isDragging=false re-sync
+                            // snaps it back to the real position. Feels like a
+                            // rubber band; making it exact needs the consumed
+                            // delta, which dispatchRawDelta doesn't report.
+                            val newOffset = (thumbOffsetAtStart + accumulatedDeltaY)
                                 .toInt()
                                 .coerceIn(0, scrollableTrackPx)
 
@@ -217,6 +243,13 @@ fun VerticalListScrollbar(
                             // and ScrollableState.scroll { } queues them via
                             // mutual exclusion, so by the time the user released
                             // a queue of stale scrolls was still catching up.
+                            //
+                            // ponytail: pxPerTrackPx is an average-item
+                            // estimate, so it drifts from the true
+                            // scroll-per-thumb-pixel ratio on lists whose items
+                            // have varying heights. Exact ratio would need a
+                            // LazyListState scroll-offset lookup per tick;
+                            // upgrade only if that drift is visible in use.
                             val info = listState.layoutInfo
                             val visible = info.visibleItemsInfo
                             val viewportPx = (info.viewportEndOffset -
@@ -232,25 +265,18 @@ fun VerticalListScrollbar(
                                 listState.dispatchRawDelta(dragAmount.y * pxPerTrackPx)
                             }
                         },
-                        onDragEnd = {
-                            anchor = null
-                            isDragging = false
-                        },
-                        onDragCancel = {
-                            anchor = null
-                            isDragging = false
-                        },
+                        onDragEnd = { isDragging = false },
+                        onDragCancel = { isDragging = false },
                     )
                 },
         ) {
-            // Visual thumb: the same thin rectangle as v0.5.x. Stays [width]
-            // wide and fills the touch-Box vertically so the rounded shape
-            // matches the touch target's bounds. The touch-Box itself stays
+            // Visual thumb: the same thin rectangle as v0.5.x, right-aligned
+            // inside the wider touch lane. The touch-Box itself stays
             // transparent — only the inner Box paints, keeping the visual a
             // slim 8dp indicator while the user gets a 24dp hit-test lane.
             Box(
                 modifier = Modifier
-                    .align(Alignment.Center)
+                    .align(Alignment.CenterEnd)
                     .width(width)
                     .fillMaxHeight()
                     .background(
@@ -260,25 +286,6 @@ fun VerticalListScrollbar(
             )
         }
     }
-}
-
-private data class DragAnchor(
-    val touchYAtStart: Float,
-    val thumbOffsetAtStart: Int,
-)
-
-/**
- * Non-suspend wrapper around [LazyListState.requestScrollToItem] so we can
- * call it from a tap-gesture lambda (which isn't a coroutine body). Mirrors
- * the public API minus the `IntRange` annotation, which Compose's KSP
- * generates and we don't need here.
- */
-private fun requestScrollToItemIndex(
-    listState: LazyListState,
-    index: Int,
-    scrollOffset: Int,
-) {
-    listState.requestScrollToItem(index, scrollOffset)
 }
 
 /** Cached scroll geometry; recomputed only when the list mutates or scrolls. */

@@ -98,25 +98,21 @@ fun NotesListScreen(
                     } else {
                         val listState = androidx.compose.foundation.lazy.rememberLazyListState()
                         Box(modifier = Modifier.fillMaxSize()) {
-val scrollbarWidth = 8.dp
-                            // Touch zone is 3× the visual width — wider than
-                            // the visual 8dp thumb so the user can actually
-                            // hit it with a finger, but kept small enough that
-                            // the gap between the bar and the content stays
-                            // tight (24dp − 8dp = 16dp).
+                            val scrollbarWidth = 8.dp
+                            // Touch lane is 3× the visual thumb width — wide
+                            // enough to grab with a finger. padding(end =
+                            // scrollbarTouchWidth) reserves it: the scrollbar
+                            // is the later sibling in this Box, so it wins
+                            // hit-test there and content inside the lane would
+                            // be untappable.
                             val scrollbarTouchWidth = 24.dp
                             LazyColumn(
                                 state = listState,
                                 contentPadding = PaddingValues(16.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp),
-                                // padding(end = 16.dp) leaves an 8dp gap to the
-                                // visual 8dp scrollbar thumb; the remaining
-                                // 8dp lane inside the scrollbar's 24dp touch
-                                // zone is invisible to LazyColumn (the
-                                // scrollbar sibling wins hit-test there).
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .padding(end = 16.dp),
+                                    .padding(end = scrollbarTouchWidth),
                             ) {
                                 items(s.items, key = { it.note.id }) { item ->
                                     NoteListRow(
