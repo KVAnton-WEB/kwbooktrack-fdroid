@@ -162,12 +162,13 @@ fun BookDetailScreen(
 
         val detailListState = androidx.compose.foundation.lazy.rememberLazyListState()
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-            // padding(end = 8.dp) reserves the right lane for the scrollbar.
+            // padding(end = 48.dp) reserves the full touch lane for the
+            // scrollbar; visual thumb is still 8.dp wide.
             LazyColumn(
                 state = detailListState,
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(end = 8.dp),
+                    .padding(end = 48.dp),
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
@@ -496,6 +497,7 @@ fun BookDetailScreen(
                 listState = detailListState,
                 modifier = Modifier.align(Alignment.CenterEnd),
                 width = 8.dp,
+                touchWidth = 48.dp,
             )
         }
     }
