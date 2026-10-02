@@ -316,12 +316,15 @@ class AddBookViewModel @Inject constructor(
                     ),
                 )
                 // The previous persisted cover (kept alive across the edit so
-                // Discard could roll it back) is now orphaned: renameCoverToBookId
-                // promoted the new selection into its slot. Drop it. (For the
-                // no-cover-change case renameCoverToBookId() returns the same
-                // path, so the inequality check skips the delete — we just
-                // refresh the recorded path to the post-rename value.)
-                if (originalCoverPath != null && originalCoverPath != finalCoverPath) {
+                // Discard could roll it back) is now orphaned by the promotion:
+// renameCoverToBookId() moved the new selection into its slot at
+                // finalCoverPath. Skip when null (user cleared the cover; the
+                // null ?: existing.coverPath fallback below preserves the row's
+                // coverPath, leaving originalCoverPath as the persisted truth).
+                // Skip when src == target (no-cover-change edit; rename is a
+                // no-op and the original file is still the file at the same
+                // path).
+                if (finalCoverPath != null && originalCoverPath != null && originalCoverPath != finalCoverPath) {
                     runCatching { File(originalCoverPath!!).delete() }
                 }
                 originalCoverPath = finalCoverPath
@@ -376,9 +379,14 @@ class AddBookViewModel @Inject constructor(
         val ext = src.extension.ifEmpty { "jpg" }
         val target = File(coversDir, "$bookId.$ext")
         return try {
-            // Удаляем все предыдущие обложки этой книги — могут быть с другим расширением.
-            coversDir.listFiles { f -> f.isFile && f.name.startsWith("$bookId.") }
-                ?.forEach { it.delete() }
+            // Drop stale covers for this book (e.g. an old .png when the new
+            // selection is .jpg). Skip the source itself — if src already
+            // happens to be named {bookId}.{ext} (the edit-no-cover-change
+            // path), sweeping it would orphan the row that points at it,
+            // since the copyTo branch below is then skipped (src == target).
+            coversDir.listFiles { f ->
+                f.isFile && f.name.startsWith("$bookId.") && f.absolutePath != src.absolutePath
+            }?.forEach { it.delete() }
             if (src.absolutePath != target.absolutePath) {
                 src.copyTo(target, overwrite = true)
                 src.delete()

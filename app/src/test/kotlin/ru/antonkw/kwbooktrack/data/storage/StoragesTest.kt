@@ -72,6 +72,28 @@ class StoragesTest {
     }
 
     @Test
+    fun coverPromoteToBookSurvivesWhenTempIsAlreadyAtBookIdPath() {
+        // edit-mode, no-cover-change: state.coverPath is the existing
+        // covers/{bookId}.{ext} file itself, so src.absolutePath ==
+        // target.absolutePath. The pre-fix code unlinked the file via the
+        // deleteForBook(bookId) prefix sweep before short-circuiting the
+        // copyTo branch — the row then held a path to a non-existent file.
+        // After fix: the source must be skipped from the sweep and survive.
+        val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val coversDir = File(ctx.filesDir, "covers")
+        val existing = File(coversDir, "42.jpg").apply {
+            writeBytes(byteArrayOf(0xCA.toByte(), 0xFE.toByte()))
+        }
+        val originalBytes = existing.readBytes()
+
+        val returned = coverStorage.promoteToBook(42L, existing.absolutePath)
+
+        assertThat(returned).isEqualTo(existing.absolutePath)
+        assertThat(existing.exists()).isTrue()
+        assertThat(existing.readBytes()).isEqualTo(originalBytes)
+    }
+
+    @Test
     fun coverDeleteForBookRemovesAllExtensionsForThatBook() {
         val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
         val coversDir = File(ctx.filesDir, "covers")

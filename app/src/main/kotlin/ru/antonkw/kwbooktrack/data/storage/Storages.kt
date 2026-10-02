@@ -48,8 +48,15 @@ class FileCoverStorage @Inject constructor(
         val ext = src.extension.ifEmpty { "jpg" }
         val target = File(coversDir, "$bookId.$ext")
         return try {
-            // Удаляем ВСЕ предыдущие обложки этой книги (могут быть с другим расширением).
-            deleteForBook(bookId)
+            // Drop stale covers for this book (e.g. an old .png when the new
+            // selection is .jpg). Skip the source itself — if src already
+            // happens to be named {bookId}.{ext} (a re-promote of an existing
+            // cover), deleteForBook() would unlink it and the copyTo branch
+            // below is then skipped (src == target), orphaning the row that
+            // points at it.
+            coversDir.listFiles { f ->
+                f.isFile && f.name.startsWith("$bookId.") && f.absolutePath != src.absolutePath
+            }?.forEach { it.delete() }
             if (src.absolutePath != target.absolutePath) {
                 src.copyTo(target, overwrite = true)
                 src.delete()
