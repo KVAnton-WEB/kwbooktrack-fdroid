@@ -68,7 +68,7 @@ fun VerticalListScrollbar(
     listState: LazyListState,
     modifier: Modifier = Modifier,
     width: Dp = 8.dp,
-    touchWidth: Dp = 40.dp,
+    touchWidth: Dp = 24.dp,
 ) {
     val density = LocalDensity.current
     val trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f)
@@ -167,10 +167,19 @@ fun VerticalListScrollbar(
                 .height(with(density) { thumbHeightPx.toDp() })
                 .pointerInput(listState) {
                     var anchor: DragAnchor? = null
+                    // dragAmount in Compose's detectDragGestures is the
+                    // *per-event* delta (positionChange = position - previousPosition),
+                    // not the cumulative finger motion from the start of the drag.
+                    // The list scroll below uses it correctly per-event; but the
+                    // thumb position needs cumulative motion — otherwise the
+                    // thumb only moves by the last event's delta and snaps back
+                    // to the start each tick (v0.5.7 bug: thumb jumps on release).
+                    var accumulatedDeltaY = 0f
                     detectDragGestures(
                         onDragStart = { offset ->
                             // touchYAtStart = thumb top + finger-to-thumb-top,
                             // in track coordinates.
+                            accumulatedDeltaY = 0f
                             anchor = DragAnchor(
                                 touchYAtStart = thumbOffsetPxState.intValue + offset.y,
                                 thumbOffsetAtStart = thumbOffsetPxState.intValue,
@@ -180,23 +189,21 @@ fun VerticalListScrollbar(
                         onDrag = { change, dragAmount ->
                             change.consume()
                             val a = anchor ?: return@detectDragGestures
-                            // newTouchY in track coords = grab point + accumulated delta.
-                            // dragAmount is the finger's delta in this Box's local
-                            // coords; the thumb's local origin doesn't move with the
-                            // thumb (it's at the Box's top-left, which only moves
-                            // when we move the offset modifier — and we move it
-                            // synchronously to follow the finger below), so
-                            // dragAmount == finger delta in track coords for the
-                            // duration of the drag.
-                            val newTouchY = a.touchYAtStart + dragAmount.y
-                            val newOffset = (a.thumbOffsetAtStart +
-                                (newTouchY - a.touchYAtStart)).toInt()
+                            // The thumb's local origin is the touchBox's top-left
+                            // (the touchBox only moves via the offset modifier, which
+                            // we move synchronously below), so dragAmount == finger
+                            // delta in track coords per event. Accumulate across
+                            // events to get the thumb's 1:1 position under the finger.
+                            accumulatedDeltaY += dragAmount.y
+                            val newOffset = (a.thumbOffsetAtStart + accumulatedDeltaY)
+                                .toInt()
                                 .coerceIn(0, scrollableTrackPx)
 
                             // 1) Visual update — synchronous, on the same frame
-                            // as the pointer event (Modifier.offset { ... } is a
-                            // deferred state read; no round-trip through full
-                            // recomposition needed).
+                            // as the pointer event (state read directly so the
+                            // snapshot system drives recomposition+relayout+redraw
+                            // in the same frame; see the LaunchedEffect comment
+                            // above for the reason we don't `.offset { IntOffset(...) }`).
                             thumbOffsetPxState.intValue = newOffset
 
                             // 2) List scroll — use dispatchRawDelta (the same

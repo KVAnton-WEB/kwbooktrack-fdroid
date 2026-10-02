@@ -98,22 +98,25 @@ fun NotesListScreen(
                     } else {
                         val listState = androidx.compose.foundation.lazy.rememberLazyListState()
                         Box(modifier = Modifier.fillMaxSize()) {
-                            val scrollbarWidth = 8.dp
-                            // Touch zone is ~5× the visual width so the user
-                            // can actually hit the thumb with a finger, and
-                            // LazyColumn yields that much right padding so
-                            // the touch zone doesn't overlap scrollable
-                            // content (the scrollbar sibling wins hit-test,
-                            // but carving out the space keeps the visual
-                            // layout clean and prevents accidental scrolls).
-                            val scrollbarTouchWidth = 40.dp
+val scrollbarWidth = 8.dp
+                            // Touch zone is 3× the visual width — wider than
+                            // the visual 8dp thumb so the user can actually
+                            // hit it with a finger, but kept small enough that
+                            // the gap between the bar and the content stays
+                            // tight (24dp − 8dp = 16dp).
+                            val scrollbarTouchWidth = 24.dp
                             LazyColumn(
                                 state = listState,
                                 contentPadding = PaddingValues(16.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp),
+                                // padding(end = 16.dp) leaves an 8dp gap to the
+                                // visual 8dp scrollbar thumb; the remaining
+                                // 8dp lane inside the scrollbar's 24dp touch
+                                // zone is invisible to LazyColumn (the
+                                // scrollbar sibling wins hit-test there).
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .padding(end = scrollbarTouchWidth),
+                                    .padding(end = 16.dp),
                             ) {
                                 items(s.items, key = { it.note.id }) { item ->
                                     NoteListRow(

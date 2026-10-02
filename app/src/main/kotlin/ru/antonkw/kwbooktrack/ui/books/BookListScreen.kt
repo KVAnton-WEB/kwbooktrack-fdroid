@@ -242,20 +242,24 @@ fun BookListScreen(
                         val listState = androidx.compose.foundation.lazy.rememberLazyListState()
                         Box(modifier = Modifier.fillMaxSize()) {
                             // padding(end = scrollbarTouchWidth) reserves the
-                            // full touch lane so neither the bar nor its extended
-                            // hit-test zone overlaps the rightmost card. Visual
-                            // thumb is still [scrollbarWidth] wide.
+                            // touch lane; touch zone is 3× the visual width
+                            // (24dp − 8dp visual = 16dp gap to the content).
                             val scrollbarWidth = 8.dp
-                            val scrollbarTouchWidth = 40.dp
+                            val scrollbarTouchWidth = 24.dp
                             if (isGrid) {
                                 val rows = remember(s.books) { s.books.chunked(3) }
                                 LazyColumn(
                                     state = listState,
                                     contentPadding = PaddingValues(16.dp),
                                     verticalArrangement = Arrangement.spacedBy(12.dp),
+                                    // padding(end = 16.dp) leaves an 8dp gap to
+                                    // the visual 8dp scrollbar; the inner
+                                    // 8dp of the scrollbar's 24dp touch zone
+                                    // overlaps LazyColumn and the scrollbar
+                                    // sibling wins hit-test.
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        .padding(end = scrollbarTouchWidth),
+                                        .padding(end = 16.dp),
                                 ) {
                                     itemsIndexed(rows, key = { i, row -> "${row.firstOrNull()?.book?.id ?: 0L}_$i" }) { i, row ->
                                         Row(
@@ -286,7 +290,7 @@ fun BookListScreen(
                                     verticalArrangement = Arrangement.spacedBy(8.dp),
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        .padding(end = scrollbarTouchWidth),
+                                        .padding(end = 16.dp),
                                 ) {
                                     items(s.books, key = { it.book.id }) {
                                         BookListCard(it, onClick = { onBookClick(it.book.id) })
