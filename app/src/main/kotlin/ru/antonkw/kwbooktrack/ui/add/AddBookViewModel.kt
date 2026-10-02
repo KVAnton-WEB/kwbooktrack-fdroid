@@ -98,32 +98,27 @@ class AddBookViewModel @Inject constructor(
 
     // Per-suggestion flows: only the field they depend on is `distinctUntilChanged`d
     // so typing in `author` doesn't recompute `genreSuggestions` and vice versa.
-    private val authorField = _state.map { it.author }.distinctUntilChanged()
-    private val genreField = _state.map { it.genre }.distinctUntilChanged()
-    private val publisherField = _state.map { it.publisher }.distinctUntilChanged()
-
     private val booksFlow = bookRepository.observeAll()
 
-    val authorSuggestions: StateFlow<List<String>> = combine(
+    /** Already-known values of [get], filtered by what the user typed into [field]. */
+    private fun suggestions(
+        field: (AddBookState) -> String,
+        get: (BookEntity) -> String?,
+    ): StateFlow<List<String>> = combine(
         booksFlow,
-        authorField,
-    ) { books, author ->
-        suggest(books, author) { it.author }
+        _state.map(field).distinctUntilChanged(),
+    ) { books, prefix ->
+        suggest(books, prefix, get)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    val genreSuggestions: StateFlow<List<String>> = combine(
-        booksFlow,
-        genreField,
-    ) { books, genre ->
-        suggest(books, genre) { it.genre }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
-    val publisherSuggestions: StateFlow<List<String>> = combine(
-        booksFlow,
-        publisherField,
-    ) { books, publisher ->
-        suggest(books, publisher) { it.publisher }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val authorSuggestions = suggestions({ it.author }, { it.author })
+    val genreSuggestions = suggestions({ it.genre }, { it.genre })
+    val publisherSuggestions = suggestions({ it.publisher }, { it.publisher })
+    val seriesSuggestions = suggestions({ it.series }, { it.series })
+    val bindingSuggestions = suggestions({ it.binding }, { it.binding })
+    val translatorSuggestions = suggestions({ it.translator }, { it.translator })
+    val originalLanguageSuggestions = suggestions({ it.originalLanguage }, { it.originalLanguage })
+    val purchasePlaceSuggestions = suggestions({ it.purchasePlace }, { it.purchasePlace })
 
     private fun suggest(
         books: List<BookEntity>,

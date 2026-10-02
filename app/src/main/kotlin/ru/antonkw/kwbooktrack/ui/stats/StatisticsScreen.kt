@@ -5,13 +5,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -27,7 +24,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -83,11 +79,15 @@ fun StatisticsScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Card {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(stringResource(R.string.stats_summary), style = MaterialTheme.typography.titleMedium)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Text(stringResource(R.string.stats_sessions, stats.totalSessions))
                     Text(stringResource(R.string.stats_pages, stats.totalPages))
-                    Text(stringResource(R.string.stats_minutes, stats.totalMinutes))
                 }
             }
 
@@ -110,19 +110,27 @@ fun StatisticsScreen(
                 ) { Text(stringResource(R.string.stats_tab_years)) }
             }
 
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChipLabel(
-                    selected = true,
-                    onClick = { /* metric click - no-op or future */ },
-                    label = stringResource(R.string.stats_label_pages),
-                    modifier = Modifier.weight(1f),
-                )
-                FilterChipLabel(
-                    selected = true,
-                    onClick = { /* metric click - no-op or future */ },
-                    label = stringResource(R.string.stats_label_books),
-                    modifier = Modifier.weight(1f),
-                )
+            Card {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    val periodLabel = periodLabel(selection)
+                    Text(
+                        text = when (selection.mode) {
+                            ChartMode.BY_MONTH -> stringResource(R.string.stats_chart_finished_by_month, periodLabel)
+                            ChartMode.BY_YEAR -> stringResource(R.string.stats_chart_finished_by_year)
+                        },
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    BarChartWithLabels(
+                        labels = when (selection.mode) {
+                            ChartMode.BY_MONTH -> monthLabels()
+                            ChartMode.BY_YEAR -> StatsCalculator.yearRange(stats.minYear, stats.maxYear).map { it.toString() }
+                        },
+                        values = when (selection.mode) {
+                            ChartMode.BY_MONTH -> monthlyChartValuesBooks(stats, selection.year)
+                            ChartMode.BY_YEAR -> stats.yearlyCompleted.associate { it.year to it.count }
+                        },
+                    )
+                }
             }
 
             Card {
@@ -143,29 +151,6 @@ fun StatisticsScreen(
                         values = when (selection.mode) {
                             ChartMode.BY_MONTH -> monthlyChartValues(stats, selection.year)
                             ChartMode.BY_YEAR -> stats.yearlyPages.associate { it.year to it.pages }
-                        },
-                    )
-                }
-            }
-
-            Card {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    val periodLabel = periodLabel(selection)
-                    Text(
-                        text = when (selection.mode) {
-                            ChartMode.BY_MONTH -> stringResource(R.string.stats_chart_finished_by_month, periodLabel)
-                            ChartMode.BY_YEAR -> stringResource(R.string.stats_chart_finished_by_year)
-                        },
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    BarChartWithLabels(
-                        labels = when (selection.mode) {
-                            ChartMode.BY_MONTH -> monthLabels()
-                            ChartMode.BY_YEAR -> StatsCalculator.yearRange(stats.minYear, stats.maxYear).map { it.toString() }
-                        },
-                        values = when (selection.mode) {
-                            ChartMode.BY_MONTH -> monthlyChartValuesBooks(stats, selection.year)
-                            ChartMode.BY_YEAR -> stats.yearlyCompleted.associate { it.year to it.count }
                         },
                     )
                 }
@@ -312,34 +297,6 @@ private fun BarChartWithLabels(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-            }
-        }
-    }
-}
-
-@Composable
-private fun androidx.compose.foundation.layout.RowScope.FilterChipLabel(
-    selected: Boolean,
-    onClick: () -> Unit,
-    label: String,
-    modifier: Modifier = Modifier,
-    trailingIcon: androidx.compose.ui.graphics.vector.ImageVector? = null,
-) {
-    Surface(
-        selected = selected,
-        onClick = onClick,
-        shape = RoundedCornerShape(8.dp),
-        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
-        modifier = modifier,
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-        ) {
-            Text(text = label, style = MaterialTheme.typography.labelLarge)
-            if (trailingIcon != null) {
-                Spacer(modifier = Modifier.padding(start = 6.dp))
-                Icon(trailingIcon, contentDescription = null, modifier = Modifier.size(18.dp))
             }
         }
     }

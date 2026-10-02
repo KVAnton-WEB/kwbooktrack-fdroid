@@ -13,12 +13,12 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -108,48 +108,62 @@ fun VerticalListScrollbar(
     // callback, so the thumb visually stayed put during drags. Reading the
     // State<T> directly in the composable body registers a normal recomposition
     // subscription, which the snapshot system drives correctly on every
-    // intValue = … write (recomposition + relayout + redraw in the same frame).
+    // write (recomposition + relayout + redraw in the same frame).
     //
-    // LaunchedEffect re-syncs from the metrics-driven [thumbOffsetPx] *only*
-    // when not dragging, for the same reason as v0.5.6: scrollFraction lags
-    // behind dispatchRawDelta and is approximate (averages item heights), so
-    // letting it overwrite the in-progress visual position during a drag makes
-    // the thumb snap back to a stale spot.
-    val thumbOffsetPxState = remember { mutableIntStateOf(thumbOffsetPx) }
+    // While not dragging the offset comes straight from the metrics, so the
+    // thumb tracks the list. During a drag the finger-driven offset wins:
+    // scrollFraction lags behind dispatchRawDelta and is approximate (it
+    // averages item heights), so letting it overwrite the in-progress visual
+    // position makes the thumb snap back to a stale spot.
+    //
+    // ponytail: a null dragOffsetPx means "follow the list". The previous
+    // version re-synced via `LaunchedEffect(thumbOffsetPx, isDragging)` — but
+    // thumbOffsetPx changes on every frame, so that cancelled and relaunched a
+    // coroutine 60-120x/second purely to assign one int. Plain composition
+    // gives the same result for free.
+    var dragOffsetPx by remember { mutableStateOf<Int?>(null) }
+    val effectiveOffsetPx = dragOffsetPx ?: thumbOffsetPx
     var isDragging by remember { mutableStateOf(false) }
-    LaunchedEffect(thumbOffsetPx, isDragging) {
-        if (!isDragging) {
-            thumbOffsetPxState.intValue = thumbOffsetPx
-        }
-    }
-    // The actual modifier offset, recomposed when the State changes:
-    val thumbOffsetY = with(density) { thumbOffsetPxState.intValue.toDp() }
+    val thumbOffsetY = with(density) { effectiveOffsetPx.toDp() }
+
+    // Geometry read from inside the gesture lambdas. Keying `pointerInput` on
+    // these is what used to restart the gesture detectors: avgItemPx is the mean
+    // height of the *visible* items, so crossing one item boundary moves
+    // thumbFraction → thumbHeightPx → scrollableTrackPx, and the tap detector
+    // was torn down and rebuilt dozens of times per fling. Keyed on
+    // rememberUpdatedState instead, so the detectors are built once.
+    val geo by rememberUpdatedState(
+        ScrollbarGeo(
+            metrics = metrics,
+            thumbHeightPx = thumbHeightPx,
+            scrollableTrackPx = scrollableTrackPx,
+            offsetPx = effectiveOffsetPx,
+        ),
+    )
 
     Box(
         modifier = modifier
             .fillMaxHeight()
             .width(touchWidth)
             .onSizeChanged { trackHeightPx = it.height }
-            .pointerInput(listState, metrics.thumbFraction, thumbHeightPx, scrollableTrackPx) {
-                // Tap on the track (outside the thumb) jumps the list.
-                // Re-keyed on the geometry inputs so the captured
-                // [metrics] / [scrollableTrackPx] / [thumbHeightPx] inside
-                // the lambda are always current — the pointerInput block
-                // re-runs when any of them change.
+            .pointerInput(listState) {
+                // Tap on the track (outside the thumb) jumps the list. All the
+                // geometry is read through [geo] so the block below never has
+                // to be re-keyed.
                 detectTapGestures { offset ->
                     // The drag handler owns the thumb's lane (24dp, inside this
                     // 24dp-wide box); a tap there is a grab, not a jump.
-                    val thumbTop = thumbOffsetPxState.intValue.toFloat()
-                    if (offset.y in thumbTop..(thumbTop + thumbHeightPx)) {
+                    val thumbTop = geo.offsetPx.toFloat()
+                    if (offset.y in thumbTop..(thumbTop + geo.thumbHeightPx)) {
                         return@detectTapGestures
                     }
-                    val ratio = ((offset.y - thumbHeightPx / 2f) / scrollableTrackPx)
+                    val ratio = ((offset.y - geo.thumbHeightPx / 2f) / geo.scrollableTrackPx)
                         .coerceIn(0f, 1f)
-                    val totalScrollable = (metrics.totalScrollPx - metrics.viewportPx)
+                    val totalScrollable = (geo.metrics.totalScrollPx - geo.metrics.viewportPx)
                         .coerceAtLeast(0f)
                     val targetScrollPx = ratio * totalScrollable
                     val info = listState.layoutInfo
-                    val avgItemPx = metrics.avgItemPx
+                    val avgItemPx = geo.metrics.avgItemPx
                     val newIndex = (targetScrollPx / avgItemPx).toInt()
                         .coerceIn(0, (info.totalItemsCount - 1).coerceAtLeast(0))
                     val targetItem = info.visibleItemsInfo
@@ -203,7 +217,7 @@ fun VerticalListScrollbar(
                     detectDragGestures(
                         onDragStart = {
                             accumulatedDeltaY = 0f
-                            thumbOffsetAtStart = thumbOffsetPxState.intValue.toFloat()
+                            thumbOffsetAtStart = geo.offsetPx.toFloat()
                             isDragging = true
                         },
                         onDrag = { change, dragAmount ->
@@ -223,14 +237,14 @@ fun VerticalListScrollbar(
                             // delta, which dispatchRawDelta doesn't report.
                             val newOffset = (thumbOffsetAtStart + accumulatedDeltaY)
                                 .toInt()
-                                .coerceIn(0, scrollableTrackPx)
+                                .coerceIn(0, geo.scrollableTrackPx)
 
                             // 1) Visual update — synchronous, on the same frame
-                            // as the pointer event (state read directly so the
-                            // snapshot system drives recomposition+relayout+redraw
-                            // in the same frame; see the LaunchedEffect comment
-                            // above for the reason we don't `.offset { IntOffset(...) }`).
-                            thumbOffsetPxState.intValue = newOffset
+                            // as the pointer event (a State write, so the snapshot
+                            // system drives recomposition+relayout+redraw in the
+                            // same frame; see the offset comment above for the
+                            // reason we don't use `.offset { IntOffset(...) }`).
+                            dragOffsetPx = newOffset
 
                             // 2) List scroll — use dispatchRawDelta (the same
                             // path LazyColumn takes when the user drags on the
@@ -260,7 +274,7 @@ fun VerticalListScrollbar(
                                 visible.sumOf { it.size }.toFloat() / visible.size
                             val totalPx = avgPx * info.totalItemsCount
                             val scrollablePx = (totalPx - viewportPx).coerceAtLeast(0f)
-                            val pxPerTrackPx = scrollablePx / scrollableTrackPx
+                            val pxPerTrackPx = scrollablePx / geo.scrollableTrackPx
                             if (pxPerTrackPx > 0f) {
                                 listState.dispatchRawDelta(dragAmount.y * pxPerTrackPx)
                             }
@@ -358,4 +372,16 @@ internal data class ScrollMetrics(
     val totalScrollPx: Float,
     val viewportPx: Float,
     val hasOverflow: Boolean,
+)
+
+/**
+ * Everything the gesture lambdas need that changes while scrolling. Held in a
+ * [rememberUpdatedState] so the `pointerInput` blocks can be keyed on
+ * `listState` alone.
+ */
+private class ScrollbarGeo(
+    val metrics: ScrollMetrics,
+    val thumbHeightPx: Int,
+    val scrollableTrackPx: Int,
+    val offsetPx: Int,
 )

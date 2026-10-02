@@ -224,8 +224,6 @@
     <!-- Stats tabs -->
     <string name="stats_tab_months">Months</string>
     <string name="stats_tab_years">Years</string>
-    <string name="stats_label_pages">Pages</string>
-    <string name="stats_label_books">Books</string>
     <string name="stats_chart_pages_by_month">Pages per month — %1$s</string>
     <string name="stats_chart_pages_by_year">Pages per year</string>
     <string name="stats_chart_finished_by_month">Books finished per month — %1$s</string>
@@ -296,10 +294,8 @@
 
     <!-- Statistics -->
     <string name="stats_title">Statistics</string>
-    <string name="stats_summary">Summary</string>
     <string name="stats_sessions">Sessions: %1$d</string>
     <string name="stats_pages">Pages: %1$d</string>
-    <string name="stats_minutes">Minutes: %1$d</string>
     <string name="stats_daily">Pages per day</string>
     <string name="stats_no_data">No data yet — add reading sessions in a book.</string>
     <string name="stats_daily_entry">%1$s    %2$d pp.</string>

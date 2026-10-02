@@ -4,10 +4,12 @@ import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import ru.antonkw.kwbooktrack.R
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
@@ -56,7 +58,12 @@ class StatisticsViewModel @Inject constructor(
         val finishedDates = books.filter { it.status == BookStatus.FINISHED && it.finishedAt != null }
             .mapNotNull { it.finishedAt }
         StatsCalculator.compute(sessions, finishedDates)
-    }.stateIn(
+    }
+        // StatsCalculator walks every session twice (Instant/LocalDate per row),
+        // so keep it off the main thread — it re-runs on every book/session
+        // write anywhere in the app, not just when this screen is visible.
+        .flowOn(Dispatchers.Default)
+        .stateIn(
         viewModelScope,
         SharingStarted.Eagerly,
         ReadingStats(0, 0, 0, emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), 0, 0),

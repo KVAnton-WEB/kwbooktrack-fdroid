@@ -75,6 +75,11 @@ fun AddBookScreen(
     val authorSuggestions by viewModel.authorSuggestions.collectAsStateWithLifecycle()
     val genreSuggestions by viewModel.genreSuggestions.collectAsStateWithLifecycle()
     val publisherSuggestions by viewModel.publisherSuggestions.collectAsStateWithLifecycle()
+    val seriesSuggestions by viewModel.seriesSuggestions.collectAsStateWithLifecycle()
+    val bindingSuggestions by viewModel.bindingSuggestions.collectAsStateWithLifecycle()
+    val translatorSuggestions by viewModel.translatorSuggestions.collectAsStateWithLifecycle()
+    val originalLanguageSuggestions by viewModel.originalLanguageSuggestions.collectAsStateWithLifecycle()
+    val purchasePlaceSuggestions by viewModel.purchasePlaceSuggestions.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val activity = context as? Activity
 
@@ -359,11 +364,11 @@ fun AddBookScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        OutlinedTextField(
+                        SuggestionTextField(
                             value = state.series,
                             onValueChange = viewModel::setSeries,
-                            label = { Text(stringResource(R.string.field_series)) },
-                            singleLine = true,
+                            suggestions = seriesSuggestions,
+                            label = stringResource(R.string.field_series),
                             modifier = Modifier.weight(1f),
                         )
                         OutlinedTextField(
@@ -378,11 +383,11 @@ fun AddBookScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        OutlinedTextField(
+                        SuggestionTextField(
                             value = state.binding,
                             onValueChange = viewModel::setBinding,
-                            label = { Text(stringResource(R.string.field_binding)) },
-                            singleLine = true,
+                            suggestions = bindingSuggestions,
+                            label = stringResource(R.string.field_binding),
                             modifier = Modifier.weight(1f),
                         )
                         OutlinedTextField(
@@ -397,18 +402,18 @@ fun AddBookScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        OutlinedTextField(
+                        SuggestionTextField(
                             value = state.translator,
                             onValueChange = viewModel::setTranslator,
-                            label = { Text(stringResource(R.string.field_translator)) },
-                            singleLine = true,
+                            suggestions = translatorSuggestions,
+                            label = stringResource(R.string.field_translator),
                             modifier = Modifier.weight(1f),
                         )
-                        OutlinedTextField(
+                        SuggestionTextField(
                             value = state.originalLanguage,
                             onValueChange = viewModel::setOriginalLanguage,
-                            label = { Text(stringResource(R.string.field_original_language)) },
-                            singleLine = true,
+                            suggestions = originalLanguageSuggestions,
+                            label = stringResource(R.string.field_original_language),
                             modifier = Modifier.weight(1f),
                         )
                     }
@@ -431,12 +436,11 @@ fun AddBookScreen(
                             modifier = Modifier.weight(1f),
                         )
                     }
-                    OutlinedTextField(
+                    SuggestionTextField(
                         value = state.purchasePlace,
                         onValueChange = viewModel::setPurchasePlace,
-                        label = { Text(stringResource(R.string.field_purchase_place)) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
+                        suggestions = purchasePlaceSuggestions,
+                        label = stringResource(R.string.field_purchase_place),
                     )
                     OutlinedTextField(
                         value = state.annotation,
@@ -502,14 +506,18 @@ private fun SuggestionTextField(
     onValueChange: (String) -> Unit,
     suggestions: List<String>,
     label: String,
+    modifier: Modifier = Modifier,
 ) {
     val trimmed = value.trim()
     var isFocused by remember { mutableStateOf(false) }
     val filtered = remember(isFocused, value, suggestions) {
         if (!isFocused || trimmed.isBlank()) emptyList()
-        else suggestions.filter { it.lowercase().contains(trimmed.lowercase()) }.take(6)
+        else {
+            val q = trimmed.lowercase()
+            suggestions.filter { it.lowercase().contains(q) }.take(6)
+        }
     }
-    Column {
+    Column(modifier = modifier) {
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,

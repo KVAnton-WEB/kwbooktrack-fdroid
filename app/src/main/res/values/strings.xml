@@ -224,8 +224,6 @@
     <!-- Stats tabs -->
     <string name="stats_tab_months">Месяцы</string>
     <string name="stats_tab_years">Годы</string>
-    <string name="stats_label_pages">Страницы</string>
-    <string name="stats_label_books">Книги</string>
     <string name="stats_chart_pages_by_month">Страниц по месяцам — %1$s</string>
     <string name="stats_chart_pages_by_year">Страниц по годам</string>
     <string name="stats_chart_finished_by_month">Завершено книг по месяцам — %1$s</string>
@@ -299,10 +297,8 @@
 
     <!-- Statistics -->
     <string name="stats_title">Статистика</string>
-    <string name="stats_summary">Сводка</string>
     <string name="stats_sessions">Сессий: %1$d</string>
     <string name="stats_pages">Страниц: %1$d</string>
-    <string name="stats_minutes">Минут: %1$d</string>
     <string name="stats_daily">Прочитано по дням</string>
     <string name="stats_no_data">Пока нет данных — добавьте сессии чтения в книге.</string>
     <string name="stats_daily_entry">%1$s    %2$d стр.</string>
