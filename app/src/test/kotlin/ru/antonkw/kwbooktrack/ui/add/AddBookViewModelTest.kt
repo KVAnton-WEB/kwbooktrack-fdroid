@@ -48,7 +48,7 @@ class AddBookViewModelTest {
 
     @Test
     fun saveInsertsBookWithManualSource() = runTest(dispatcher) {
-        val vm = AddBookViewModel(androidx.lifecycle.SavedStateHandle(), bookRepository, ApplicationProvider.getApplicationContext())
+        val vm = AddBookViewModel(androidx.lifecycle.SavedStateHandle(), bookRepository, ApplicationProvider.getApplicationContext(), ru.antonkw.kwbooktrack.data.NoOpCoverStorage)
         vm.setTitle("Dune")
         vm.setAuthor("Frank Herbert")
         vm.setIsbn("9780441172719")
@@ -68,7 +68,7 @@ class AddBookViewModelTest {
 
     @Test
     fun emptyTitleDoesNotSave() = runTest(dispatcher) {
-        val vm = AddBookViewModel(androidx.lifecycle.SavedStateHandle(), bookRepository, ApplicationProvider.getApplicationContext())
+        val vm = AddBookViewModel(androidx.lifecycle.SavedStateHandle(), bookRepository, ApplicationProvider.getApplicationContext(), ru.antonkw.kwbooktrack.data.NoOpCoverStorage)
         vm.save()
         advanceUntilIdle()
 
@@ -78,21 +78,21 @@ class AddBookViewModelTest {
 
     @Test
     fun setIsbnStripsNonDigits() = runTest(dispatcher) {
-        val vm = AddBookViewModel(androidx.lifecycle.SavedStateHandle(), bookRepository, ApplicationProvider.getApplicationContext())
+        val vm = AddBookViewModel(androidx.lifecycle.SavedStateHandle(), bookRepository, ApplicationProvider.getApplicationContext(), ru.antonkw.kwbooktrack.data.NoOpCoverStorage)
         vm.setIsbn("978-0-441-17271-X")
         assertThat(vm.state.value.isbn).isEqualTo("978044117271X")
     }
 
     @Test
     fun setPageCountStripsNonDigits() = runTest(dispatcher) {
-        val vm = AddBookViewModel(androidx.lifecycle.SavedStateHandle(), bookRepository, ApplicationProvider.getApplicationContext())
+        val vm = AddBookViewModel(androidx.lifecycle.SavedStateHandle(), bookRepository, ApplicationProvider.getApplicationContext(), ru.antonkw.kwbooktrack.data.NoOpCoverStorage)
         vm.setPageCount("5x0x0")
         assertThat(vm.state.value.pageCount).isEqualTo("500")
     }
 
     @Test
     fun shortIsbnIsKeptAsIs() = runTest(dispatcher) {
-        val vm = AddBookViewModel(androidx.lifecycle.SavedStateHandle(), bookRepository, ApplicationProvider.getApplicationContext())
+        val vm = AddBookViewModel(androidx.lifecycle.SavedStateHandle(), bookRepository, ApplicationProvider.getApplicationContext(), ru.antonkw.kwbooktrack.data.NoOpCoverStorage)
         vm.setIsbn("12345")
         vm.setTitle("Test")
         vm.save()
@@ -110,6 +110,7 @@ class AddBookViewModelTest {
             androidx.lifecycle.SavedStateHandle(),
             bookRepository,
             ApplicationProvider.getApplicationContext(),
+            ru.antonkw.kwbooktrack.data.NoOpCoverStorage,
         )
         vm.setTitle("Hyperion")
         vm.setAuthor("Dan Simmons")
@@ -158,6 +159,7 @@ class AddBookViewModelTest {
             androidx.lifecycle.SavedStateHandle(),
             bookRepository,
             ApplicationProvider.getApplicationContext(),
+            ru.antonkw.kwbooktrack.data.NoOpCoverStorage,
         )
         vm.setTitle("Foo")
         vm.setAuthor("Bar")
@@ -177,6 +179,7 @@ class AddBookViewModelTest {
             androidx.lifecycle.SavedStateHandle(),
             bookRepository,
             ApplicationProvider.getApplicationContext(),
+            ru.antonkw.kwbooktrack.data.NoOpCoverStorage,
         )
         vm.setTitle("Foo")
         vm.setAuthor("Bar")

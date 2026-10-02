@@ -24,6 +24,7 @@ import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
 import ru.antonkw.kwbooktrack.data.db.entity.BookSource
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
+import ru.antonkw.kwbooktrack.data.storage.CoverStorage
 import java.io.File
 import javax.inject.Inject
 
@@ -64,6 +65,7 @@ class AddBookViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val bookRepository: BookRepository,
     @ApplicationContext private val context: Context,
+    private val coverStorage: CoverStorage,
 ) : ViewModel() {
 
     private val editingBookId: Long = savedStateHandle.get<Long>(KEY_BOOK_ID) ?: 0L
@@ -84,7 +86,7 @@ class AddBookViewModel @Inject constructor(
     // unlink on cancel, the persisted cover is not. Without this distinction
     // onCleared()/attachCover()/clearCover() would happily delete the
     // book's actual cover when the user hits Back or Discard (and even on
-    // Save, because state.coverPath doesn't track renameCoverToBookId()).
+    // Save, because state.coverPath doesn't track CoverStorage.promoteToBook()).
     // Mutated only from init() and save() — read from the cleanup paths.
     private var originalCoverPath: String? = null
 
@@ -219,16 +221,12 @@ class AddBookViewModel @Inject constructor(
             val previous = _state.value.coverPath
             val saved = withContext(Dispatchers.IO) {
                 runCatching {
-                    val coversDir = File(context.filesDir, "covers").apply { mkdirs() }
                     val ext = context.contentResolver.getType(uri)?.substringAfter("/")
                         ?: uri.lastPathSegment?.substringAfterLast('.', "")
                         ?: "jpg"
-                    val tempId = -System.currentTimeMillis()
-                    val target = File(coversDir, "cover_$tempId.$ext")
                     context.contentResolver.openInputStream(uri)?.use { input ->
-                        target.outputStream().use { out -> input.copyTo(out) }
+                        coverStorage.saveTemp(input, ext)
                     } ?: return@runCatching null
-                    target.absolutePath
                 }.getOrNull()
             }
             if (saved != null) {
@@ -280,7 +278,7 @@ class AddBookViewModel @Inject constructor(
             val printPages = s.printPages.toIntOrNull()
             if (isEditing) {
                 val existing = bookRepository.findById(editingBookId) ?: return@launch
-                val finalCoverPath = renameCoverToBookId(existing.id, s.coverPath)
+                val finalCoverPath = coverStorage.promoteToBook(existing.id, s.coverPath)
                 bookRepository.update(
                     existing.copy(
                         title = s.title,
@@ -317,7 +315,7 @@ class AddBookViewModel @Inject constructor(
                 )
                 // The previous persisted cover (kept alive across the edit so
                 // Discard could roll it back) is now orphaned by the promotion:
-// renameCoverToBookId() moved the new selection into its slot at
+                // promoteToBook() moved the new selection into its slot at
                 // finalCoverPath. Skip when null (user cleared the cover; the
                 // null ?: existing.coverPath fallback below preserves the row's
                 // coverPath, leaving originalCoverPath as the persisted truth).
@@ -361,39 +359,13 @@ class AddBookViewModel @Inject constructor(
                     isSold = s.isSold,
                 )
                 val newId = bookRepository.insert(tempBook)
-                val finalCoverPath = renameCoverToBookId(newId, s.coverPath)
+                val finalCoverPath = coverStorage.promoteToBook(newId, s.coverPath)
                 if (finalCoverPath != null) {
                     bookRepository.update(tempBook.copy(id = newId, coverPath = finalCoverPath))
                 }
                 originalCoverPath = finalCoverPath
             }
             _state.value = s.copy(saved = true)
-        }
-    }
-
-    private fun renameCoverToBookId(bookId: Long, currentPath: String?): String? {
-        if (currentPath == null) return null
-        val src = File(currentPath)
-        if (!src.exists()) return currentPath
-        val coversDir = File(context.filesDir, "covers").apply { mkdirs() }
-        val ext = src.extension.ifEmpty { "jpg" }
-        val target = File(coversDir, "$bookId.$ext")
-        return try {
-            // Drop stale covers for this book (e.g. an old .png when the new
-            // selection is .jpg). Skip the source itself — if src already
-            // happens to be named {bookId}.{ext} (the edit-no-cover-change
-            // path), sweeping it would orphan the row that points at it,
-            // since the copyTo branch below is then skipped (src == target).
-            coversDir.listFiles { f ->
-                f.isFile && f.name.startsWith("$bookId.") && f.absolutePath != src.absolutePath
-            }?.forEach { it.delete() }
-            if (src.absolutePath != target.absolutePath) {
-                src.copyTo(target, overwrite = true)
-                src.delete()
-            }
-            target.absolutePath
-        } catch (_: Exception) {
-            currentPath
         }
     }
 
