@@ -19,6 +19,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,10 +41,18 @@ import kotlinx.coroutines.launch
  * slide under the thumb. The bar is hidden entirely when the content
  * fits the viewport (no scroll possible).
  *
- * Geometry comes from [LazyListState.layoutInfo]:
- * - `viewportStartOffset` is the exact pixel scroll position of the list.
- * - `avgItemPx` (mean of visible items' heights) estimates the rest.
- * - Thumb position = `viewportStartOffset / (totalSize − viewportSize)`.
+ * Geometry comes from [LazyListState]:
+ * - `avgItemPx` (mean of visible items' heights) estimates per-item size.
+ * - scroll position = `avgItemPx * firstVisibleItemIndex + firstVisibleItemScrollOffset`
+ *   (the same formula `LazyListState.calculateScrollOffset` uses internally
+ *   for `ScrollIndicatorState`).
+ * - Note: `info.viewportStartOffset` is *not* the scroll position in Foundation
+ *   1.7.x — it is hard-coded to `-beforeContentPadding` and only changes when
+ *   padding does. Use `firstVisibleItemIndex` / `firstVisibleItemScrollOffset`
+ *   instead, both of which are snapshot-backed (`scrollPosition.index` and
+ *   `scrollPosition.scrollOffset` are `mutableIntStateOf` delegates), so the
+ *   thumb tracks every scroll tick.
+ * - Thumb position = `scrollPx / (totalSize − viewportSize)`.
  *
  * Interaction:
  * - Tap the track → jump the list so the thumb centres on the tap.
@@ -97,6 +106,14 @@ fun VerticalListScrollbar(
             .coerceIn(0, scrollableTrackPx)
     } ?: thumbOffsetPx
 
+    // The drag-handler block below is keyed only on `listState`, so it never
+    // re-runs once composed. Anything we want to read *fresh* inside the
+    // gesture lambdas (i.e. the current thumb offset for the on-grab anchor)
+    // must go through rememberUpdatedState, otherwise it stays pinned to the
+    // value at first composition and the list scrolls to a stale position when
+    // the user grabs the thumb after scrolling.
+    val effectiveThumbOffsetState = rememberUpdatedState(effectiveThumbOffset)
+
     fun jumpToTrackY(trackY: Float) {
         val ratio = ((trackY - thumbHeightPx / 2f) / scrollableTrackPx).coerceIn(0f, 1f)
         val totalScrollable = (metrics.totalScrollPx - metrics.viewportPx).coerceAtLeast(0f)
@@ -145,11 +162,13 @@ fun VerticalListScrollbar(
                         onDragStart = { offset ->
                             // Translate the thumb-local offset (in this Box's
                             // space) back to track coordinates, then anchor.
-                            val touchYTrack = effectiveThumbOffset + offset.y
+                            // effectiveThumbOffsetState is fresh-read — see its
+                            // comment.
+                            val touchYTrack = effectiveThumbOffsetState.value + offset.y
                             dragAnchor = DragAnchor(
                                 touchYAtStart = touchYTrack,
                                 touchYCurrent = touchYTrack,
-                                thumbOffsetAtStart = effectiveThumbOffset,
+                                thumbOffsetAtStart = effectiveThumbOffsetState.value,
                             )
                             // And jump to where the user grabbed, so the
                             // list position matches the new thumb spot.
@@ -157,9 +176,26 @@ fun VerticalListScrollbar(
                         },
                         onDragEnd = { dragAnchor = null },
                         onDragCancel = { dragAnchor = null },
-                        onDrag = { change, _ ->
+                        onDrag = { change, dragAmount ->
                             change.consume()
-                            dragAnchor = dragAnchor?.copy(touchYCurrent = dragAnchor!!.touchYAtStart + change.position.y)
+                            // dragAmount is the finger's delta in the thumb
+                            // Box's local coords. The thumb's local coords
+                            // don't move with the thumb (origin stays at the
+                            // thumb's top-left), so dragAmount equals the
+                            // finger's delta in track coords *only* as long as
+                            // we keep the thumb glued to the previous finger
+                            // position. Adding dragAmount to touchYAtStart
+                            // therefore keeps thumb_top == finger - initial_grab.
+                            val anchor = dragAnchor
+                            if (anchor != null) {
+                                val newTouchY = anchor.touchYAtStart + dragAmount.y
+                                dragAnchor = anchor.copy(touchYCurrent = newTouchY)
+                                // Without this, the thumb floats with the
+                                // finger but the list never moves, so on
+                                // release effectiveThumbOffset snaps back to
+                                // thumbOffsetPx and the drag feels dead.
+                                jumpToTrackY(newTouchY)
+                            }
                         },
                     )
                 },
@@ -176,10 +212,31 @@ private data class DragAnchor(
 /** Cached scroll geometry; recomputed only when the list mutates or scrolls. */
 private fun LazyListState.scrollMetrics(): ScrollMetrics {
     val info = layoutInfo
-    val total = info.totalItemsCount
     val visible = info.visibleItemsInfo
-    val viewportPx = (info.viewportEndOffset - info.viewportStartOffset).toFloat()
-    if (total == 0 || visible.isEmpty() || viewportPx <= 0f) {
+    return computeScrollMetrics(
+        firstVisibleItemIndex = firstVisibleItemIndex,
+        firstVisibleItemScrollOffset = firstVisibleItemScrollOffset,
+        visibleItemSizes = visible.map { it.size },
+        totalItemsCount = info.totalItemsCount,
+        // viewportEndOffset - viewportStartOffset = itemsViewport + beforeContentPadding
+        // + afterContentPadding (see LazyListMeasureResult). Subtract both paddings
+        // so thumbFraction/scale use the actual items area.
+        // ponytail: tight to Foundation 1.7.x; revisit if viewportStartOffset stops
+        // being `-beforeContentPadding`.
+        viewportPx = (info.viewportEndOffset - info.viewportStartOffset -
+            info.beforeContentPadding - info.afterContentPadding).toFloat(),
+    )
+}
+
+/** Pure math; the [LazyListState] bridge above just feeds it real measurements. */
+internal fun computeScrollMetrics(
+    firstVisibleItemIndex: Int,
+    firstVisibleItemScrollOffset: Int,
+    visibleItemSizes: List<Int>,
+    totalItemsCount: Int,
+    viewportPx: Float,
+): ScrollMetrics {
+    if (totalItemsCount == 0 || visibleItemSizes.isEmpty() || viewportPx <= 0f) {
         return ScrollMetrics(
             scrollFraction = 0f,
             thumbFraction = 1f,
@@ -189,13 +246,16 @@ private fun LazyListState.scrollMetrics(): ScrollMetrics {
             hasOverflow = false,
         )
     }
-    val visibleSum = visible.sumOf { it.size }
-    val avgItemPx = visibleSum.toFloat() / visible.size
-    val totalScrollPx = avgItemPx * total
-    // viewportStartOffset IS the scroll position of the list — use it
-    // directly, not firstVisibleItemScrollOffset (which is derived from it
-    // and would double-count when combined with firstVisibleItem.index).
-    val scrollPx = info.viewportStartOffset.toFloat()
+    val visibleSum = visibleItemSizes.sum()
+    val avgItemPx = visibleSum.toFloat() / visibleItemSizes.size
+    val totalScrollPx = avgItemPx * totalItemsCount
+    // scrollPx = avgItemPx * firstVisibleItemIndex + firstVisibleItemScrollOffset
+    // — same formula LazyListState.calculateScrollOffset() uses for its
+    // ScrollIndicatorState. viewportStartOffset in Foundation 1.7.x is fixed to
+    // -beforeContentPadding (it's the items viewport's content-space start, not
+    // the scroll position), so reading it here made scrollFraction stay at 0
+    // and the thumb freeze at the top regardless of scroll.
+    val scrollPx = avgItemPx * firstVisibleItemIndex + firstVisibleItemScrollOffset
     val hasOverflow = totalScrollPx > viewportPx
     val fraction = if (hasOverflow) {
         (scrollPx / (totalScrollPx - viewportPx)).coerceIn(0f, 1f)
@@ -212,7 +272,7 @@ private fun LazyListState.scrollMetrics(): ScrollMetrics {
     )
 }
 
-private data class ScrollMetrics(
+internal data class ScrollMetrics(
     val scrollFraction: Float,
     val thumbFraction: Float,
     val avgItemPx: Float,
