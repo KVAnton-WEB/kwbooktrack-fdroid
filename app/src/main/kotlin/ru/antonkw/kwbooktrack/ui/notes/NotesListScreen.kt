@@ -99,14 +99,14 @@ fun NotesListScreen(
                         val listState = androidx.compose.foundation.lazy.rememberLazyListState()
                         Box(modifier = Modifier.fillMaxSize()) {
                             val scrollbarWidth = 8.dp
-                            // Touch zone is ~6× the visual width so the user
+                            // Touch zone is ~5× the visual width so the user
                             // can actually hit the thumb with a finger, and
                             // LazyColumn yields that much right padding so
                             // the touch zone doesn't overlap scrollable
                             // content (the scrollbar sibling wins hit-test,
                             // but carving out the space keeps the visual
                             // layout clean and prevents accidental scrolls).
-                            val scrollbarTouchWidth = 48.dp
+                            val scrollbarTouchWidth = 40.dp
                             LazyColumn(
                                 state = listState,
                                 contentPadding = PaddingValues(16.dp),

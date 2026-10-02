@@ -246,7 +246,7 @@ fun BookListScreen(
                             // hit-test zone overlaps the rightmost card. Visual
                             // thumb is still [scrollbarWidth] wide.
                             val scrollbarWidth = 8.dp
-                            val scrollbarTouchWidth = 48.dp
+                            val scrollbarTouchWidth = 40.dp
                             if (isGrid) {
                                 val rows = remember(s.books) { s.books.chunked(3) }
                                 LazyColumn(

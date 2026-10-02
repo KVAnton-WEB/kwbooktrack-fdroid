@@ -68,7 +68,7 @@ fun VerticalListScrollbar(
     listState: LazyListState,
     modifier: Modifier = Modifier,
     width: Dp = 8.dp,
-    touchWidth: Dp = width * 6,
+    touchWidth: Dp = 40.dp,
 ) {
     val density = LocalDensity.current
     val trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f)
@@ -94,18 +94,21 @@ fun VerticalListScrollbar(
     val thumbOffsetPx = (metrics.scrollFraction * scrollableTrackPx).toInt()
         .coerceIn(0, scrollableTrackPx)
 
-    // Visual thumb position. Driven directly by the gesture lambdas via
-    // [Modifier.offset { ... }] (a deferred state read: the layout phase
-    // reads the latest value without a full recomposition). After release,
-    // LaunchedEffect re-syncs from [thumbOffsetPx] (which tracks the list
-    // state via snapshotFlow) — *only* when not dragging. During a drag the
-    // scrollFraction recomputation in [metrics] lags behind dispatchRawDelta
-    // (and is approximate anyway: it averages item heights, so it doesn't
-    // match the exact pixel position the gesture math holds). Without the
-    // [isDragging] guard, the LaunchedEffect would overwrite the in-progress
-    // visual position on every snapshot apply, making the thumb visibly
-    // snap back to a stale metrics-driven spot — that's the "thumb stays
-    // put, then jumps to a new place when the list scrolls" symptom.
+    // Visual thumb position. We use a concrete `.offset(y = …)` (not the
+    // lambda overload `.offset { IntOffset(...) }`) because Compose Foundation
+    // 1.7.x's deferred-state-read offset modifier does not reliably subscribe
+    // to the state — the lambda re-runs on layout but the layout phase doesn't
+    // always pick up fresh state writes that happened inside a pointer event
+    // callback, so the thumb visually stayed put during drags. Reading the
+    // State<T> directly in the composable body registers a normal recomposition
+    // subscription, which the snapshot system drives correctly on every
+    // intValue = … write (recomposition + relayout + redraw in the same frame).
+    //
+    // LaunchedEffect re-syncs from the metrics-driven [thumbOffsetPx] *only*
+    // when not dragging, for the same reason as v0.5.6: scrollFraction lags
+    // behind dispatchRawDelta and is approximate (averages item heights), so
+    // letting it overwrite the in-progress visual position during a drag makes
+    // the thumb snap back to a stale spot.
     val thumbOffsetPxState = remember { mutableIntStateOf(thumbOffsetPx) }
     var isDragging by remember { mutableStateOf(false) }
     LaunchedEffect(thumbOffsetPx, isDragging) {
@@ -113,6 +116,8 @@ fun VerticalListScrollbar(
             thumbOffsetPxState.intValue = thumbOffsetPx
         }
     }
+    // The actual modifier offset, recomposed when the State changes:
+    val thumbOffsetY = with(density) { thumbOffsetPxState.intValue.toDp() }
 
     Box(
         modifier = modifier
@@ -158,7 +163,7 @@ fun VerticalListScrollbar(
             modifier = Modifier
                 .width(touchWidth)
                 .align(Alignment.TopEnd)
-                .offset { IntOffset(0, thumbOffsetPxState.intValue) }
+                .offset(y = thumbOffsetY)
                 .height(with(density) { thumbHeightPx.toDp() })
                 .pointerInput(listState) {
                     var anchor: DragAnchor? = null
