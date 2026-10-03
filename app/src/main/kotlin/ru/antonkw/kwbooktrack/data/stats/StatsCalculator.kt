@@ -49,18 +49,9 @@ object StatsCalculator {
             .map { (k, v) -> MonthlyBooks(k.first, k.second, v) }
             .sortedWith(compareBy({ it.year }, { it.month }))
 
-        val monthlyPagesList = sessions
-            .filter { it.endPage != null && it.startedAt > 0L }
-            .groupBy {
-                Instant.ofEpochMilli(it.startedAt).atZone(ZoneOffset.UTC).toLocalDate()
-                    .let { d -> YearMonth.of(d.year, d.monthValue) }
-            }
-            .map { (ym, list) ->
-                val pages = list.zipWithNext { a, b ->
-                    (b.endPage ?: 0) - (a.endPage ?: 0)
-                }.filter { it > 0 }.sum()
-                MonthlyPages(ym.year, ym.monthValue, pages)
-            }
+        val monthlyPagesList = dailyPages
+            .groupBy { YearMonth.from(it.date) }
+            .map { (ym, list) -> MonthlyPages(ym.year, ym.monthValue, list.sumOf { it.pages }) }
             .sortedWith(compareBy({ it.year }, { it.month }))
 
         val yearlyCompleted = monthly
@@ -94,18 +85,40 @@ object StatsCalculator {
     }
 
     fun aggregateDailyPages(sessions: List<ReadingSessionEntity>): List<DailyPages> {
+        return pageDeltas(sessions)
+            .groupBy({ it.first }, { it.second })
+            .map { (date, pages) -> DailyPages(date, pages.sum()) }
+            .sortedBy { it.date }
+    }
+
+    // end_page is an absolute cursor into the book, not a count of pages read,
+    // so pages are the jump between consecutive sessions *of the same book*,
+    // credited to the day of the later session. Two things this gets right that
+    // a plain zipWithNext over the incoming list did not: the list is sorted
+    // here (the DAO hands it over started_at DESC, which inverted every delta
+    // into a negative number that .filter { it > 0 } then threw away), and the
+    // baseline is the previous session of the same book rather than "no
+    // previous session today" — otherwise a day with a single session read 0
+    // pages. Deltas telescope, so their sum is exactly the total and
+    // totalPages can keep summing the daily buckets.
+    private fun pageDeltas(sessions: List<ReadingSessionEntity>): List<Pair<LocalDate, Int>> {
         return sessions
             .filter { it.endPage != null && it.startedAt > 0L }
-            .groupBy {
-                Instant.ofEpochMilli(it.startedAt).atZone(ZoneOffset.UTC).toLocalDate()
+            .groupBy { it.bookId }
+            .values
+            .flatMap { bookSessions ->
+                val ordered = bookSessions.sortedBy { it.startedAt }
+                ordered.mapIndexedNotNull { i, s ->
+                    val end = s.endPage ?: return@mapIndexedNotNull null
+                    val prev = ordered.getOrNull(i - 1)?.endPage ?: 0
+                    val pages = end - prev
+                    if (pages <= 0) null
+                    else {
+                        Instant.ofEpochMilli(s.startedAt).atZone(ZoneOffset.UTC)
+                            .toLocalDate() to pages
+                    }
+                }
             }
-            .map { (date, list) ->
-                val pages = list.zipWithNext { a, b ->
-                    (b.endPage ?: 0) - (a.endPage ?: 0)
-                }.filter { it > 0 }.sum()
-                DailyPages(date, pages)
-            }
-            .sortedBy { it.date }
     }
 
     fun lastNMonths(now: LocalDate, n: Int): List<YearMonth> {
