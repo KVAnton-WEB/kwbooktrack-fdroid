@@ -102,11 +102,74 @@ class BookSearchCaseInsensitivityTest {
         }
     }
 
-    private fun sample(title: String, author: String, createdAt: Long, updatedAt: Long) =
-        BookEntity(
-            title = title,
-            author = author,
-            createdAt = createdAt,
-            updatedAt = updatedAt,
-        )
+    @Test
+    fun cyrillicSeriesMatchesLowercaseQuery() {
+        runBlocking {
+            repo.insert(sample("Братство", "Робинс", series = "Стиль Сага", createdAt = 0L, updatedAt = 0L))
+            val results = repo.search("сага").first()
+            assertThat(results.map { it.title }).containsExactly("Братство")
+        }
+    }
+
+    @Test
+    fun cyrillicSeriesMatchesUppercaseQuery() {
+        // Guards the pre-lowercased series_search column (BookRepository
+        // .withSearchKeys). The query token is lowercased in Kotlin and the
+        // stored key is lowercased in Kotlin too — SQLite can't be trusted to
+        // do either half, since LIKE and lower() fold case for ASCII only on
+        // AOSP. The stored series is lowercased and the query is uppercased
+        // here, so the test only passes if the column is doing the work.
+        runBlocking {
+            repo.insert(sample("Братство", "Робинс", series = "стиль сага", createdAt = 0L, updatedAt = 0L))
+            val results = repo.search("САГА").first()
+            assertThat(results.map { it.title }).containsExactly("Братство")
+        }
+    }
+
+    @Test
+    fun seriesNumberIsSearchable() {
+        runBlocking {
+            repo.insert(sample("Братство", "Робинс", series = "Стиль Сага", seriesNumber = "7", createdAt = 0L, updatedAt = 0L))
+            val results = repo.search("7").first()
+            assertThat(results.map { it.title }).containsExactly("Братство")
+        }
+    }
+
+    @Test
+    fun seriesAndKeywordAreAndedTogether() {
+        runBlocking {
+            repo.insert(
+                sample("Братство", "Робинс", series = "Стиль Сага", seriesNumber = "7", createdAt = 0L, updatedAt = 0L),
+            )
+            repo.insert(sample("Дюна", "Герберт", series = "Стиль Сага", seriesNumber = "1", createdAt = 0L, updatedAt = 1L))
+            val results = repo.search("сага 7").first()
+            assertThat(results.map { it.title }).containsExactly("Братство")
+        }
+    }
+
+    @Test
+    fun bookWithoutSeriesDoesNotMatchOrBreakResults() {
+        runBlocking {
+            repo.insert(sample("Без серии", "Никто", createdAt = 0L, updatedAt = 0L))
+            repo.insert(sample("С серией", "Кто-то", series = "Стиль Сага", createdAt = 0L, updatedAt = 1L))
+            assertThat(repo.search("сага").first().map { it.title }).containsExactly("С серией")
+            assertThat(repo.search("никто").first().map { it.title }).containsExactly("Без серии")
+        }
+    }
+
+    private fun sample(
+        title: String,
+        author: String,
+        createdAt: Long,
+        updatedAt: Long,
+        series: String? = null,
+        seriesNumber: String? = null,
+    ) = BookEntity(
+        title = title,
+        author = author,
+        series = series,
+        seriesNumber = seriesNumber,
+        createdAt = createdAt,
+        updatedAt = updatedAt,
+    )
 }

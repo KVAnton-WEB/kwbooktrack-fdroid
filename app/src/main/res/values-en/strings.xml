@@ -23,6 +23,9 @@
     <string name="field_purchase_place">Purchase place</string>
     <string name="field_series">Series</string>
     <string name="field_series_number">Series number</string>
+    <!-- Short form for the add/edit row, where the full label wraps to two
+         lines and stretches the row. BookInfoDialog still uses the long one. -->
+    <string name="field_series_number_short">#</string>
     <string name="field_condition">Condition</string>
     <string name="field_translator">Translator</string>
     <string name="field_print_year">Print year</string>
@@ -91,6 +94,7 @@
     <string name="filter_wishlist">Wishlist</string>
     <string name="filter_reading">Reading</string>
     <string name="filter_finished">Finished</string>
+    <string name="status_abandoned">Abandoned</string>
     <string name="filter_purchased">Purchased</string>
 
     <!-- Month names -->

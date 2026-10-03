@@ -73,6 +73,8 @@ import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import ru.antonkw.kwbooktrack.R
 import ru.antonkw.kwbooktrack.ui.common.MonthYearPickerDialog
+import ru.antonkw.kwbooktrack.ui.common.labelRes
+import ru.antonkw.kwbooktrack.ui.common.seriesLabel
 import java.time.LocalDate
 import java.time.YearMonth
 
@@ -353,12 +355,16 @@ private fun BookListCard(item: BookWithProgress, onClick: () -> Unit) {
                     overflow = TextOverflow.Ellipsis,
                 )
                 val meta = listOfNotNull(
-                    book.year?.toString(),
-                    book.publisher,
-                    book.status.name,
+                    book.seriesLabel(),
+                    stringResource(book.status.labelRes),
                 ).joinToString(" · ")
                 if (meta.isNotEmpty()) {
-                    Text(text = meta, style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        text = meta,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
                 if (book.rating != null && book.rating > 0) {
                     Row(modifier = Modifier.padding(top = 2.dp)) {

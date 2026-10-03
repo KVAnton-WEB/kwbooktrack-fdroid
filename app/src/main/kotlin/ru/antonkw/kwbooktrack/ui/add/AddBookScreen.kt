@@ -374,7 +374,11 @@ fun AddBookScreen(
                         OutlinedTextField(
                             value = state.seriesNumber,
                             onValueChange = viewModel::setSeriesNumber,
-                            label = { Text(stringResource(R.string.field_series_number)) },
+                            // № instead of "Номер серии": the long label wraps
+                            // to two lines in this weight(0.5f) slot and
+                            // stretches the whole row. One glyph can't wrap, so
+                            // the row matches its neighbour again.
+                            label = { Text(stringResource(R.string.field_series_number_short)) },
                             singleLine = true,
                             modifier = Modifier.weight(0.5f),
                         )

@@ -5,19 +5,31 @@ import org.junit.Test
 
 class ScrollbarMetricsTest {
 
-    private val itemHeight = 80f
+    private val avgItemPx = 80f
     private val itemCount = 100
     private val viewportPx = 800f
 
+    private fun metrics(
+        index: Int = 0,
+        offset: Int = 0,
+        avg: Float = avgItemPx,
+        count: Int = itemCount,
+        viewport: Float = viewportPx,
+        canBackward: Boolean = true,
+        canForward: Boolean = true,
+    ) = computeScrollMetrics(
+        firstVisibleItemIndex = index,
+        firstVisibleItemScrollOffset = offset,
+        avgItemPx = avg,
+        totalItemsCount = count,
+        viewportPx = viewport,
+        canScrollBackward = canBackward,
+        canScrollForward = canForward,
+    )
+
     @Test
     fun `top of list — fraction is 0`() {
-        val m = computeScrollMetrics(
-            firstVisibleItemIndex = 0,
-            firstVisibleItemScrollOffset = 0,
-            visibleItemSizes = listOf(80, 80, 80, 80, 80, 80, 80, 80, 80, 80),
-            totalItemsCount = itemCount,
-            viewportPx = viewportPx,
-        )
+        val m = metrics()
         assertThat(m.scrollFraction).isEqualTo(0f)
         assertThat(m.hasOverflow).isTrue()
     }
@@ -25,38 +37,18 @@ class ScrollbarMetricsTest {
     @Test
     fun `scrolled halfway — fraction near 0_5`() {
         // 100 items * 80px = 8000. Viewport 800. Scrollable range = 7200.
-        // Halfway scroll: index=5, offset=0 → scrollPx = 5*80 = 400 (too low)
-        // Adjust to index=45, offset=0 → scrollPx = 45*80 = 3600 → fraction = 3600/7200 = 0.5
-        val m = computeScrollMetrics(
-            firstVisibleItemIndex = 45,
-            firstVisibleItemScrollOffset = 0,
-            visibleItemSizes = listOf(80, 80, 80, 80, 80, 80, 80, 80, 80, 80),
-            totalItemsCount = itemCount,
-            viewportPx = viewportPx,
-        )
+        // index=45 → scrollPx = 3600 → fraction = 3600/7200 = 0.5
+        val m = metrics(index = 45)
         assertThat(m.scrollFraction).isWithin(1e-4f).of(0.5f)
     }
 
     @Test
     fun `partial scroll within first item moves the thumb`() {
-        // This is the v0.5.2 regression: viewportStartOffset (the broken signal)
-        // does not change between these two states — both have firstVisibleItem=0
-        // — but firstVisibleItemScrollOffset does. The bug was reading the wrong
-        // field; the fix uses firstVisibleItemScrollOffset.
-        val noScroll = computeScrollMetrics(
-            firstVisibleItemIndex = 0,
-            firstVisibleItemScrollOffset = 0,
-            visibleItemSizes = listOf(80, 80, 80, 80, 80, 80, 80, 80, 80, 80),
-            totalItemsCount = itemCount,
-            viewportPx = viewportPx,
-        )
-        val scrolled30 = computeScrollMetrics(
-            firstVisibleItemIndex = 0,
-            firstVisibleItemScrollOffset = 30,
-            visibleItemSizes = listOf(80, 80, 80, 80, 80, 80, 80, 80, 80, 80),
-            totalItemsCount = itemCount,
-            viewportPx = viewportPx,
-        )
+        // Regression from v0.5.2: viewportStartOffset (the broken signal) does
+        // not change between these two states — both have firstVisibleItem=0 —
+        // but firstVisibleItemScrollOffset does.
+        val noScroll = metrics()
+        val scrolled30 = metrics(offset = 30)
         assertThat(scrolled30.scrollFraction).isGreaterThan(noScroll.scrollFraction)
         assertThat(scrolled30.scrollFraction).isWithin(1e-4f).of(30f / 7200f)
     }
@@ -64,57 +56,119 @@ class ScrollbarMetricsTest {
     @Test
     fun `bottom of list — fraction is 1`() {
         // 100 items * 80px = 8000. Viewport 800. Max scroll = 7200.
-        // finalVisibleIndex = 99 - viewportItems + 1. With avg=80 and viewport=800,
-        // visible items ≈ 10. firstVisibleItemIndex = 90, offset=0 gives
-        // scrollPx = 90*80 = 7200 → fraction = 1.
-        val m = computeScrollMetrics(
-            firstVisibleItemIndex = 90,
-            firstVisibleItemScrollOffset = 0,
-            visibleItemSizes = listOf(80, 80, 80, 80, 80, 80, 80, 80, 80, 80),
-            totalItemsCount = itemCount,
-            viewportPx = viewportPx,
-        )
+        // firstVisibleItemIndex = 90 → scrollPx = 7200 → fraction = 1.
+        val m = metrics(index = 90)
         assertThat(m.scrollFraction).isEqualTo(1f)
     }
 
     @Test
     fun `empty list — no overflow, fraction 0`() {
-        val m = computeScrollMetrics(
-            firstVisibleItemIndex = 0,
-            firstVisibleItemScrollOffset = 0,
-            visibleItemSizes = emptyList(),
-            totalItemsCount = 0,
-            viewportPx = viewportPx,
-        )
+        val m = metrics(count = 0)
         assertThat(m.hasOverflow).isFalse()
         assertThat(m.scrollFraction).isEqualTo(0f)
     }
 
     @Test
     fun `content fits in viewport — no overflow`() {
-        // 3 items of 80px each = 240px content, viewport 800px → no scroll possible.
-        val m = computeScrollMetrics(
-            firstVisibleItemIndex = 0,
-            firstVisibleItemScrollOffset = 0,
-            visibleItemSizes = listOf(80, 80, 80),
-            totalItemsCount = 3,
-            viewportPx = viewportPx,
-        )
+        // 3 items of 80px each = 240px content, viewport 800px. A list that fits
+        // reports no scrollability in either direction, which is what
+        // hasOverflow is read from — the item-count arithmetic can't tell a
+        // fitting list from one whose single item happens to measure small.
+        val m = metrics(count = 3, canBackward = false, canForward = false)
         assertThat(m.hasOverflow).isFalse()
         assertThat(m.scrollFraction).isEqualTo(0f)
     }
 
     @Test
+    fun `one item past the viewport shows the bar even when the estimate fits`() {
+        // BookDetailScreen packs every note into a single item, so its height
+        // can grow past the viewport while totalItemsCount and the frozen mean
+        // both stay exactly where they were. Deriving hasOverflow from the
+        // estimate said "fits" here and the bar was never drawn at all.
+        val m = metrics(count = 2, avg = 400f, viewport = 800f)
+        assertThat(m.totalScrollPx).isEqualTo(800f) // the estimate's wrong answer
+        assertThat(m.hasOverflow).isTrue() // the list's answer
+    }
+
+    @Test
+    fun `unmeasured average — no overflow, bar stays hidden`() {
+        // First composition: layout not measured yet, so the frozen estimate is
+        // 0. Must report no overflow rather than dividing by zero.
+        val m = metrics(avg = 0f)
+        assertThat(m.hasOverflow).isFalse()
+        assertThat(m.scrollFraction).isEqualTo(0f)
+        assertThat(m.thumbFraction).isEqualTo(1f)
+    }
+
+    @Test
     fun `thumb fraction is clamped to 8 percent minimum`() {
         // 1000 items * 80px = 80_000. viewportPx=800. Raw fraction = 800/80000 = 0.01.
-        // Should be clamped up to 0.08 so the thumb stays grabbable.
-        val m = computeScrollMetrics(
-            firstVisibleItemIndex = 0,
-            firstVisibleItemScrollOffset = 0,
-            visibleItemSizes = listOf(80, 80, 80, 80, 80, 80, 80, 80, 80, 80),
-            totalItemsCount = 1000,
-            viewportPx = viewportPx,
-        )
+        val m = metrics(count = 1000)
         assertThat(m.thumbFraction).isAtLeast(0.08f)
+    }
+
+    @Test
+    fun `short list — thumb fills most of the track`() {
+        // The notes-list case: 8 rows in a 2000px viewport. avgItemPx=400 →
+        // totalScrollPx=3200, thumbFraction=0.625. There *is* scrollable track
+        // left, so taps must work — an earlier version special-cased taps on
+        // the thumb and silently swallowed them, which made a short list feel
+        // like a dead bar.
+        val m = metrics(avg = 400f, count = 8, viewport = 2000f)
+        assertThat(m.hasOverflow).isTrue()
+        assertThat(m.thumbFraction).isWithin(1e-4f).of(2000f / 3200f)
+        assertThat(m.thumbFraction).isLessThan(1f)
+    }
+
+    @Test
+    fun `heterogeneous item sizes — fraction comes from the frozen average`() {
+        // BookDetailScreen packs every note into one item, so the visible mix
+        // is wildly uneven. Position must depend only on the frozen avg, never
+        // on which items happen to be on screen — otherwise the thumb breathes.
+        val atIndex10 = metrics(index = 10, avg = 500f, count = 20, viewport = 1500f)
+        assertThat(atIndex10.hasOverflow).isTrue()
+        assertThat(atIndex10.totalScrollPx).isEqualTo(10_000f)
+        assertThat(atIndex10.scrollFraction).isWithin(1e-4f).of(5000f / 8500f)
+    }
+
+    @Test
+    fun `scrollPx is exposed so a tap can dispatch a delta`() {
+        // The tap path computes (targetScrollPx - scrollPx) and hands that to
+        // dispatchRawDelta. If scrollPx were missing the delta would be
+        // absolute-from-zero and every tap above the thumb would scroll the
+        // wrong way — which is the "thumb doesn't rise" symptom.
+        assertThat(metrics(index = 45).scrollPx).isEqualTo(3600f)
+        assertThat(metrics(index = 45, offset = 30).scrollPx).isEqualTo(3630f)
+        assertThat(metrics().scrollPx).isEqualTo(0f)
+    }
+
+    @Test
+    fun `at the very top the thumb pins to 0 even if the estimate says otherwise`() {
+        // A stale (over-estimating) avg would otherwise put the thumb partway
+        // down the track on the first frame.
+        val m = metrics(index = 0, canBackward = false, canForward = true)
+        assertThat(m.scrollFraction).isEqualTo(0f)
+    }
+
+    @Test
+    fun `at the very end the thumb pins to 1 even if the estimate undershoots`() {
+        // The frozen average can undershoot the real content height — worst on
+        // BookDetailScreen, where all notes share one item. Without the pin the
+        // thumb could never reach the bottom of the track.
+        val m = metrics(index = 50, canBackward = true, canForward = false)
+        assertThat(m.hasOverflow).isTrue()
+        assertThat(m.scrollFraction).isEqualTo(1f)
+    }
+
+    @Test
+    fun `tapping above the thumb from the end produces a negative delta`() {
+        // Regression for "scroll to the end, then tap higher: nothing happens".
+        // The tap dispatches (targetScrollPx - scrollPx), so the current
+        // position has to be exposed on the metrics at all.
+        val atEnd = metrics(index = 90, canForward = false)
+        val mid = metrics(index = 45)
+        val delta = 0.5f * (mid.totalScrollPx - mid.viewportPx) - atEnd.scrollPx
+        assertThat(atEnd.scrollPx).isEqualTo(7200f)
+        assertThat(delta).isLessThan(0f)
     }
 }

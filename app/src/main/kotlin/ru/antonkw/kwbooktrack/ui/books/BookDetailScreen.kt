@@ -63,6 +63,8 @@ import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
 import ru.antonkw.kwbooktrack.data.db.entity.NoteEntity
 import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
 import ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity
+import ru.antonkw.kwbooktrack.ui.common.labelRes
+import ru.antonkw.kwbooktrack.ui.common.seriesLabel
 import java.time.Instant
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
@@ -193,7 +195,7 @@ fun BookDetailScreen(
                                     book.year?.toString(),
                                     book.publisher,
                                     book.genre,
-                                    book.status.name,
+                                    stringResource(book.status.labelRes),
                                     book.rating?.let { "★".repeat(it) },
                                 ).joinToString(" · ")
                                 if (meta.isNotEmpty()) {
@@ -228,7 +230,7 @@ fun BookDetailScreen(
             // the "Show all details" dialog — they clutter the main view.
             val v5Line = listOfNotNull(
                 book.subtitle,
-                book.series?.let { s -> book.seriesNumber?.let { n -> "$s #$n" } ?: s },
+                book.seriesLabel(),
                 book.binding,
             )
             if (v5Line.isNotEmpty()) {

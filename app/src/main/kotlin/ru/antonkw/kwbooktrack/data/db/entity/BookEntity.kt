@@ -63,6 +63,13 @@ data class BookEntity(
     val titleSearch: String = "",
     @ColumnInfo(name = "author_search")
     val authorSearch: String = "",
+    // --- v6: series search key ---
+    // Pre-lowercased "series series_number". Needed because SQLite's own
+    // lower()/LIKE fold case for ASCII only — AOSP's build has no ICU — so
+    // a Cyrillic query can't match a stored series without it. Same trick as
+    // title_search/author_search; see BookRepository.withSearchKeys.
+    @ColumnInfo(name = "series_search")
+    val seriesSearch: String = "",
     // --- v5: extended Tellico fields ---
     @ColumnInfo(name = "binding")
     val binding: String? = null,

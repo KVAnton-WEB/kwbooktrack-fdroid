@@ -28,13 +28,21 @@ class BookRepository @Inject constructor(
             .filter { it.isNotEmpty() }
         if (tokens.isEmpty()) return bookDao.observeAll()
         val conditions = tokens.joinToString(" AND ") {
-            "(title_search LIKE ? OR author_search LIKE ? OR REPLACE(IFNULL(isbn13, ''), '-', '') LIKE ?)"
+            // Every LIKE target is already lowercased on write (withSearchKeys),
+            // and the token above is lowercased too, so both sides of the
+            // comparison are in the same case. Don't wrap these in LOWER():
+            // SQLite folds case for ASCII only, so over Cyrillic it changes
+            // nothing — it would read like it works while silently matching
+            // nothing.
+            "(title_search LIKE ? OR author_search LIKE ?" +
+                " OR REPLACE(IFNULL(isbn13, ''), '-', '') LIKE ?" +
+                " OR series_search LIKE ?)"
         }
         val sql = "SELECT * FROM books WHERE $conditions ORDER BY updated_at DESC"
-        // Bind the same argument 3× per token — one per LIKE position.
+        // Bind the same argument 4× per token — one per LIKE position.
         // bindArgs removes the only way a token-derived literal could end up in the
         // SQL string itself.
-        val args = tokens.flatMap { token -> List(3) { "%$token%" } }.toTypedArray()
+        val args = tokens.flatMap { token -> List(4) { "%$token%" } }.toTypedArray()
         return bookDao.rawSearch(SimpleSQLiteQuery(sql, args))
     }
 
@@ -64,6 +72,12 @@ class BookRepository @Inject constructor(
         book.copy(
             titleSearch = book.title.lowercase() + " " + (book.subtitle?.lowercase().orEmpty()),
             authorSearch = book.author.lowercase(),
+            // Lowercased here rather than in SQL: Kotlin's lowercase() folds
+            // Cyrillic, SQLite's lower() does not on AOSP (no ICU build), so a
+            // SQL-side LOWER() would silently leave Cyrillic untouched.
+            seriesSearch = listOfNotNull(book.series, book.seriesNumber)
+                .filter { it.isNotBlank() }
+                .joinToString(" ") { it.lowercase() },
         )
 
     suspend fun delete(book: BookEntity): Int {
