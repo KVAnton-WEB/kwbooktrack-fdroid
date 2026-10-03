@@ -72,6 +72,7 @@ import coil.compose.AsyncImage
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import ru.antonkw.kwbooktrack.R
+import ru.antonkw.kwbooktrack.data.time.toLocalDate
 import ru.antonkw.kwbooktrack.ui.common.MonthYearPickerDialog
 import ru.antonkw.kwbooktrack.ui.common.labelRes
 import ru.antonkw.kwbooktrack.ui.common.seriesLabel
@@ -313,9 +314,8 @@ fun BookListScreen(
         val today = LocalDate.now()
         val max = YearMonth.of(today.year, today.month)
         val min = YearMonth.of(today.year - 5, 1)
-        val initial = period.startMillis?.let {
-            java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneOffset.UTC).toLocalDate()
-        }?.let { YearMonth.of(it.year, it.monthValue) } ?: max
+        val initial = period.startMillis?.let { it.toLocalDate() }
+            ?.let { YearMonth.of(it.year, it.monthValue) } ?: max
         MonthYearPickerDialog(
             initial = initial,
             min = min,

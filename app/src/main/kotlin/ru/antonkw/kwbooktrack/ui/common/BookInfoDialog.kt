@@ -28,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ru.antonkw.kwbooktrack.R
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
+import ru.antonkw.kwbooktrack.data.time.toLocalDate
 
 /**
  * Read-only "all details" dialog for a book. Each row is a label/value pair;
@@ -152,11 +153,7 @@ private fun stringOrNull(@androidx.annotation.StringRes label: Int, value: Strin
 
 private fun boolLabel(value: Boolean): String = if (value) "✓" else "—"
 
-private fun formatDate(epochMs: Long): String =
-    java.time.Instant.ofEpochMilli(epochMs)
-        .atZone(java.time.ZoneOffset.UTC)
-        .toLocalDate()
-        .toString()
+private fun formatDate(epochMs: Long): String = epochMs.toLocalDate().toString()
 
 private fun copyToClipboard(context: Context, value: String, @androidx.annotation.StringRes labelRes: Int) {
     val label = context.getString(labelRes)

@@ -27,7 +27,7 @@ import ru.antonkw.kwbooktrack.data.db.migration.Migrate1To2
         TagEntity::class,
         BookTagCrossRef::class,
     ],
-    version = 6,
+    version = 7,
     // Schema export is disabled: all transitions are explicit Migrations
     // wired into DatabaseModule via .addMigrations(...), so Room doesn't
     // need a checked-in json file per step. The previous

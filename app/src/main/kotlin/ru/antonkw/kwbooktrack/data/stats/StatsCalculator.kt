@@ -3,10 +3,9 @@ package ru.antonkw.kwbooktrack.data.stats
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
 import ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity
-import java.time.Instant
+import ru.antonkw.kwbooktrack.data.time.toLocalDate
 import java.time.LocalDate
 import java.time.YearMonth
-import java.time.ZoneOffset
 
 data class DailyPages(val date: LocalDate, val pages: Int)
 
@@ -42,7 +41,7 @@ object StatsCalculator {
         val totalMinutes = sessions.mapNotNull { it.durationSec }.sum() / 60
 
         val monthly = finishedBookDates.map { ts ->
-            val date = Instant.ofEpochMilli(ts).atZone(ZoneOffset.UTC).toLocalDate()
+            val date = ts.toLocalDate()
             MonthlyBooks(date.year, date.monthValue, 0)
         }.groupingBy { it.year to it.month }
             .eachCount()
@@ -112,11 +111,8 @@ object StatsCalculator {
                     val end = s.endPage ?: return@mapIndexedNotNull null
                     val prev = ordered.getOrNull(i - 1)?.endPage ?: 0
                     val pages = end - prev
-                    if (pages <= 0) null
-                    else {
-                        Instant.ofEpochMilli(s.startedAt).atZone(ZoneOffset.UTC)
-                            .toLocalDate() to pages
-                    }
+if (pages <= 0) null
+                        else s.startedAt.toLocalDate() to pages
                 }
             }
     }

@@ -9,8 +9,8 @@ import ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.NoteRepository
 import ru.antonkw.kwbooktrack.data.repository.SessionRepository
+import ru.antonkw.kwbooktrack.data.time.toEpochMs
 import java.io.File
-import java.time.ZoneOffset
 import javax.inject.Inject
 
 data class BookmoryImportResult(
@@ -59,7 +59,7 @@ class ImportBookmoryUseCase @Inject constructor(
                         BookmoryStatus.WISHLIST -> BookStatus.WISHLIST
                         BookmoryStatus.UNKNOWN -> BookStatus.WISHLIST
                     },
-                    finishedAt = parsed.sessions.lastOrNull()?.endedAt?.atStartOfDay(ZoneOffset.UTC)?.toInstant()?.toEpochMilli(),
+                    finishedAt = parsed.sessions.lastOrNull()?.endedAt?.toEpochMs(),
                     createdAt = System.currentTimeMillis(),
                     updatedAt = System.currentTimeMillis(),
                     source = BookSource.BOOKMORY,
@@ -67,14 +67,46 @@ class ImportBookmoryUseCase @Inject constructor(
             )
             books++
 
-            parsed.sessions.forEach { session ->
-                val startedAt = session.startedAt?.atStartOfDay(ZoneOffset.UTC)?.toInstant()?.toEpochMilli()
-                val endedAt = session.endedAt?.atStartOfDay(ZoneOffset.UTC)?.toInstant()?.toEpochMilli()
+            // Max page reached per note date — Bookmory's "Журнал чтения" carries
+            // session periods but not per-session page numbers, so endPage is
+            // reconstructed from notes: the latest page logged during a session's
+            // date range is the page the reader was on when the session ended.
+            // The last FINISHED session with no notes in range falls back to
+            // pageCount: by the time the book is "дочитано", the reader is on
+            // the last page. Other sessions without notes stay null.
+            val maxPageByDate: Map<java.time.LocalDate, Int> = parsed.notes
+                .mapNotNull { note -> note.date?.let { d -> note.page?.let { p -> d to p } } }
+                .groupBy({ it.first }, { it.second })
+                .mapValues { (_, pages) -> pages.max() }
+
+            parsed.sessions.forEachIndexed { idx, session ->
+                val startedAt = session.startedAt?.toEpochMs()
+                val endedAt = session.endedAt?.toEpochMs()
+                val endPage: Int? = when {
+                    session.startedAt != null && session.endedAt != null -> {
+                        var d = session.startedAt
+                        val end = session.endedAt
+                        var max = 0
+                        var found = false
+                        while (d != null && !d.isAfter(end)) {
+                            val p = maxPageByDate[d]
+                            if (p != null && p > max) { max = p; found = true }
+                            d = d!!.plusDays(1)
+                        }
+                        if (found) max else null
+                    }
+                    else -> null
+                } ?: run {
+                    val isLastFinishedSession = parsed.status == BookmoryStatus.FINISHED &&
+                        idx == parsed.sessions.lastIndex
+                    if (isLastFinishedSession) parsed.totalPages else null
+                }
                 sessionRepository.insert(
                     ReadingSessionEntity(
                         bookId = bookId,
                         startedAt = startedAt ?: System.currentTimeMillis(),
                         endedAt = endedAt,
+                        endPage = endPage,
                         durationSec = session.readingTimeMinutes?.let { it * 60L },
                         note = session.comment,
                     ),
@@ -83,7 +115,7 @@ class ImportBookmoryUseCase @Inject constructor(
             }
 
             parsed.notes.forEach { note ->
-                val createdAt = note.date?.atStartOfDay(ZoneOffset.UTC)?.toInstant()?.toEpochMilli()
+                val createdAt = note.date?.toEpochMs()
                     ?: System.currentTimeMillis()
                 noteRepository.insert(
                     NoteEntity(

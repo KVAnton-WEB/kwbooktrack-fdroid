@@ -135,7 +135,9 @@ class BookmoryParser {
 
     private fun parseDate(raw: String): LocalDate? {
         if (raw.isBlank()) return null
-        for (pattern in listOf("dd.MM.yyyy", "yyyy-MM-dd")) {
+        // Bookmory dates in notes carry a trailing " HH:mm" that doesn't fit
+        // date-only patterns, so try date+time first.
+        for (pattern in listOf("dd.MM.yyyy HH:mm", "dd.MM.yyyy", "yyyy-MM-dd")) {
             try {
                 return LocalDate.parse(raw, DateTimeFormatter.ofPattern(pattern))
             } catch (_: Exception) {

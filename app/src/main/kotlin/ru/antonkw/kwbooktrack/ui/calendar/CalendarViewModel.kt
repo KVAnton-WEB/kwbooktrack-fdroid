@@ -15,9 +15,9 @@ import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
 import ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.SessionRepository
+import ru.antonkw.kwbooktrack.data.time.toEpochMs
 import java.time.LocalDate
 import java.time.YearMonth
-import java.time.ZoneOffset
 import javax.inject.Inject
 
 data class CalendarBook(
@@ -104,8 +104,8 @@ class CalendarViewModel @Inject constructor(
         sessions: List<ReadingSessionEntity>,
         booksById: Map<Long, BookEntity>,
     ): List<CalendarBook> {
-        val startMs = date.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
-        val endMs = date.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+        val startMs = date.toEpochMs()
+        val endMs = date.plusDays(1).toEpochMs()
         return sessions
             .filter { it.startedAt in startMs until endMs }
             .mapNotNull { session ->

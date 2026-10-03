@@ -76,8 +76,7 @@ import ru.antonkw.kwbooktrack.data.db.entity.PhotoEntity
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.NoteRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
-import java.time.Instant
-import java.time.ZoneOffset
+import ru.antonkw.kwbooktrack.data.time.toLocalDateTime
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 import ru.antonkw.kwbooktrack.R
@@ -361,7 +360,7 @@ private fun NoteDetailContent(state: NoteDetailUiState.Loaded, onOpenBook: (Long
                 text = stringResource(
                     R.string.note_created_label,
                     remember { DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm") }
-                        .format(Instant.ofEpochMilli(state.note.createdAt).atZone(ZoneOffset.UTC).toLocalDateTime()),
+                        .format(state.note.createdAt.toLocalDateTime()),
                 ),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

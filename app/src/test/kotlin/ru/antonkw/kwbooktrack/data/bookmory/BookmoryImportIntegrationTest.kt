@@ -30,6 +30,7 @@ class BookmoryImportIntegrationTest {
     private lateinit var useCase: ImportBookmoryUseCase
     private lateinit var tempDir: File
     private lateinit var bookmoryDir: File
+    private val createdDirs = mutableListOf<File>()
 
     @Before
     fun setUp() {
@@ -62,6 +63,7 @@ class BookmoryImportIntegrationTest {
     fun tearDown() {
         db.close()
         tempDir.deleteRecursively()
+        createdDirs.forEach { it.deleteRecursively() }
         if (bookmoryDir.parentFile?.name?.startsWith("kwbooktrack-bookmory-fixture-") == true) {
             bookmoryDir.parentFile.deleteRecursively()
         }
@@ -146,5 +148,102 @@ class BookmoryImportIntegrationTest {
         val result = useCase(tempDir)
         assertThat(result.totalFiles).isEqualTo(0)
         assertThat(result.importedBooks).isEqualTo(0)
+    }
+
+    @Test
+    fun sessionEndPageComesFromLatestNoteInRange() = runBlocking {
+        // Session 08.04–30.06 contains notes on 15.04 page 100 and 20.05 page 230.
+        // endPage must be 230 (the latest page reached), not the earlier note.
+        val dir = newIsolatedDir("end-page-test")
+        File(dir, "book.md").writeText(
+            """
+            ***
+            ### Информация о книге
+            - Название: Тестовая книга
+            - Авторы: Тест
+            - Всего страниц: с. 368
+            - Статус: Дочитано!
+
+            ***
+            ### Журнал чтения 1
+            - Период чтения: 08.04.2026 ~ 30.06.2026
+
+            ***
+            ### Список заметок
+            #### #1
+            - Дата: 15.04.2026 12:00
+            - Страница: с. 100
+            - Тип заметки: Цитата
+            - Содержание: ранняя заметка.
+            #### #2
+            - Дата: 20.05.2026 12:00
+            - Страница: с. 230
+            - Тип заметки: Цитата
+            - Содержание: поздняя заметка.
+            """.trimIndent(),
+        )
+        useCase(dir)
+        val sessions = db.readingSessionDao().observeAll().first()
+        assertThat(sessions).hasSize(1)
+        assertThat(sessions.single().endPage).isEqualTo(230)
+    }
+
+    @Test
+    fun finishedSessionWithoutNotesFallsBackToPageCount() = runBlocking {
+        // Finished book with no notes → last FINISHED session gets pageCount
+        // (368) so pages can be reconstructed end-to-end.
+        val dir = newIsolatedDir("no-notes-test")
+        File(dir, "book.md").writeText(
+            """
+            ***
+            ### Информация о книге
+            - Название: Без заметок
+            - Авторы: Тест
+            - Всего страниц: с. 368
+            - Статус: Дочитано!
+
+            ***
+            ### Журнал чтения 1
+            - Период чтения: 01.01.2026 ~ 31.01.2026
+            """.trimIndent(),
+        )
+        useCase(dir)
+        val sessions = db.readingSessionDao().observeAll().first()
+        assertThat(sessions.single().endPage).isEqualTo(368)
+    }
+
+    @Test
+    fun nonLastSessionWithoutNotesKeepsEndPageNull() = runBlocking {
+        // Reading book, only the last session gets the pageCount fallback;
+        // a prior session with no notes stays null.
+        val dir = newIsolatedDir("non-last-test")
+        File(dir, "book.md").writeText(
+            """
+            ***
+            ### Информация о книге
+            - Название: В процессе
+            - Авторы: Тест
+            - Всего страниц: с. 500
+            - Статус: Читаю!
+
+            ***
+            ### Журнал чтения 1
+            - Период чтения: 01.01.2026 ~ 15.01.2026
+            ### Журнал чтения 2
+            - Период чтения: 16.01.2026 ~ 31.01.2026
+            """.trimIndent(),
+        )
+        useCase(dir)
+        val sessions = db.readingSessionDao().observeAll().first()
+            .sortedBy { it.startedAt }
+        assertThat(sessions).hasSize(2)
+        assertThat(sessions[0].endPage).isNull()
+        assertThat(sessions[1].endPage).isNull()
+    }
+
+    private fun newIsolatedDir(name: String): File {
+        val dir = Files.createTempDirectory("kwbooktrack-$name-").toFile()
+        createdDirs += dir
+        return dir
     }
 }

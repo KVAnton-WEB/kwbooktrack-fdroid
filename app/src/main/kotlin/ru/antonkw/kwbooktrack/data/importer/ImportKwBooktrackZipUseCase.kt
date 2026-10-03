@@ -9,11 +9,11 @@ import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
 import ru.antonkw.kwbooktrack.data.exporter.ExportManifest
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.storage.CoverStorage
+import ru.antonkw.kwbooktrack.data.time.toEpochMs
 import java.io.File
 import java.io.StringReader
 import java.nio.charset.StandardCharsets
 import java.time.LocalDate
-import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.zip.ZipInputStream
 import javax.inject.Inject
@@ -142,10 +142,7 @@ class ImportKwBooktrackZipUseCase @Inject constructor(
     private fun parseDate(raw: String?): Long? {
         if (raw.isNullOrBlank()) return null
         return try {
-            LocalDate.parse(raw.trim(), DateTimeFormatter.ISO_LOCAL_DATE)
-                .atStartOfDay(ZoneOffset.UTC)
-                .toInstant()
-                .toEpochMilli()
+            LocalDate.parse(raw.trim(), DateTimeFormatter.ISO_LOCAL_DATE).toEpochMs()
         } catch (_: Exception) {
             null
         }

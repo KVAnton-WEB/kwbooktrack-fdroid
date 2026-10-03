@@ -25,8 +25,8 @@ import ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
 import ru.antonkw.kwbooktrack.data.repository.SessionRepository
+import ru.antonkw.kwbooktrack.data.time.toEpochMs
 import java.time.LocalDate
-import java.time.ZoneOffset
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -67,7 +67,7 @@ class StatisticsViewModelTest {
 
     @Test
     fun statsReflectInsertedBooksAndSessions() = runTest(dispatcher) {
-        val today = LocalDate.now().atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+        val today = LocalDate.now().toEpochMs()
         bookRepository.insert(
             BookEntity(
                 title = "Dune",

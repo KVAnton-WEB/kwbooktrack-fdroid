@@ -66,7 +66,8 @@ import ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity
 import ru.antonkw.kwbooktrack.ui.common.labelRes
 import ru.antonkw.kwbooktrack.ui.common.seriesLabel
 import java.time.Instant
-import java.time.ZoneOffset
+import ru.antonkw.kwbooktrack.data.time.toLocalDate
+import ru.antonkw.kwbooktrack.data.time.toLocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -594,11 +595,7 @@ private fun SessionRow(session: ReadingSessionEntity) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = SESSION_FMT.format(
-                    java.time.Instant.ofEpochMilli(session.startedAt)
-                        .atZone(ZoneOffset.UTC)
-                        .toLocalDateTime(),
-                ),
+                text = SESSION_FMT.format(session.startedAt.toLocalDateTime()),
                 style = MaterialTheme.typography.bodyMedium,
             )
             Text(
@@ -616,4 +613,4 @@ private val SESSION_FMT: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.
 private val DATE_FMT: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy", Locale("ru"))
 
 private fun formatDate(epochMs: Long): String =
-    DATE_FMT.format(Instant.ofEpochMilli(epochMs).atZone(ZoneOffset.UTC).toLocalDate())
+    DATE_FMT.format(epochMs.toLocalDate())

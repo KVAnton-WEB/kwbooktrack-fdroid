@@ -23,9 +23,9 @@ import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
 import ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.SessionRepository
+import ru.antonkw.kwbooktrack.data.time.toEpochMs
 import java.time.LocalDate
 import java.time.YearMonth
-import java.time.ZoneOffset
 import javax.inject.Inject
 
 enum class BookFilterType(@StringRes val labelRes: Int) {
@@ -53,8 +53,8 @@ data class PeriodOption(
         fun allTime() = PeriodOption(labelRes = R.string.period_all)
 
         fun year(year: Int): PeriodOption {
-            val start = LocalDate.of(year, 1, 1).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
-            val end = LocalDate.of(year + 1, 1, 1).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+            val start = LocalDate.of(year, 1, 1).toEpochMs()
+            val end = LocalDate.of(year + 1, 1, 1).toEpochMs()
             return PeriodOption(
                 labelRes = R.string.period_year,
                 formatArg = year.toString(),
@@ -64,9 +64,8 @@ data class PeriodOption(
         }
 
         fun month(year: Int, month: Int, @StringRes monthNameRes: Int): PeriodOption {
-            val start = LocalDate.of(year, month, 1).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
-            val end = YearMonth.of(year, month).plusMonths(1)
-                .atDay(1).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+            val start = LocalDate.of(year, month, 1).toEpochMs()
+            val end = YearMonth.of(year, month).plusMonths(1).atDay(1).toEpochMs()
             return PeriodOption(
                 labelRes = R.string.period_year_month,
                 formatArg = "$year|$monthNameRes",

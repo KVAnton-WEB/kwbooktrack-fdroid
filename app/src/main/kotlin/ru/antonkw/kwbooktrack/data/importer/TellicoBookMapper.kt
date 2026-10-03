@@ -4,6 +4,7 @@ import org.apache.commons.csv.CSVRecord
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
 import ru.antonkw.kwbooktrack.data.db.entity.BookSource
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
+import ru.antonkw.kwbooktrack.data.time.toEpochMs
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
@@ -114,10 +115,7 @@ class TellicoBookMapper @Inject constructor() {
         val candidates = listOf("dd.MM.yyyy", "yyyy-MM-dd")
         for (pattern in candidates) {
             try {
-                return LocalDate.parse(raw.trim(), DateTimeFormatter.ofPattern(pattern))
-                    .atStartOfDay(java.time.ZoneOffset.UTC)
-                    .toInstant()
-                    .toEpochMilli()
+                return LocalDate.parse(raw.trim(), DateTimeFormatter.ofPattern(pattern)).toEpochMs()
             } catch (_: Exception) {
                 // try next
             }

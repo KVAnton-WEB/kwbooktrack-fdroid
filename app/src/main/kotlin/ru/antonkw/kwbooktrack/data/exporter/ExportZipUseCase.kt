@@ -11,13 +11,12 @@ import ru.antonkw.kwbooktrack.data.db.dao.ReadingSessionDao
 import ru.antonkw.kwbooktrack.data.db.dao.TagDao
 import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
+import ru.antonkw.kwbooktrack.data.time.toLocalDate
 import java.io.BufferedOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.io.OutputStream
 import java.nio.charset.StandardCharsets
-import java.time.Instant
-import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
@@ -158,9 +157,7 @@ class ExportZipUseCase @Inject constructor(
 
     private fun epochToDate(epoch: Long?): String {
         if (epoch == null) return ""
-        return DateTimeFormatter.ISO_LOCAL_DATE.format(
-            Instant.ofEpochMilli(epoch).atZone(ZoneOffset.UTC).toLocalDate(),
-        )
+        return DateTimeFormatter.ISO_LOCAL_DATE.format(epoch.toLocalDate())
     }
 
     companion object {

@@ -25,6 +25,8 @@ import ru.antonkw.kwbooktrack.data.db.entity.BookSource
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.storage.CoverStorage
+import ru.antonkw.kwbooktrack.data.time.toEpochMs
+import ru.antonkw.kwbooktrack.data.time.toLocalDate
 import java.io.File
 import javax.inject.Inject
 
@@ -394,9 +396,7 @@ class AddBookViewModel @Inject constructor(
         for (pattern in listOf("dd.MM.yyyy", "yyyy-MM-dd")) {
             try {
                 return java.time.LocalDate.parse(raw.trim(), java.time.format.DateTimeFormatter.ofPattern(pattern))
-                    .atStartOfDay(java.time.ZoneOffset.UTC)
-                    .toInstant()
-                    .toEpochMilli()
+                    .toEpochMs()
             } catch (_: Exception) { /* try next */ }
         }
         return null
@@ -405,8 +405,7 @@ class AddBookViewModel @Inject constructor(
     private fun parsePriceInput(raw: String): Double? = raw.toDoubleOrNull()
 
     private fun formatDate(epochMs: Long): String =
-        java.time.Instant.ofEpochMilli(epochMs).atZone(java.time.ZoneOffset.UTC).toLocalDate()
-            .format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy"))
+        epochMs.toLocalDate().format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy"))
 
     private fun formatPrice(value: Double): String = "%.2f".format(value)
 

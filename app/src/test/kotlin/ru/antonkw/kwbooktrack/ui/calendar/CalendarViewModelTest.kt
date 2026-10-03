@@ -24,7 +24,7 @@ import ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
 import ru.antonkw.kwbooktrack.data.repository.SessionRepository
-import java.time.ZoneOffset
+import ru.antonkw.kwbooktrack.data.time.toEpochMs
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -74,7 +74,7 @@ class CalendarViewModelTest {
         val bookId = bookRepository.insert(
             BookEntity(title = "Hyperion", author = "Simmons", createdAt = 0L, updatedAt = 0L),
         )
-        val midnight = firstOfMonth.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+        val midnight = firstOfMonth.toEpochMs()
         sessionRepository.insert(
             ReadingSessionEntity(bookId = bookId, startedAt = midnight, endPage = 50),
         )
