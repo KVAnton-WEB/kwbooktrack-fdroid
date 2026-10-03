@@ -28,16 +28,20 @@ interface CoverStorage {
 @Singleton
 class FileCoverStorage @Inject constructor(
     @ApplicationContext private val context: Context,
+    private val transcoder: CoverTranscoder,
 ) : CoverStorage {
     private val coversDir: File = File(context.filesDir, "covers").apply { mkdirs() }
 
     override fun saveTemp(source: InputStream, extension: String): String {
         // UUID avoids races where two parallel saves within the same millisecond
         // would pick the same name and overwrite each other.
-        val target = File(coversDir, "cover_${UUID.randomUUID()}.${extension.ifEmpty { "jpg" }}")
-        source.use { input ->
-            target.outputStream().use { input.copyTo(it) }
-        }
+        val raw = source.use { it.readBytes() }
+        // Downscale + WebP here rather than at render time: this is the single
+        // funnel every cover passes through (gallery pick, camera capture,
+        // own-ZIP re-import), so a 300px lossy WebP is what lands on disk.
+        val (bytes, ext) = transcoder.toWebp(raw)?.let { it to "webp" } ?: (raw to extension.ifEmpty { "jpg" })
+        val target = File(coversDir, "cover_${UUID.randomUUID()}.$ext")
+        target.writeBytes(bytes)
         return target.absolutePath
     }
 

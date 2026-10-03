@@ -5,6 +5,7 @@ import ru.antonkw.kwbooktrack.data.db.entity.NoteEntity
 import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.NoteRepository
+import ru.antonkw.kwbooktrack.data.storage.CoverTranscoder
 import java.io.File
 import java.io.Reader
 import java.nio.file.Files
@@ -31,6 +32,7 @@ class ImportTellicoUseCase @Inject constructor(
     private val mapper: TellicoBookMapper,
     private val bookRepository: BookRepository,
     private val noteRepository: NoteRepository,
+    private val transcoder: CoverTranscoder,
 ) {
     suspend operator fun invoke(
         input: Reader,
@@ -77,11 +79,16 @@ class ImportTellicoUseCase @Inject constructor(
         val resolved = runCatching { src.canonicalPath }.getOrNull() ?: return 0
         if (!resolved.startsWith(sourceRoot + File.separator) && resolved != sourceRoot) return 0
         if (!src.exists() || !src.isFile) return 0
-        val ext = src.extension.ifEmpty { "jpg" }
         val destDir = File(outputDir, "covers").apply { mkdirs() }
-        val dest = File(destDir, "$bookId.$ext")
         return try {
-            Files.copy(src.toPath(), dest.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            // Same funnel as the gallery pick: a 300px lossy WebP is what we
+            // keep. Falls back to the original bytes when the source isn't
+            // decodable, so a broken cover never fails the import.
+            val raw = src.readBytes()
+            val webp = transcoder.toWebp(raw)
+            val ext = if (webp != null) "webp" else src.extension.ifEmpty { "jpg" }
+            val dest = File(destDir, "$bookId.$ext")
+            if (webp != null) dest.writeBytes(webp) else Files.copy(src.toPath(), dest.toPath(), StandardCopyOption.REPLACE_EXISTING)
             val existing = bookRepository.findById(bookId)
             if (existing != null) {
                 bookRepository.update(existing.copy(coverPath = dest.absolutePath))

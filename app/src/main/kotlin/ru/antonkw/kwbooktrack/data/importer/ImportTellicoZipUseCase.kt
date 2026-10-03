@@ -2,6 +2,7 @@ package ru.antonkw.kwbooktrack.data.importer
 
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.NoteRepository
+import ru.antonkw.kwbooktrack.data.storage.CoverTranscoder
 import java.io.File
 import java.io.StringReader
 import java.util.zip.ZipEntry
@@ -14,6 +15,7 @@ class ImportTellicoZipUseCase @Inject constructor(
     private val mapper: TellicoBookMapper,
     private val bookRepository: BookRepository,
     private val noteRepository: NoteRepository,
+    private val transcoder: CoverTranscoder,
 ) {
     suspend operator fun invoke(
         zipFile: File,
@@ -85,6 +87,7 @@ class ImportTellicoZipUseCase @Inject constructor(
             mapper = mapper,
             bookRepository = bookRepository,
             noteRepository = noteRepository,
+            transcoder = transcoder,
         )
         val result = useCase(
             input = StringReader(csvContent.toString()),

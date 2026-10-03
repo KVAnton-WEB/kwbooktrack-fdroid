@@ -1,5 +1,6 @@
 package ru.antonkw.kwbooktrack.ui.add
 
+import ru.antonkw.kwbooktrack.data.storage.CoverTranscoder
 import android.app.Application
 import android.content.Context
 import android.net.Uri
@@ -221,7 +222,7 @@ class AddBookViewModelTest {
 
     private val context: Context get() = ApplicationProvider.getApplicationContext()
 
-    private val coverStorage: CoverStorage get() = FileCoverStorage(context)
+    private val coverStorage: CoverStorage get() = FileCoverStorage(context, CoverTranscoder())
 
     private val coversDir: File get() = File(context.filesDir, "covers").apply { mkdirs() }
 
@@ -312,7 +313,9 @@ class AddBookViewModelTest {
         vm.save()?.join()
 
         val saved = bookRepository.findById(id)!!
-        assertThat(saved.coverPath).isEqualTo(File(coversDir, "$id.png").absolutePath)
+        // saveTemp transcodes, so a decodable pick always lands as .webp
+        // whatever extension it arrived with.
+        assertThat(saved.coverPath).isEqualTo(File(coversDir, "$id.webp").absolutePath)
         assertThat(File(saved.coverPath!!).exists()).isTrue()
         assertThat(oldCover.exists()).isFalse()
         assertThat(tempCovers()).isEmpty()
@@ -349,13 +352,13 @@ class AddBookViewModelTest {
         val (id, oldCover) = bookWithCover()
         val vm = editVm(id)
         vm.clearCover()
-        // .png so the promoted file has a different name than the cleared
-        // covers/1.jpg — otherwise "old file gone" is trivially true.
+        // Different source name so the pick isn't a no-op; the stored file is
+        // .webp either way because saveTemp transcodes.
         pickCover(vm, "again.png")
         vm.save()?.join()
 
         val saved = bookRepository.findById(id)!!
-        assertThat(saved.coverPath).isEqualTo(File(coversDir, "$id.png").absolutePath)
+        assertThat(saved.coverPath).isEqualTo(File(coversDir, "$id.webp").absolutePath)
         assertThat(File(saved.coverPath!!).exists()).isTrue()
         assertThat(oldCover.exists()).isFalse()
     }

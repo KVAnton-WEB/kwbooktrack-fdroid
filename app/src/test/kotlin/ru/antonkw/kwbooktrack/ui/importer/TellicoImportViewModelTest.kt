@@ -1,5 +1,6 @@
 package ru.antonkw.kwbooktrack.ui.importer
 
+import ru.antonkw.kwbooktrack.data.storage.CoverTranscoder
 import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
@@ -53,6 +54,7 @@ class TellicoImportViewModelTest {
             TellicoBookMapper(),
             bookRepository,
             noteRepository,
+            CoverTranscoder(),
         )
         vm = TellicoImportViewModel(ApplicationProvider.getApplicationContext(), useCase)
     }

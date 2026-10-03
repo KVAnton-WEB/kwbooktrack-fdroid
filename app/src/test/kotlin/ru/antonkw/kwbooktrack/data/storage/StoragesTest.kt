@@ -29,7 +29,7 @@ class StoragesTest {
     @Before
     fun setUp() {
         val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
-        coverStorage = FileCoverStorage(ctx)
+        coverStorage = FileCoverStorage(ctx, CoverTranscoder())
         photoStorage = FilePhotoStorage(ctx)
     }
 
@@ -41,18 +41,32 @@ class StoragesTest {
         photosDir.listFiles()?.forEach { it.delete() }
     }
 
+    /** Real decodable PNG — saveTemp transcodes, so garbage input isn't a valid fixture. */
+    private fun pngBytes(w: Int = 8, h: Int = 8, color: Int = android.graphics.Color.RED): ByteArray {
+        val bmp = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
+        android.graphics.Canvas(bmp).drawColor(color)
+        return java.io.ByteArrayOutputStream().use { out ->
+            bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+            bmp.recycle()
+            out.toByteArray()
+        }
+    }
+
     @Test
     fun coverSaveTempWritesAUniqueFileEachCall() {
         // Two parallel saveTemp() calls in the same millisecond used to pick
         // the same tempId (=-currentTimeMillis()) and overwrite each other.
         // After fix #15, UUID suffixes make collisions impossible.
-        val a = coverStorage.saveTemp(ByteArrayInputStream(byteArrayOf(0x01)), "jpg")
-        val b = coverStorage.saveTemp(ByteArrayInputStream(byteArrayOf(0x02)), "jpg")
+        val a = coverStorage.saveTemp(ByteArrayInputStream(pngBytes(color = android.graphics.Color.RED)), "png")
+        val b = coverStorage.saveTemp(ByteArrayInputStream(pngBytes(color = android.graphics.Color.BLUE)), "png")
         assertThat(a).isNotEqualTo(b)
         assertThat(File(a).exists()).isTrue()
         assertThat(File(b).exists()).isTrue()
-        assertThat(File(a).readBytes()).isEqualTo(byteArrayOf(0x01))
-        assertThat(File(b).readBytes()).isEqualTo(byteArrayOf(0x02))
+        // saveTemp is no longer a byte copy — it downscales and re-encodes, so
+        // the stored bytes are a WebP, not the PNG that went in. (Distinct
+        // colours can still encode to identical bytes at 8×8, so the
+        // uniqueness that matters here is the path, asserted above.)
+        assertThat(File(a).readBytes()).isNotEqualTo(pngBytes())
     }
 
     @Test
@@ -62,13 +76,15 @@ class StoragesTest {
         // Pre-create a JPG and a PNG cover for book 42.
         File(coversDir, "42.jpg").writeBytes(byteArrayOf(0xFF.toByte(), 0xD8.toByte()))
         File(coversDir, "42.png").writeBytes(byteArrayOf(0x89.toByte(), 0x50.toByte()))
-        val newTemp = coverStorage.saveTemp(ByteArrayInputStream(byteArrayOf(0xAA.toByte())), "jpg")
+        val newTemp = coverStorage.saveTemp(ByteArrayInputStream(pngBytes()), "png")
 
         coverStorage.promoteToBook(42L, newTemp)
 
-        assertThat(File(coversDir, "42.jpg").exists()).isTrue()
+        // The picked cover decodes, so saveTemp already stored it as .webp and
+        // the prefix sweep drops the stale .jpg/.png.
+        assertThat(File(coversDir, "42.webp").exists()).isTrue()
+        assertThat(File(coversDir, "42.jpg").exists()).isFalse()
         assertThat(File(coversDir, "42.png").exists()).isFalse()
-        assertThat(File(coversDir, "42.jpg").readBytes()).isEqualTo(byteArrayOf(0xAA.toByte()))
     }
 
     @Test

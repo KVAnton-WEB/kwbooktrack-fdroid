@@ -1,5 +1,7 @@
 package ru.antonkw.kwbooktrack.data.importer
 
+import ru.antonkw.kwbooktrack.data.storage.CoverTranscoder
+
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.first
@@ -43,7 +45,7 @@ class TellicoZipImportRealTest {
             PhotoRepository(db.photoDao(), ru.antonkw.kwbooktrack.data.NoOpPhotoStorage),
         )
         noteRepo = NoteRepository(db.noteDao(), ru.antonkw.kwbooktrack.data.NoOpPhotoStorage)
-        useCase = ImportTellicoZipUseCase(TellicoCsvReader(), TellicoBookMapper(), repo, noteRepo)
+        useCase = ImportTellicoZipUseCase(TellicoCsvReader(), TellicoBookMapper(), repo, noteRepo, CoverTranscoder())
         tempOut = Files.createTempDirectory("kwbooktrack-zip-").toFile()
     }
 
