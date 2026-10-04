@@ -150,6 +150,27 @@ class TellicoBookMapperTest {
         assertThat(book.printYear).isNull()
     }
 
+    @Test
+    fun htmlInAnnotationReviewAndQuotesBecomesMarkdown() {
+        // LiveLib exports these fields as HTML; the annotation renders as plain
+        // text and bodyMd goes through Markwon, so raw tags would be visible.
+        val record = csvRecord(
+            "Заголовок" to "Дюна",
+            "Автор" to "Герберт",
+            "Аннотация" to "<p>Пустыня и <b>песок</b>&nbsp;везде.</p><p>Вторая.</p>",
+            "Рецензия" to "<p>Отличная <i>книга</i>.</p>",
+            "Цитаты" to "<p>Первая цитата.</p><p>Вторая &laquo;цитата&raquo;.</p>",
+        )
+
+        val mapped = TellicoBookMapper().map(record)!!
+
+        assertThat(mapped.book.annotation).isEqualTo("Пустыня и **песок** везде.\n\nВторая.")
+        assertThat(mapped.review).isEqualTo("Отличная *книга*.")
+        // Quotes are split after conversion, so <p>-separated quotes don't
+        // collapse into one note.
+        assertThat(mapped.quotes).containsExactly("Первая цитата.", "Вторая «цитата».").inOrder()
+    }
+
     private fun csvRecord(vararg pairs: Pair<String, String>): CSVRecord {
         val headers = pairs.map { it.first }
         val values = pairs.map { (k, v) -> if (v.contains(';') || v.contains('"')) "\"$v\"" else v }

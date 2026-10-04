@@ -9,6 +9,7 @@ import ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.NoteRepository
 import ru.antonkw.kwbooktrack.data.repository.SessionRepository
+import ru.antonkw.kwbooktrack.data.text.HtmlToMarkdown
 import ru.antonkw.kwbooktrack.data.time.toEpochMs
 import java.io.File
 import javax.inject.Inject
@@ -121,7 +122,7 @@ class ImportBookmoryUseCase @Inject constructor(
                     NoteEntity(
                         bookId = bookId,
                         page = note.page,
-                        bodyMd = note.content,
+                        bodyMd = HtmlToMarkdown.convert(note.content),
                         kind = NoteKind.NOTE,
                         createdAt = createdAt,
                         updatedAt = createdAt,

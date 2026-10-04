@@ -4,6 +4,7 @@ import org.apache.commons.csv.CSVRecord
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
 import ru.antonkw.kwbooktrack.data.db.entity.BookSource
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
+import ru.antonkw.kwbooktrack.data.text.HtmlToMarkdown
 import ru.antonkw.kwbooktrack.data.time.toEpochMs
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -55,7 +56,7 @@ class TellicoBookMapper @Inject constructor() {
             printPages = field(record, "Усл. печ. л.")?.toIntOrNull(),
             originalLanguage = nullable(record, "Язык оригинала"),
             originalTitle = nullable(record, "Оригинальное название"),
-            annotation = nullable(record, "Аннотация"),
+            annotation = nullable(record, "Аннотация")?.let { HtmlToMarkdown.convert(it) }?.takeUnless { it.isBlank() },
             isGift = parseBool(record, "Подарок"),
             isLent = parseBool(record, "Одолжено"),
             isSold = parseBool(record, "Продано?"),
@@ -64,14 +65,19 @@ class TellicoBookMapper @Inject constructor() {
             source = BookSource.TELLICO,
         )
         val quotes = parseQuotes(field(record, "Цитаты"))
-        val review = field(record, "Рецензия")?.takeUnless { it.isBlank() }
+        val review = field(record, "Рецензия")
+            ?.let { HtmlToMarkdown.convert(it) }
+            ?.takeUnless { it.isBlank() }
         return MappedBook(book, quotes, review)
     }
 
     private fun parseQuotes(raw: String?): List<String> {
         if (raw.isNullOrBlank()) return emptyList()
-        return raw.split('\n', ';')
-            .map { it.trim() }
+        // Конвертим до разбиения, иначе цитаты, разделённые в выгрузке тегом
+        // <br>, слиплись бы в одну заметку.
+        return HtmlToMarkdown.convert(raw)
+            .split('\n', ';')
+            .map { it.trim().removePrefix("- ").trim() }
             .filter { it.isNotEmpty() }
     }
 
