@@ -170,7 +170,8 @@ fun BookDetailScreen(
         val coverPath = book.coverPath
         if (showCoverViewer && !coverPath.isNullOrBlank()) {
             PhotoGalleryDialog(
-                photos = listOf(PhotoSource(book.id, coverPath)),
+                // id здесь — id фото; у обложки книги своего id нет, поэтому -1.
+                photos = listOf(PhotoSource(-1L, coverPath)),
                 initialIndex = 0,
                 onDismiss = { showCoverViewer = false },
             )
@@ -197,7 +198,6 @@ fun BookDetailScreen(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
-                            val coverPath = book.coverPath
                             BookCoverImage(
                                 path = coverPath,
                                 sizeDp = 96,

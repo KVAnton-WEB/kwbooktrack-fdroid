@@ -81,7 +81,7 @@ class ImportTellicoUseCase @Inject constructor(
         if (!src.exists() || !src.isFile) return 0
         val destDir = File(outputDir, "covers").apply { mkdirs() }
         return try {
-            // Same funnel as the gallery pick: a 300px lossy WebP is what we
+            // Same funnel as the gallery pick: a 600px lossy WebP is what we
             // keep. Falls back to the original bytes when the source isn't
             // decodable, so a broken cover never fails the import.
             val raw = src.readBytes()

@@ -1,5 +1,6 @@
 package ru.antonkw.kwbooktrack.ui.common
 
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -53,8 +54,9 @@ fun PhotoGalleryDialog(
                 state = pagerState,
                 modifier = Modifier.fillMaxSize(),
             ) { page ->
+                val path = photos[page].path
                 AsyncImage(
-                    model = remember(photos[page].path) { File(photos[page].path) },
+                    model = remember(path) { photoImageModel(path) },
                     contentDescription = null,
                     contentScale = ContentScale.Fit,
                     modifier = Modifier.fillMaxSize(),
@@ -77,17 +79,27 @@ fun PhotoGalleryDialog(
                     tint = Color.White,
                 )
             }
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(16.dp),
-            ) {
-                androidx.compose.material3.Text(
-                    text = "${pagerState.currentPage + 1} / ${photos.size}",
-                    color = Color.White,
-                    style = MaterialTheme.typography.labelMedium,
-                )
+            if (photos.size > 1) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(16.dp),
+                ) {
+                    androidx.compose.material3.Text(
+                        text = "${pagerState.currentPage + 1} / ${photos.size}",
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                }
             }
         }
     }
 }
+
+/**
+ * Модель Coil для фото. Сохранённое фото — путь к файлу, несохранённое
+ * (редактор заметки) — `content://` URI: `File("content://…")` указывает на
+ * несуществующий файл, и Coil такой URI не грузит — картинка пустая.
+ */
+internal fun photoImageModel(path: String): Any =
+    if (path.startsWith("content://")) Uri.parse(path) else File(path)

@@ -38,7 +38,7 @@ class FileCoverStorage @Inject constructor(
         val raw = source.use { it.readBytes() }
         // Downscale + WebP here rather than at render time: this is the single
         // funnel every cover passes through (gallery pick, camera capture,
-        // own-ZIP re-import), so a 300px lossy WebP is what lands on disk.
+        // own-ZIP re-import), so a 600px lossy WebP is what lands on disk.
         val (bytes, ext) = transcoder.toWebp(raw)?.let { it to "webp" } ?: (raw to extension.ifEmpty { "jpg" })
         val target = File(coversDir, "cover_${UUID.randomUUID()}.$ext")
         target.writeBytes(bytes)

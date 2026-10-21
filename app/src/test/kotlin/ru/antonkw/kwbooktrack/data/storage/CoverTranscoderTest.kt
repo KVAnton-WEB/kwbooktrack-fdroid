@@ -41,8 +41,8 @@ class CoverTranscoderTest {
         assertThat(out).isNotNull()
         val (w, h) = webpSizeOf(out!!)
         assertThat(maxOf(w, h)).isAtMost(CoverTranscoder.MAX_LONG_SIDE_PX)
-        assertThat(w).isEqualTo(200)
-        assertThat(h).isEqualTo(300)
+        assertThat(w).isEqualTo(400)
+        assertThat(h).isEqualTo(600)
     }
 
     @Test
@@ -66,7 +66,7 @@ class CoverTranscoderTest {
         val out = transcoder.toWebp(pngBytes(2400, 1600))
         assertThat(out).isNotNull()
         val (w, h) = webpSizeOf(out!!)
-        assertThat(w).isEqualTo(300)
-        assertThat(h).isEqualTo(200)
+        assertThat(w).isEqualTo(600)
+        assertThat(h).isEqualTo(400)
     }
 }
