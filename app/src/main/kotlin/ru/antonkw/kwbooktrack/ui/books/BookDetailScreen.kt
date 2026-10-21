@@ -63,6 +63,8 @@ import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
 import ru.antonkw.kwbooktrack.data.db.entity.NoteEntity
 import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
 import ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity
+import ru.antonkw.kwbooktrack.ui.common.PhotoGalleryDialog
+import ru.antonkw.kwbooktrack.ui.common.PhotoSource
 import ru.antonkw.kwbooktrack.ui.common.labelRes
 import ru.antonkw.kwbooktrack.ui.common.seriesLabel
 import java.time.Instant
@@ -91,6 +93,7 @@ fun BookDetailScreen(
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showFinishDialog by remember { mutableStateOf(false) }
     var showInfoDialog by remember { mutableStateOf(false) }
+    var showCoverViewer by remember { mutableStateOf(false) }
     var tempRating by remember { mutableStateOf(0) }
     val book = state.book
 
@@ -163,6 +166,16 @@ fun BookDetailScreen(
             return@Scaffold
         }
 
+        // Полноэкранный просмотр обложки — как фото в заметках.
+        val coverPath = book.coverPath
+        if (showCoverViewer && !coverPath.isNullOrBlank()) {
+            PhotoGalleryDialog(
+                photos = listOf(PhotoSource(book.id, coverPath)),
+                initialIndex = 0,
+                onDismiss = { showCoverViewer = false },
+            )
+        }
+
         val detailListState = androidx.compose.foundation.lazy.rememberLazyListState()
         // padding(end = scrollbarTouchWidth) reserves the scrollbar's whole
         // touch lane — the bar is the later sibling in this Box, so it wins
@@ -184,10 +197,15 @@ fun BookDetailScreen(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
+                            val coverPath = book.coverPath
                             BookCoverImage(
-                                path = book.coverPath,
+                                path = coverPath,
                                 sizeDp = 96,
                                 modifier = Modifier.padding(end = 4.dp),
+                                contentDescription = stringResource(R.string.label_cover),
+                                onClick = if (!coverPath.isNullOrBlank()) {
+                                    { showCoverViewer = true }
+                                } else null,
                             )
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(book.title, style = MaterialTheme.typography.headlineSmall)

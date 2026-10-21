@@ -498,14 +498,19 @@ internal fun BookCoverImage(
     path: String?,
     sizeDp: Int? = null,
     modifier: Modifier = Modifier,
+    contentDescription: String? = null,
+    onClick: (() -> Unit)? = null,
 ) {
     val base = when {
         sizeDp != null -> modifier.size(sizeDp.dp)
         else -> modifier
     }
+    // clickable last in the chain → it inherits the size constraint, so the
+    // touch target is the cover itself and not the whole slot.
+    val interactive = if (onClick != null) base.clickable(onClick = onClick) else base
     if (path.isNullOrBlank()) {
         Box(
-            modifier = base.background(MaterialTheme.colorScheme.surfaceVariant),
+            modifier = interactive.background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
@@ -517,8 +522,8 @@ internal fun BookCoverImage(
     } else {
         AsyncImage(
             model = java.io.File(path),
-            contentDescription = null,
-            modifier = base,
+            contentDescription = contentDescription,
+            modifier = interactive,
             contentScale = androidx.compose.ui.layout.ContentScale.Crop,
         )
     }
