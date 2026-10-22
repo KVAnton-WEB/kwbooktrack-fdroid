@@ -24,10 +24,12 @@ import ru.antonkw.kwbooktrack.data.TestDb
 import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
 import ru.antonkw.kwbooktrack.data.db.entity.BookSource
+import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
 import ru.antonkw.kwbooktrack.data.storage.CoverStorage
 import ru.antonkw.kwbooktrack.data.storage.FileCoverStorage
+import ru.antonkw.kwbooktrack.data.time.toEpochMs
 import java.io.ByteArrayInputStream
 import java.io.File
 
@@ -208,6 +210,80 @@ class AddBookViewModelTest {
         assertThat(book.printYear).isEqualTo(2018)
         assertThat(book.printPages).isEqualTo(32)
     }
+    // --- read flag + finished date ---------------------------------------
+
+    private suspend fun seedBook(
+        status: BookStatus = BookStatus.WISHLIST,
+        startedAt: Long? = null,
+        finishedAt: Long? = null,
+    ): Long {
+        val now = System.currentTimeMillis()
+        return bookRepository.insert(
+            BookEntity(
+                title = SEEDED_TITLE,
+                author = "Frank Herbert",
+                status = status,
+                startedAt = startedAt,
+                finishedAt = finishedAt,
+                createdAt = now,
+                updatedAt = now,
+            ),
+        )
+    }
+
+    @Test
+    fun tickingReadMakesBookFinishedWithPrefilledDate() = runTest(dispatcher) {
+        val id = seedBook()
+        val vm = editVm(id)
+        vm.setIsRead(true)
+        assertThat(vm.state.value.finishedDate).isNotEmpty()
+        vm.save()?.join()
+
+        val saved = bookRepository.findById(id)!!
+        assertThat(saved.status).isEqualTo(BookStatus.FINISHED)
+        assertThat(saved.finishedAt).isNotNull()
+    }
+
+    @Test
+    fun untickingReadClearsFinishedDate() = runTest(dispatcher) {
+        // The "marked as read by mistake" case: the date must go away with
+        // the flag, otherwise the book still counts as finished in stats.
+        val id = seedBook(status = BookStatus.FINISHED, finishedAt = System.currentTimeMillis())
+        val vm = editVm(id)
+        assertThat(vm.state.value.isRead).isTrue()
+        vm.setIsRead(false)
+        vm.save()?.join()
+
+        val saved = bookRepository.findById(id)!!
+        assertThat(saved.finishedAt).isNull()
+        assertThat(saved.status).isEqualTo(BookStatus.WISHLIST)
+    }
+
+    @Test
+    fun untickingReadKeepsStartedBookInReading() = runTest(dispatcher) {
+        val id = seedBook(
+            status = BookStatus.FINISHED,
+            startedAt = System.currentTimeMillis(),
+            finishedAt = System.currentTimeMillis(),
+        )
+        val vm = editVm(id)
+        vm.setIsRead(false)
+        vm.save()?.join()
+
+        assertThat(bookRepository.findById(id)!!.status).isEqualTo(BookStatus.READING)
+    }
+
+    @Test
+    fun finishedDateCanBeEdited() = runTest(dispatcher) {
+        val id = seedBook(status = BookStatus.FINISHED, finishedAt = System.currentTimeMillis())
+        val vm = editVm(id)
+        vm.setFinishedDate("01.05.2024")
+        vm.save()?.join()
+
+        assertThat(bookRepository.findById(id)!!.finishedAt)
+            .isEqualTo(java.time.LocalDate.of(2024, 5, 1).toEpochMs())
+    }
+
     // --- cover lifecycle -------------------------------------------------
     //
     // These run against the real FileCoverStorage. The bugs they pin lived in

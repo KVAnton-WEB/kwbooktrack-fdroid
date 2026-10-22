@@ -42,6 +42,9 @@ data class AddBookState(
     val coverPath: String? = null,
     val purchaseDate: String = "",
     val purchasePrice: String = "",
+    // "Прочитано" — the finished flag and the date it was finished on.
+    val isRead: Boolean = false,
+    val finishedDate: String = "",
     // --- v5: extended Tellico fields ---
     val subtitle: String = "",
     val binding: String = "",
@@ -159,6 +162,8 @@ class AddBookViewModel @Inject constructor(
                         coverPath = book.coverPath,
                         purchaseDate = book.purchaseDate?.let { formatDate(it) }.orEmpty(),
                         purchasePrice = book.purchasePrice?.let { formatPrice(it) }.orEmpty(),
+                        isRead = book.status == BookStatus.FINISHED,
+                        finishedDate = book.finishedAt?.let { formatDate(it) }.orEmpty(),
                         subtitle = book.subtitle.orEmpty(),
                         binding = book.binding.orEmpty(),
                         series = book.series.orEmpty(),
@@ -196,6 +201,16 @@ class AddBookViewModel @Inject constructor(
         val cleaned = value.replace(',', '.').filter { it.isDigit() || it == '.' }
         _state.value = _state.value.copy(purchasePrice = cleaned)
     }
+    fun setIsRead(value: Boolean) {
+        val s = _state.value
+        _state.value = s.copy(
+            isRead = value,
+            // Prefill today the first time the book is ticked as read, so
+            // finished_at gets a value without the user typing a date.
+            finishedDate = if (value && s.finishedDate.isBlank()) formatDate(System.currentTimeMillis()) else s.finishedDate,
+        )
+    }
+    fun setFinishedDate(value: String) { _state.value = _state.value.copy(finishedDate = value) }
     fun setSubtitle(value: String) { _state.value = _state.value.copy(subtitle = value) }
     fun setBinding(value: String) { _state.value = _state.value.copy(binding = value) }
     fun setSeries(value: String) { _state.value = _state.value.copy(series = value) }
@@ -287,10 +302,23 @@ class AddBookViewModel @Inject constructor(
             val now = System.currentTimeMillis()
             val purchaseDate = parseDateInput(s.purchaseDate)
             val purchasePrice = parsePriceInput(s.purchasePrice)
+            val finishedDate = parseDateInput(s.finishedDate)
             val printYear = s.printYear.toIntOrNull()
             val printPages = s.printPages.toIntOrNull()
             if (isEditing) {
                 val existing = bookRepository.findById(editingBookId) ?: return@launch
+                // "Прочитано" is a checkbox, so the finished date travels with
+                // it: ticking it makes the book FINISHED on the date in the
+                // field, unticking it clears the date and drops the book back
+                // to "in progress" (or "to read" if it was never started).
+                // Any other status is left alone.
+                val status = when {
+                    s.isRead -> BookStatus.FINISHED
+                    existing.status == BookStatus.FINISHED ->
+                        if (existing.startedAt != null) BookStatus.READING else BookStatus.WISHLIST
+                    else -> existing.status
+                }
+                val finishedAt = if (s.isRead) finishedDate else null
                 // What the row will point at from now on. promoteToBook()
                 // returns null for both "left alone" and "cleared", so
                 // removedCover is what tells them apart — without it the
@@ -312,6 +340,8 @@ class AddBookViewModel @Inject constructor(
                         publisher = s.publisher.takeUnless { it.isBlank() },
                         genre = s.genre.takeUnless { it.isBlank() },
                         rating = s.rating,
+                        status = status,
+                        finishedAt = finishedAt,
                         coverPath = finalCoverPath,
                         purchaseDate = purchaseDate,
                         purchasePrice = purchasePrice,
@@ -358,7 +388,8 @@ class AddBookViewModel @Inject constructor(
                     publisher = s.publisher.takeUnless { it.isBlank() },
                     genre = s.genre.takeUnless { it.isBlank() },
                     rating = s.rating,
-                    status = BookStatus.WISHLIST,
+                    status = if (s.isRead) BookStatus.FINISHED else BookStatus.WISHLIST,
+                    finishedAt = if (s.isRead) finishedDate else null,
                     createdAt = now,
                     updatedAt = now,
                     source = BookSource.MANUAL,

@@ -185,6 +185,8 @@
     <string name="label_genre">Genre</string>
     <string name="label_purchase_date">Purchase date (yyyy-MM-dd)</string>
     <string name="label_purchase_price">Price</string>
+    <string name="field_is_read">Finished</string>
+    <string name="label_finished_date">Finished date (dd.MM.yyyy)</string>
     <string name="label_cover">Cover</string>
     <string name="action_pick_cover">Pick cover</string>
     <string name="action_take_photo">Take photo</string>

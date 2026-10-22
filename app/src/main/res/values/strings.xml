@@ -185,6 +185,8 @@
     <string name="label_genre">Жанр</string>
     <string name="label_purchase_date">Дата покупки (dd.MM.yyyy)</string>
     <string name="label_purchase_price">Цена</string>
+    <string name="field_is_read">Прочитано</string>
+    <string name="label_finished_date">Дата прочтения (dd.MM.yyyy)</string>
     <string name="label_cover">Обложка</string>
     <string name="action_pick_cover">Выбрать обложку</string>
     <string name="action_take_photo">Сделать фото</string>

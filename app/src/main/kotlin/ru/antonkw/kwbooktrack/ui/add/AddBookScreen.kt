@@ -97,6 +97,7 @@ fun AddBookScreen(
         state.condition, state.translator, state.printYear, state.printPages,
         state.originalLanguage, state.originalTitle, state.annotation, state.purchasePlace,
         state.isGift, state.isLent, state.isSold, state.coverPath, state.rating,
+        state.isRead, state.finishedDate,
     ) {
         state.title.isNotBlank() || state.author.isNotBlank() || state.isbn.isNotBlank() ||
             state.pageCount.isNotBlank() || state.year.isNotBlank() ||
@@ -109,7 +110,7 @@ fun AddBookScreen(
             state.originalLanguage.isNotBlank() || state.originalTitle.isNotBlank() ||
             state.annotation.isNotBlank() || state.purchasePlace.isNotBlank() ||
             state.isGift || state.isLent || state.isSold ||
-            state.coverPath != null || state.rating != null
+            state.coverPath != null || state.rating != null || state.isRead
     }
     val handleBack = {
         if (viewModel.isDirty && (viewModel.isEditing || hasUserInput)) {
@@ -337,6 +338,23 @@ fun AddBookScreen(
                         }
                     }
                 }
+            }
+
+            // «Прочитано» + дата прочтения. Галочка снимается, если книга
+            // отмечена прочитанной случайно; дата редактируется вручную.
+            CheckboxWithLabel(
+                checked = state.isRead,
+                onCheckedChange = viewModel::setIsRead,
+                label = stringResource(R.string.field_is_read),
+            )
+            if (state.isRead) {
+                OutlinedTextField(
+                    value = state.finishedDate,
+                    onValueChange = viewModel::setFinishedDate,
+                    label = { Text(stringResource(R.string.label_finished_date)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
 
             // v5: extra fields in a single Card so the form doesn't grow taller
