@@ -37,15 +37,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.antonkw.kwbooktrack.data.stats.MonthlyBooks
 import ru.antonkw.kwbooktrack.data.stats.ReadingStats
 import ru.antonkw.kwbooktrack.data.stats.StatsCalculator
-import java.time.LocalDate
 import kotlin.math.max
-import kotlin.math.roundToInt
 import ru.antonkw.kwbooktrack.R
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -161,7 +158,7 @@ fun StatisticsScreen(
                 labels = chartLabels,
                 values = when (selection.mode) {
                     ChartMode.BY_MONTH -> monthlySpendChartValues(stats, selection.year)
-                    ChartMode.BY_YEAR -> stats.yearlySpend.associate { it.year to it.amount.roundToInt() }
+                    ChartMode.BY_YEAR -> stats.yearlySpend.associate { it.year to it.amount }
                 },
             )
         }
@@ -243,10 +240,10 @@ private fun monthlyCountsChartValues(monthly: List<MonthlyBooks>, year: Int): Ma
     return (1..12).associateWith { byMonth[it] ?: 0 }
 }
 
-/** Сумма покупок по месяцам года — в целых единицах, копейки отбрасываются. */
+/** Сумма покупок по месяцам года — в целых единицах, копейки округляются. */
 private fun monthlySpendChartValues(stats: ReadingStats, year: Int): Map<Int, Int> {
     val byMonth = stats.monthlySpend.filter { it.year == year }
-        .associate { it.month to it.amount.roundToInt() }
+        .associate { it.month to it.amount }
     return (1..12).associateWith { byMonth[it] ?: 0 }
 }
 

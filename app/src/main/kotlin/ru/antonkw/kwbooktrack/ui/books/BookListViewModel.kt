@@ -24,6 +24,7 @@ import ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.SessionRepository
 import ru.antonkw.kwbooktrack.data.time.toEpochMs
+import ru.antonkw.kwbooktrack.data.time.toLocalDate
 import java.time.LocalDate
 import java.time.YearMonth
 import javax.inject.Inject
@@ -43,10 +44,24 @@ data class PeriodOption(
     /** Период покрывает целый год, а не один месяц. */
     val wholeYear: Boolean = false,
 ) {
+    /**
+     * Дата попадает в период. Книга без этой даты не подходит ни под один
+     * период, включая «Всё время» — дата нужна, чтобы сказать «эта книга».
+     */
     fun matches(epochMs: Long?): Boolean {
         if (epochMs == null) return false
         if (startMillis == null || endMillis == null) return true
         return epochMs in startMillis until endMillis
+    }
+
+    /**
+     * Книга подходит под период, если в диапазон попала любая из её дат.
+     * Книги без дат в период не попадают — как и в [matches].
+     */
+    fun matchesAny(vararg dates: Long?): Boolean {
+        val start = startMillis ?: return true
+        val end = endMillis ?: return true
+        return dates.any { it != null && it in start until end }
     }
 
     val isAllTime: Boolean get() = startMillis == null
@@ -76,9 +91,6 @@ data class PeriodOption(
                 endMillis = end,
             )
         }
-
-        fun fromDate(date: LocalDate): PeriodOption =
-            month(date.year, date.monthValue, PeriodOptions.monthRes(date.monthValue))
     }
 }
 
@@ -93,18 +105,6 @@ object PeriodOptions {
 
     @StringRes
     fun monthRes(m: Int): Int = monthResIds[m - 1]
-
-    fun generate(now: LocalDate = LocalDate.now()): List<PeriodOption> {
-        val currentYear = now.year
-        val list = mutableListOf(PeriodOption.allTime())
-        for (year in currentYear downTo currentYear - 2) {
-            list.add(PeriodOption.year(year))
-            for (m in 12 downTo 1) {
-                list.add(PeriodOption.month(year, m, monthRes(m)))
-            }
-        }
-        return list
-    }
 }
 
 data class BookWithProgress(
@@ -135,7 +135,7 @@ sealed interface BookListUiState {
 class BookListViewModel @Inject constructor(
     private val bookRepository: BookRepository,
     private val sessionRepository: SessionRepository,
-    savedStateHandle: SavedStateHandle,
+    private val savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
     private val query = MutableStateFlow(savedStateHandle.get<String>(KEY_QUERY) ?: "")
@@ -144,14 +144,27 @@ class BookListViewModel @Inject constructor(
         runCatching { BookFilterType.valueOf(savedStateHandle.get<String>(KEY_FILTER) ?: BookFilterType.ALL.name) }
             .getOrDefault(BookFilterType.ALL)
     )
-    // Compute the period list exactly once. Calling generate() twice could straddle
-    // midnight and return two different lists (e.g. December → January next year),
-    // and then getOrNull(idx) would silently pick the wrong option from the second list.
-    private val periodOptions: List<PeriodOption> = PeriodOptions.generate()
-    private val period = MutableStateFlow(
-        savedStateHandle.get<Int>(KEY_PERIOD_INDEX)?.let { periodOptions.getOrNull(it) }
-            ?: periodOptions.first()
-    )
+    private val period = MutableStateFlow(readPeriod())
+
+    /**
+     * Период хранится датой начала и флагом «весь год»: из них он
+     * восстанавливается однозначно. Ноль — «всё время».
+     */
+    private fun readPeriod(): PeriodOption {
+        val start = savedStateHandle.get<Long>(KEY_PERIOD_START) ?: 0L
+        if (start <= 0L) return PeriodOption.allTime()
+        val date = start.toLocalDate()
+        return if (savedStateHandle.get<Boolean>(KEY_PERIOD_WHOLE_YEAR) == true) {
+            PeriodOption.year(date.year)
+        } else {
+            PeriodOption.month(date.year, date.monthValue, PeriodOptions.monthRes(date.monthValue))
+        }
+    }
+
+    private fun writePeriod(option: PeriodOption) {
+        savedStateHandle[KEY_PERIOD_START] = option.startMillis ?: 0L
+        savedStateHandle[KEY_PERIOD_WHOLE_YEAR] = option.wholeYear
+    }
 
     private fun attachProgress(
         books: List<BookEntity>,
@@ -173,9 +186,16 @@ class BookListViewModel @Inject constructor(
         val t = filterType.value
         return books.filter { book ->
             when (t) {
-                BookFilterType.ALL -> true
-                BookFilterType.FINISHED -> book.status == BookStatus.FINISHED && p.matches(book.finishedAt)
-                BookFilterType.READING -> book.status == BookStatus.READING
+                // Период сужает любой тип фильтра: «Все» — по любой дате книги,
+                // «В процессе» — по дате начала чтения или покупки. Книга без
+                // дат не попадает ни в какой ограниченный период.
+                BookFilterType.ALL ->
+                    p.matchesAny(book.finishedAt, book.startedAt, book.purchaseDate)
+                BookFilterType.FINISHED ->
+                    book.status == BookStatus.FINISHED && p.matches(book.finishedAt)
+                BookFilterType.READING ->
+                    book.status == BookStatus.READING &&
+                        p.matchesAny(book.startedAt, book.purchaseDate)
                 BookFilterType.PURCHASED -> p.matches(book.purchaseDate)
             }
         }
@@ -214,29 +234,34 @@ class BookListViewModel @Inject constructor(
 
     fun setQuery(value: String) {
         query.value = value
+        savedStateHandle[KEY_QUERY] = value
     }
 
     fun toggleLayout() {
         isGrid.value = !isGrid.value
+        savedStateHandle[KEY_GRID] = isGrid.value
     }
 
     fun setFilterType(value: BookFilterType) {
         filterType.value = value
+        savedStateHandle[KEY_FILTER] = value.name
     }
 
     fun setPeriod(option: PeriodOption) {
         period.value = option
+        writePeriod(option)
     }
 
     fun clearFilters() {
         filterType.value = BookFilterType.ALL
-        period.value = PeriodOptions.generate().first()
+        setPeriod(PeriodOption.allTime())
     }
 
     companion object {
         private const val KEY_QUERY = "query"
         private const val KEY_GRID = "isGrid"
         private const val KEY_FILTER = "filter"
-        private const val KEY_PERIOD_INDEX = "periodIdx"
+        private const val KEY_PERIOD_START = "periodStart"
+        private const val KEY_PERIOD_WHOLE_YEAR = "periodWholeYear"
     }
 }

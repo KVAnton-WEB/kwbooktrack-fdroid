@@ -305,10 +305,6 @@
 
     <!-- Calendar -->
     <string name="calendar_title">Календарь чтения</string>
-    <string name="calendar_empty">За этот день сессий нет.</string>
-    <string name="calendar_pages_format">%1$d стр.</string>
-    <string name="calendar_minutes_format">%1$d мин</string>
-    <string name="calendar_total_format">%1$d стр. · %2$d мин</string>
 
     <!-- Statistics -->
     <string name="stats_title">Статистика</string>

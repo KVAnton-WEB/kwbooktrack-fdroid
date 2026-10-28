@@ -14,7 +14,6 @@ class StatsCalculatorTest {
         val stats = StatsCalculator.compute(emptyList(), emptyList())
         assertThat(stats.totalSessions).isEqualTo(0)
         assertThat(stats.totalPages).isEqualTo(0)
-        assertThat(stats.totalMinutes).isEqualTo(0)
         assertThat(stats.dailyPages).isEmpty()
         assertThat(stats.monthlyCompleted).isEmpty()
     }
@@ -95,16 +94,6 @@ class StatsCalculatorTest {
     }
 
     @Test
-    fun totalMinutesSumsDurationInSeconds() {
-        val sessions = listOf(
-            ReadingSessionEntity(bookId = 1, startedAt = 1L, endPage = 10, durationSec = 600L),
-            ReadingSessionEntity(bookId = 1, startedAt = 2L, endPage = 20, durationSec = 1200L),
-        )
-        val stats = StatsCalculator.compute(sessions, emptyList())
-        assertThat(stats.totalMinutes).isEqualTo(30)
-    }
-
-    @Test
     fun sessionDeltasCountPagesSinceThePreviousSession() {
         // Журнал чтения показывает, сколько страниц прочитано с прошлой записи.
         val day = LocalDate.of(2026, 9, 15)
@@ -170,9 +159,10 @@ class StatsCalculatorTest {
             .containsExactly(1 to 2, 2 to 1, 3 to 1).inOrder()
         // Сумма считается только по книгам с ценой — март без цены в неё не попадает.
         assertThat(stats.monthlySpend.map { it.month to it.amount })
-            .containsExactly(1 to 150.5, 2 to 20.0).inOrder()
+            .containsExactly(1 to 151, 2 to 20).inOrder()
+        // Год — сумма уже округлённых месяцев, поэтому 151 + 20, а не 170.
         assertThat(stats.yearlySpend.map { it.year to it.amount })
-            .containsExactly(2026 to 170.5)
+            .containsExactly(2026 to 171)
     }
 
     private fun purchasedBook(title: String, date: LocalDate, price: Double?) = BookEntity(

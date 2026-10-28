@@ -86,7 +86,6 @@ class StatisticsViewModelTest {
         advanceUntilIdle()
         val stats = vm.stats.first { it.totalSessions == 1 }
         assertThat(stats.totalSessions).isEqualTo(1)
-        assertThat(stats.totalMinutes).isEqualTo(10)
         assertThat(stats.monthlyCompleted).isNotEmpty()
     }
 

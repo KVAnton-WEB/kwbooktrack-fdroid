@@ -69,7 +69,6 @@ class StatisticsViewModel @Inject constructor(
         ReadingStats(
             totalSessions = 0,
             totalPages = 0,
-            totalMinutes = 0,
             dailyPages = emptyList(),
             monthlyCompleted = emptyList(),
             monthlyPages = emptyList(),

@@ -302,10 +302,6 @@
 
     <!-- Calendar -->
     <string name="calendar_title">Reading calendar</string>
-    <string name="calendar_empty">No sessions on this day.</string>
-    <string name="calendar_pages_format">%1$d pp.</string>
-    <string name="calendar_minutes_format">%1$d min</string>
-    <string name="calendar_total_format">%1$d pp. · %2$d min</string>
 
     <!-- Statistics -->
     <string name="stats_title">Statistics</string>

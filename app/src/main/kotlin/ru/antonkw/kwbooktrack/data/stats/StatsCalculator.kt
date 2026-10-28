@@ -5,6 +5,7 @@ import ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity
 import ru.antonkw.kwbooktrack.data.time.toLocalDate
 import java.time.LocalDate
 import java.time.YearMonth
+import kotlin.math.roundToInt
 
 data class DailyPages(val date: LocalDate, val pages: Int)
 
@@ -16,14 +17,13 @@ data class YearlyBooks(val year: Int, val count: Int)
 
 data class YearlyPages(val year: Int, val pages: Int)
 
-data class MonthlySpend(val year: Int, val month: Int, val amount: Double)
+data class MonthlySpend(val year: Int, val month: Int, val amount: Int)
 
-data class YearlySpend(val year: Int, val amount: Double)
+data class YearlySpend(val year: Int, val amount: Int)
 
 data class ReadingStats(
     val totalSessions: Int,
     val totalPages: Int,
-    val totalMinutes: Long,
     val dailyPages: List<DailyPages>,
     val monthlyCompleted: List<MonthlyBooks>,
     val monthlyPages: List<MonthlyPages>,
@@ -46,7 +46,6 @@ object StatsCalculator {
     ): ReadingStats {
         val dailyPages = aggregateDailyPages(sessions)
         val totalPages = dailyPages.sumOf { it.pages }
-        val totalMinutes = sessions.mapNotNull { it.durationSec }.sum() / 60
 
         val monthly = monthlyCounts(finishedBookDates)
         // Купленной считается книга с датой покупки; в сумму попадают только
@@ -83,7 +82,6 @@ object StatsCalculator {
         return ReadingStats(
             totalSessions = sessions.size,
             totalPages = totalPages,
-            totalMinutes = totalMinutes,
             dailyPages = dailyPages,
             monthlyCompleted = monthly,
             monthlyPages = monthlyPagesList,
@@ -111,7 +109,9 @@ object StatsCalculator {
     /** Сумма покупок по месяцам — цены книг, купленных в этом месяце. */
     private fun monthlySums(purchases: List<Pair<Long, Double>>): List<MonthlySpend> =
         purchases.groupBy { YearMonth.from(it.first.toLocalDate()) }
-            .map { (ym, list) -> MonthlySpend(ym.year, ym.monthValue, list.sumOf { it.second }) }
+            .map { (ym, list) ->
+                MonthlySpend(ym.year, ym.monthValue, list.sumOf { it.second }.roundToInt())
+            }
             .sortedWith(compareBy({ it.year }, { it.month }))
 
     private fun yearlyCounts(monthly: List<MonthlyBooks>): List<YearlyBooks> =
@@ -120,6 +120,7 @@ object StatsCalculator {
             .map { (y, list) -> YearlyBooks(y, list.sumOf { it.count }) }
             .sortedBy { it.year }
 
+    /** Год — сумма уже округлённых месяцев, поэтому сумма месяцев равна году. */
     private fun yearlySums(monthly: List<MonthlySpend>): List<YearlySpend> =
         monthly
             .groupBy { it.year }

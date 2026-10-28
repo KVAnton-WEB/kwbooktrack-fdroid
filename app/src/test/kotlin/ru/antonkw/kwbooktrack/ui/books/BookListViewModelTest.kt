@@ -109,6 +109,40 @@ class BookListViewModelTest {
         assertThat(loaded.books.map { it.book.title }).containsExactly("Январь", "Декабрь")
     }
 
+    @Test
+    fun periodFiltersAllTypesToo() = runTest(dispatcher) {
+        repository.insert(purchased("Куплена в 2026", LocalDate.of(2026, 3, 1)))
+        repository.insert(purchased("Куплена в 2025", LocalDate.of(2025, 3, 1)))
+        val viewModel = BookListViewModel(repository, sessionRepository, androidx.lifecycle.SavedStateHandle())
+        TestViewModels.track(viewModel)
+        viewModel.setPeriod(PeriodOption.year(2026))
+        val loaded = viewModel.uiState.first { it is BookListUiState.Loaded } as BookListUiState.Loaded
+        // Тип по умолчанию — «Все», но период сужает и его: остаётся книга 2026 года.
+        assertThat(loaded.books.map { it.book.title }).containsExactly("Куплена в 2026")
+    }
+
+    @Test
+    fun savedStateRestoresPeriod() = runTest(dispatcher) {
+        val saved = androidx.lifecycle.SavedStateHandle(
+            mapOf("periodStart" to LocalDate.of(2026, 3, 1).toEpochMs(), "periodWholeYear" to false),
+        )
+        val viewModel = BookListViewModel(repository, sessionRepository, saved)
+        TestViewModels.track(viewModel)
+        val period = viewModel.currentPeriod.value
+        assertThat(period.wholeYear).isFalse()
+        assertThat(period.startMillis).isEqualTo(LocalDate.of(2026, 3, 1).toEpochMs())
+    }
+
+    @Test
+    fun savedStateRestoresWholeYearPeriod() = runTest(dispatcher) {
+        val saved = androidx.lifecycle.SavedStateHandle(
+            mapOf("periodStart" to LocalDate.of(2026, 1, 1).toEpochMs(), "periodWholeYear" to true),
+        )
+        val viewModel = BookListViewModel(repository, sessionRepository, saved)
+        TestViewModels.track(viewModel)
+        assertThat(viewModel.currentPeriod.value.wholeYear).isTrue()
+    }
+
     private fun purchased(title: String, date: LocalDate) = BookEntity(
         title = title,
         author = "Author",
