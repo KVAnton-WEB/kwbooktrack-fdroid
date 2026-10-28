@@ -102,4 +102,56 @@ class StatsCalculatorTest {
         val stats = StatsCalculator.compute(sessions, emptyList())
         assertThat(stats.totalMinutes).isEqualTo(30)
     }
+
+    @Test
+    fun sessionDeltasCountPagesSinceThePreviousSession() {
+        // Журнал чтения показывает, сколько страниц прочитано с прошлой записи.
+        val day = LocalDate.of(2026, 9, 15)
+        val ts = day.toEpochMs()
+        val sessions = listOf(
+            ReadingSessionEntity(id = 1, bookId = 1, startedAt = ts, endPage = 50),
+            ReadingSessionEntity(id = 2, bookId = 1, startedAt = ts + 1000L, endPage = 80),
+        )
+        val deltas = StatsCalculator.sessionDeltas(sessions)
+        // Первая запись отсчитывается от нуля, вторая — от предыдущей.
+        assertThat(deltas[1L]).isEqualTo(50)
+        assertThat(deltas[2L]).isEqualTo(30)
+    }
+
+    @Test
+    fun sessionDeltasOrderTiesById() {
+        // Две записи в одну миллисекунду: порядок между ними задаёт id,
+        // а не тот порядок, в котором список пришёл из DAO.
+        val sessions = listOf(
+            ReadingSessionEntity(id = 2, bookId = 1, startedAt = 1000L, endPage = 80),
+            ReadingSessionEntity(id = 1, bookId = 1, startedAt = 1000L, endPage = 50),
+        )
+        val deltas = StatsCalculator.sessionDeltas(sessions)
+        assertThat(deltas[1L]).isEqualTo(50)
+        assertThat(deltas[2L]).isEqualTo(30)
+    }
+
+    @Test
+    fun sessionDeltasIgnoreSessionsWithoutDate() {
+        // Сессия без даты не считается ни за прочитанные страницы, ни за базу
+        // для следующей — так же, как в статистике.
+        val sessions = listOf(
+            ReadingSessionEntity(id = 1, bookId = 1, startedAt = 0L, endPage = 40),
+            ReadingSessionEntity(id = 2, bookId = 1, startedAt = 1000L, endPage = 80),
+        )
+        val deltas = StatsCalculator.sessionDeltas(sessions)
+        assertThat(deltas[1L]).isNull()
+        assertThat(deltas[2L]).isEqualTo(80)
+    }
+
+    @Test
+    fun sessionDeltasDoNotMixBooks() {
+        val sessions = listOf(
+            ReadingSessionEntity(id = 1, bookId = 1, startedAt = 1000L, endPage = 300),
+            ReadingSessionEntity(id = 2, bookId = 2, startedAt = 2000L, endPage = 40),
+        )
+        val deltas = StatsCalculator.sessionDeltas(sessions)
+        assertThat(deltas[1L]).isEqualTo(300)
+        assertThat(deltas[2L]).isEqualTo(40)
+    }
 }

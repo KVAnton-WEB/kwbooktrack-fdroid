@@ -101,21 +101,46 @@ object StatsCalculator {
     // pages. Deltas telescope, so their sum is exactly the total and
     // totalPages can keep summing the daily buckets.
     private fun pageDeltas(sessions: List<ReadingSessionEntity>): List<Pair<LocalDate, Int>> {
-        return sessions
+        return deltaPairs(sessions).mapNotNull { (s, pages) ->
+            if (pages <= 0) null
+            else s.startedAt.toLocalDate() to pages
+        }
+    }
+
+    /**
+     * Сколько страниц прочитано в каждой сессии — разница между её end_page
+     * и end_page предыдущей (по времени) сессии той же книги. Первая сессия
+     * книги отсчитывается от нуля, поэтому сумма дельт = прочитано всего.
+     * Сессии без корректной даты игнорируются — так же, как в статистике.
+     *
+     * @return id сессии -> страницы (может быть отрицательным, если страницу
+     *   перечитали заново).
+     */
+    fun sessionDeltas(sessions: List<ReadingSessionEntity>): Map<Long, Int> =
+        deltaPairs(sessions).associate { (s, pages) -> s.id to pages }
+
+    // Сессия -> прочитано страниц с прошлой сессии этой же книги.
+    // The eligible set is also the baseline set: the previous session of a
+    // book is only a baseline if it counts as a reading session itself, so
+    // both filters live here and every caller gets the same set.
+    private fun deltaPairs(
+        sessions: List<ReadingSessionEntity>,
+    ): List<Pair<ReadingSessionEntity, Int>> =
+        sessions
             .filter { it.endPage != null && it.startedAt > 0L }
             .groupBy { it.bookId }
             .values
             .flatMap { bookSessions ->
-                val ordered = bookSessions.sortedBy { it.startedAt }
+                // id breaks ties: two sessions can share a millisecond, and
+                // without it the order between them is whatever the DAO's
+                // ORDER BY started_at DESC happened to produce.
+                val ordered = bookSessions.sortedWith(compareBy({ it.startedAt }, { it.id }))
                 ordered.mapIndexedNotNull { i, s ->
                     val end = s.endPage ?: return@mapIndexedNotNull null
                     val prev = ordered.getOrNull(i - 1)?.endPage ?: 0
-                    val pages = end - prev
-if (pages <= 0) null
-                        else s.startedAt.toLocalDate() to pages
+                    s to (end - prev)
                 }
             }
-    }
 
     fun lastNMonths(now: LocalDate, n: Int): List<YearMonth> {
         val current = YearMonth.of(now.year, now.month)

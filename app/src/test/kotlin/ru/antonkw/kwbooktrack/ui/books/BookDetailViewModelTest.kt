@@ -17,6 +17,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import ru.antonkw.kwbooktrack.data.TestDb
+import ru.antonkw.kwbooktrack.data.TestViewModels
 import ru.antonkw.kwbooktrack.data.NoOpPhotoStorage
 import ru.antonkw.kwbooktrack.data.NoOpCoverStorage
 import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
@@ -49,6 +50,7 @@ class BookDetailViewModelTest {
 
     @After
     fun tearDown() {
+        TestViewModels.cancelAll(dispatcher.scheduler)
         db.close()
         Dispatchers.resetMain()
     }
@@ -63,6 +65,7 @@ class BookDetailViewModelTest {
             photoRepository,
             NoOpPhotoStorage,
         )
+        TestViewModels.track(viewModel)
         assertThat(viewModel.uiState.value.book).isNull()
     }
 
@@ -78,6 +81,7 @@ class BookDetailViewModelTest {
             photoRepository,
             NoOpPhotoStorage,
         )
+        TestViewModels.track(viewModel)
         viewModel.setCurrentPage(150)
 
         val sessions = db.readingSessionDao().observeByBook(bookId).first()
@@ -97,6 +101,7 @@ class BookDetailViewModelTest {
             photoRepository,
             NoOpPhotoStorage,
         )
+        TestViewModels.track(viewModel)
         viewModel.setCurrentPage(50)
 
         val updated = bookRepository.findById(bookId)!!
@@ -116,6 +121,7 @@ class BookDetailViewModelTest {
             photoRepository,
             NoOpPhotoStorage,
         )
+        TestViewModels.track(viewModel)
         viewModel.markFinished(rating = 5)
 
         val updated = bookRepository.findById(bookId)!!
@@ -156,14 +162,38 @@ class BookDetailViewModelTest {
         assertThat(db.noteDao().observeByBook(bookId).first()).isEmpty()
     }
 
-    private fun viewModelForBook(bookId: Long) = BookDetailViewModel(
-        androidx.lifecycle.SavedStateHandle(mapOf("bookId" to bookId)),
-        bookRepository,
-        sessionRepository,
-        noteRepository,
-        photoRepository,
-        NoOpPhotoStorage,
-    )
+    @Test
+    fun journalShowsPagesReadSinceThePreviousEntry() = runTest(dispatcher) {
+        val bookId = bookRepository.insert(sampleBook("Dune", pageCount = 500))
+        sessionRepository.insert(
+            ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity(
+                bookId = bookId, startedAt = 1000L, endPage = 50,
+            ),
+        )
+        sessionRepository.insert(
+            ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity(
+                bookId = bookId, startedAt = 2000L, endPage = 80,
+            ),
+        )
+
+        val viewModel = viewModelForBook(bookId)
+        // Ждём сессии: книга и сессии приходят из разных потоков.
+        val state = viewModel.uiState.first { it.book != null && it.sessions.size == 2 }
+        assertThat(state.sessionDeltas.values).containsExactly(50, 30)
+    }
+
+    private fun viewModelForBook(bookId: Long): BookDetailViewModel {
+        val vm = BookDetailViewModel(
+            androidx.lifecycle.SavedStateHandle(mapOf("bookId" to bookId)),
+            bookRepository,
+            sessionRepository,
+            noteRepository,
+            photoRepository,
+            NoOpPhotoStorage,
+        )
+        TestViewModels.track(vm)
+        return vm
+    }
 
     private fun sampleBook(
         title: String,

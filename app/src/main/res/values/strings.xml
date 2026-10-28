@@ -127,6 +127,7 @@
     <string name="label_sessions_count">Журнал чтения (%1$d)</string>
     <string name="empty_sessions">Пока нет сессий. Введите текущую страницу, чтобы начать.</string>
     <string name="session_end_page">стр. %1$d</string>
+    <string name="session_page_delta">%+d стр.</string>
     <string name="session_no_page">—</string>
     <string name="label_meta_isbn">ISBN</string>
     <string name="label_meta_pages">Стр.</string>
@@ -241,6 +242,8 @@
     <string name="calendar_prev_month">Предыдущий месяц</string>
     <string name="calendar_next_month">Следующий месяц</string>
     <string name="calendar_today">К текущему</string>
+    <string name="calendar_mode_books">Книги</string>
+    <string name="calendar_mode_pages">Страницы</string>
 
     <!-- Weekdays -->
     <string name="weekday_mon">Пн</string>

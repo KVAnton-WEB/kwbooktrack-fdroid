@@ -509,7 +509,7 @@ fun BookDetailScreen(
                 }
             } else {
                 items(state.sessions, key = { it.id }) { session ->
-                    SessionRow(session)
+                    SessionRow(session, state.sessionDeltas[session.id])
                 }
             }
 
@@ -605,7 +605,7 @@ private fun QuoteRow(quote: NoteEntity, photoPath: String?, onOpen: (Long) -> Un
 }
 
 @Composable
-private fun SessionRow(session: ReadingSessionEntity) {
+private fun SessionRow(session: ReadingSessionEntity, delta: Int?) {
     Card {
         Row(
             modifier = Modifier.fillMaxWidth().padding(12.dp),
@@ -616,10 +616,23 @@ private fun SessionRow(session: ReadingSessionEntity) {
                 text = SESSION_FMT.format(session.startedAt.toLocalDateTime()),
                 style = MaterialTheme.typography.bodyMedium,
             )
-            Text(
-                text = session.endPage?.let { stringResource(R.string.session_end_page, it) } ?: stringResource(R.string.session_no_page),
-                style = MaterialTheme.typography.bodyMedium,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // Сколько страниц прочитано с прошлой записи журнала.
+                // Ноль не показываем: это либо та же страница, что и раньше,
+                // либо ничего не прочитано — в журнале это шум.
+                if (delta != null && delta != 0) {
+                    Text(
+                        text = stringResource(R.string.session_page_delta, delta),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.tertiary,
+                        modifier = Modifier.padding(end = 8.dp),
+                    )
+                }
+                Text(
+                    text = session.endPage?.let { stringResource(R.string.session_end_page, it) } ?: stringResource(R.string.session_no_page),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
         }
     }
 }

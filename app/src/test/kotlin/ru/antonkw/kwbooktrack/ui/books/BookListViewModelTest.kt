@@ -14,6 +14,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import ru.antonkw.kwbooktrack.data.TestDb
+import ru.antonkw.kwbooktrack.data.TestViewModels
 import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
@@ -42,6 +43,7 @@ class BookListViewModelTest {
 
     @After
     fun tearDown() {
+        TestViewModels.cancelAll(dispatcher.scheduler)
         db.close()
         Dispatchers.resetMain()
     }
@@ -49,6 +51,7 @@ class BookListViewModelTest {
     @Test
     fun initialQueryAndLayoutAreDefaults() = runTest(dispatcher) {
         val viewModel = BookListViewModel(repository, sessionRepository, androidx.lifecycle.SavedStateHandle())
+        TestViewModels.track(viewModel)
         assertThat(viewModel.currentQuery.value).isEmpty()
         assertThat(viewModel.currentLayout.value).isFalse()
         assertThat(viewModel.uiState.value).isEqualTo(BookListUiState.Loading)
@@ -57,6 +60,7 @@ class BookListViewModelTest {
     @Test
     fun setQueryUpdatesCurrentQuery() = runTest(dispatcher) {
         val viewModel = BookListViewModel(repository, sessionRepository, androidx.lifecycle.SavedStateHandle())
+        TestViewModels.track(viewModel)
         viewModel.setQuery("Толкин")
         assertThat(viewModel.currentQuery.value).isEqualTo("Толкин")
     }
@@ -64,6 +68,7 @@ class BookListViewModelTest {
     @Test
     fun toggleLayoutFlipsIsGrid() = runTest(dispatcher) {
         val viewModel = BookListViewModel(repository, sessionRepository, androidx.lifecycle.SavedStateHandle())
+        TestViewModels.track(viewModel)
         val before = viewModel.currentLayout.value
         viewModel.toggleLayout()
         val after = viewModel.currentLayout.value
@@ -75,6 +80,7 @@ class BookListViewModelTest {
     fun savedStateRestoresQuery() = runTest(dispatcher) {
         val saved = androidx.lifecycle.SavedStateHandle(mapOf("query" to "Asimov"))
         val viewModel = BookListViewModel(repository, sessionRepository, saved)
+        TestViewModels.track(viewModel)
         assertThat(viewModel.currentQuery.value).isEqualTo("Asimov")
     }
 
@@ -82,6 +88,7 @@ class BookListViewModelTest {
     fun savedStateRestoresLayout() = runTest(dispatcher) {
         val saved = androidx.lifecycle.SavedStateHandle(mapOf("isGrid" to true))
         val viewModel = BookListViewModel(repository, sessionRepository, saved)
+        TestViewModels.track(viewModel)
         assertThat(viewModel.currentLayout.value).isTrue()
     }
 }

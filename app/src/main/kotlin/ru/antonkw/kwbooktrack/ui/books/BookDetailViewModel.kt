@@ -23,6 +23,7 @@ import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.NoteRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
 import ru.antonkw.kwbooktrack.data.repository.SessionRepository
+import ru.antonkw.kwbooktrack.data.stats.StatsCalculator
 import ru.antonkw.kwbooktrack.data.storage.PhotoStorage
 import javax.inject.Inject
 
@@ -39,6 +40,8 @@ data class BookDetailUiState(
     val notes: List<NoteEntity>,
     val photos: List<PhotoEntity>,
     val progress: BookProgress,
+    // Сколько страниц прочитано в каждой сессии журнала (id сессии -> страницы).
+    val sessionDeltas: Map<Long, Int> = emptyMap(),
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -70,7 +73,14 @@ class BookDetailViewModel @Inject constructor(
                 photoRepository.observeByBook(bookId),
             ) { book, sessions, notes, photos ->
                 val progress = computeProgress(book, sessions)
-                BookDetailUiState(book, sessions, notes, photos, progress)
+                BookDetailUiState(
+                    book,
+                    sessions,
+                    notes,
+                    photos,
+                    progress,
+                    StatsCalculator.sessionDeltas(sessions),
+                )
             }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyState())
         }
 

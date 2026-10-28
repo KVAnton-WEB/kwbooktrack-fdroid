@@ -127,6 +127,7 @@
     <string name="label_sessions_count">Reading log (%1$d)</string>
     <string name="empty_sessions">No sessions yet — enter the current page to start.</string>
     <string name="session_end_page">p. %1$d</string>
+    <string name="session_page_delta">%+d pp.</string>
     <string name="session_no_page">—</string>
     <string name="label_meta_isbn">ISBN</string>
     <string name="label_meta_pages">Pages</string>
@@ -241,6 +242,8 @@
     <string name="calendar_prev_month">Previous month</string>
     <string name="calendar_next_month">Next month</string>
     <string name="calendar_today">Today</string>
+    <string name="calendar_mode_books">Books</string>
+    <string name="calendar_mode_pages">Pages</string>
 
     <!-- Weekdays -->
     <string name="weekday_mon">Mon</string>

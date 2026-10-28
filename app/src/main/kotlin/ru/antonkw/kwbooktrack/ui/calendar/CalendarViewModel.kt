@@ -15,6 +15,7 @@ import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
 import ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.SessionRepository
+import ru.antonkw.kwbooktrack.data.stats.StatsCalculator
 import ru.antonkw.kwbooktrack.data.time.toEpochMs
 import java.time.LocalDate
 import java.time.YearMonth
@@ -29,12 +30,20 @@ data class CalendarBook(
 data class CalendarDay(
     val date: LocalDate,
     val books: List<CalendarBook>,
+    // Сколько страниц прочитано за этот день (сумма по всем книгам).
+    val pages: Int = 0,
 )
+
+enum class CalendarMode {
+    // Обложки книг, которые читались в этот день.
+    BOOKS,
+    // Суммарное количество прочитанных страниц за день.
+    PAGES,
+}
 
 data class CalendarUiState(
     val month: YearMonth,
     val days: List<CalendarDay?>,
-    val totalBooksThisMonth: Int,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -47,9 +56,17 @@ class CalendarViewModel @Inject constructor(
     private val _month = MutableStateFlow(YearMonth.now())
     val month: StateFlow<YearMonth> = _month
 
+    // Что показывает ячейка календаря: обложки книг или число страниц.
+    private val _mode = MutableStateFlow(CalendarMode.BOOKS)
+    val mode: StateFlow<CalendarMode> = _mode
+
     val uiState: StateFlow<CalendarUiState> = _month
         .flatMapLatest { ym -> buildStateForMonth(ym) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyState(_month.value))
+
+    fun setMode(mode: CalendarMode) {
+        _mode.value = mode
+    }
 
     fun goToPreviousMonth() {
         _month.value = _month.value.minusMonths(1)
@@ -72,6 +89,7 @@ class CalendarViewModel @Inject constructor(
         sessionRepository.observeAll(),
     ) { books, sessions ->
         val booksById = books.associateBy { it.id }
+        val pagesByDate = StatsCalculator.aggregateDailyPages(sessions).associate { it.date to it.pages }
         val firstOfMonth = ym.atDay(1)
         val daysInMonth = ym.lengthOfMonth()
         val firstDow = (firstOfMonth.dayOfWeek.value + 6) % 7 // Mon=0 ... Sun=6
@@ -83,19 +101,13 @@ class CalendarViewModel @Inject constructor(
         for (day in 1..daysInMonth) {
             val date = ym.atDay(day)
             val booksForDay = sessionsForDate(date, sessions, booksById)
-            cells.add(CalendarDay(date, booksForDay))
+            cells.add(CalendarDay(date, booksForDay, pagesByDate[date] ?: 0))
         }
         while (cells.size < weeks * 7) cells.add(null)
-
-        val totalBooks = cells.filterNotNull()
-            .flatMap { it.books }
-            .distinctBy { it.title }
-            .size
 
         CalendarUiState(
             month = ym,
             days = cells,
-            totalBooksThisMonth = totalBooks,
         )
     }
 
@@ -126,6 +138,6 @@ class CalendarViewModel @Inject constructor(
         val cells = ArrayList<CalendarDay?>(firstDow + daysInMonth)
         repeat(firstDow) { cells.add(null) }
         for (day in 1..daysInMonth) cells.add(CalendarDay(ym.atDay(day), emptyList()))
-        return CalendarUiState(month = ym, days = cells, totalBooksThisMonth = 0)
+        return CalendarUiState(month = ym, days = cells)
     }
 }

@@ -18,6 +18,7 @@ import org.robolectric.RobolectricTestRunner
 import ru.antonkw.kwbooktrack.data.NoOpCoverStorage
 import ru.antonkw.kwbooktrack.data.NoOpPhotoStorage
 import ru.antonkw.kwbooktrack.data.TestDb
+import ru.antonkw.kwbooktrack.data.TestViewModels
 import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
 import ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity
@@ -50,6 +51,7 @@ class CalendarViewModelTest {
 
     @After
     fun tearDown() {
+        TestViewModels.cancelAll(dispatcher.scheduler)
         db.close()
         Dispatchers.resetMain()
     }
@@ -57,9 +59,9 @@ class CalendarViewModelTest {
     @Test
     fun emptySessionsYieldsEmptyDaysButCorrectShape() = runTest(dispatcher) {
         val vm = CalendarViewModel(bookRepository, sessionRepository)
+        TestViewModels.track(vm)
         advanceUntilIdle()
         val state = vm.uiState.first { it.days.size >= 28 } // any month has >= 28 days
-        assertThat(state.totalBooksThisMonth).isEqualTo(0)
         assertThat(state.days.filterNotNull().flatMap { it.books }).isEmpty()
         // First of month is positioned so the grid has a non-null Monday-Sunday block.
         assertThat(state.days.firstOrNull { it != null }?.date).isEqualTo(
@@ -70,6 +72,7 @@ class CalendarViewModelTest {
     @Test
     fun sessionOnDayShowsBookInThatCell() = runTest(dispatcher) {
         val vm = CalendarViewModel(bookRepository, sessionRepository)
+        TestViewModels.track(vm)
         val firstOfMonth = vm.month.value.atDay(1)
         val bookId = bookRepository.insert(
             BookEntity(title = "Hyperion", author = "Simmons", createdAt = 0L, updatedAt = 0L),
@@ -80,8 +83,35 @@ class CalendarViewModelTest {
         )
 
         advanceUntilIdle()
-        val state = vm.uiState.first { it.totalBooksThisMonth == 1 }
+        val state = vm.uiState.first { s -> s.days.any { it?.books?.isNotEmpty() == true } }
         val day1 = state.days.firstOrNull { it?.date == firstOfMonth }
         assertThat(day1?.books?.map { it.title }).containsExactly("Hyperion")
+    }
+
+    @Test
+    fun dayCellCarriesTheTotalPagesReadThatDay() = runTest(dispatcher) {
+        // Режим «Страницы» показывает сумму прочитанных за день страниц.
+        val vm = CalendarViewModel(bookRepository, sessionRepository)
+        TestViewModels.track(vm)
+        val firstOfMonth = vm.month.value.atDay(1)
+        val bookId = bookRepository.insert(
+            BookEntity(title = "Hyperion", author = "Simmons", createdAt = 0L, updatedAt = 0L),
+        )
+        val midnight = firstOfMonth.toEpochMs()
+        sessionRepository.insert(
+            ReadingSessionEntity(bookId = bookId, startedAt = midnight, endPage = 50),
+        )
+        sessionRepository.insert(
+            ReadingSessionEntity(bookId = bookId, startedAt = midnight + 1000L, endPage = 80),
+        )
+
+        advanceUntilIdle()
+        // Ждём именно страницы: книги и сессии приходят из разных потоков,
+        // поэтому состояние может обновиться раньше, чем дойдут сессии.
+        val state = vm.uiState.first { s ->
+            s.days.firstOrNull { it?.date == firstOfMonth }?.pages == 80
+        }
+        val day1 = state.days.firstOrNull { it?.date == firstOfMonth }
+        assertThat(day1?.pages).isEqualTo(80)
     }
 }

@@ -24,6 +24,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -61,6 +64,7 @@ fun CalendarScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val month by viewModel.month.collectAsStateWithLifecycle()
+    val mode by viewModel.mode.collectAsStateWithLifecycle()
     val today = remember { LocalDate.now() }
     val maxYm = remember(today) { YearMonth.of(today.year, today.month) }
 
@@ -86,6 +90,8 @@ fun CalendarScreen(
                 text = stringResource(R.string.calendar_prompt),
                 style = MaterialTheme.typography.bodyMedium,
             )
+
+            CalendarModeSelector(mode = mode, onModeChange = viewModel::setMode)
 
             Row(
                 modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
@@ -155,7 +161,7 @@ fun CalendarScreen(
                     key = { idx -> uiState.days[idx]?.date?.toString() ?: "pad_$idx" },
                 ) { idx ->
                     val day = uiState.days[idx]
-                    DayCell(day = day)
+                    DayCell(day = day, mode = mode)
                 }
             }
         }
@@ -174,8 +180,38 @@ fun CalendarScreen(
     }
 }
 
+// Режимы ячейки календаря — список создаётся один раз на процесс, а не на
+// каждой рекомпозиции.
+private val CALENDAR_MODES = listOf(CalendarMode.BOOKS, CalendarMode.PAGES)
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DayCell(day: CalendarDay?) {
+private fun CalendarModeSelector(mode: CalendarMode, onModeChange: (CalendarMode) -> Unit) {
+    SingleChoiceSegmentedButtonRow(
+        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+    ) {
+        CALENDAR_MODES.forEachIndexed { index, m ->
+            SegmentedButton(
+                shape = SegmentedButtonDefaults.itemShape(index = index, count = CALENDAR_MODES.size),
+                selected = m == mode,
+                onClick = { onModeChange(m) },
+                icon = {},
+            ) {
+                Text(
+                    text = stringResource(
+                        when (m) {
+                            CalendarMode.BOOKS -> R.string.calendar_mode_books
+                            CalendarMode.PAGES -> R.string.calendar_mode_pages
+                        }
+                    ),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DayCell(day: CalendarDay?, mode: CalendarMode) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -193,44 +229,61 @@ private fun DayCell(day: CalendarDay?) {
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.padding(2.dp),
             )
-            when {
-                day.books.isEmpty() -> {
-                    androidx.compose.foundation.layout.Spacer(modifier = Modifier.fillMaxSize())
-                }
-                day.books.size == 1 -> {
-                    val book = day.books.first()
+            if (mode == CalendarMode.PAGES) {
+                if (day.pages > 0) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .weight(1f, fill = true)
-                            .padding(vertical = 1.dp),
+                            .weight(1f, fill = true),
+                        contentAlignment = Alignment.Center,
                     ) {
-                        CoverTile(book, fillHeight = true)
+                        Text(
+                            text = stringResource(R.string.calendar_pages_format, day.pages),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
                     }
                 }
-                else -> {
-                    val perTileHeight = (110.dp / day.books.size.coerceAtMost(3))
-                    day.books.take(3).forEach { book ->
+            } else {
+                when {
+                    day.books.isEmpty() -> {
+                        androidx.compose.foundation.layout.Spacer(modifier = Modifier.fillMaxSize())
+                    }
+                    day.books.size == 1 -> {
+                        val book = day.books.first()
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(perTileHeight)
+                                .weight(1f, fill = true)
                                 .padding(vertical = 1.dp),
                         ) {
                             CoverTile(book, fillHeight = true)
                         }
                     }
+                    else -> {
+                        val perTileHeight = (110.dp / day.books.size.coerceAtMost(3))
+                        day.books.take(3).forEach { book ->
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(perTileHeight)
+                                    .padding(vertical = 1.dp),
+                            ) {
+                                CoverTile(book, fillHeight = true)
+                            }
+                        }
+                    }
                 }
-            }
-            if (day.books.isNotEmpty() && day.books.first().rating != null) {
-                Row(modifier = Modifier.fillMaxWidth().padding(top = 2.dp)) {
-                    repeat(day.books.first().rating!!) {
-                        Icon(
-                            imageVector = Icons.Filled.Star,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.tertiary,
-                            modifier = Modifier.size(10.dp),
-                        )
+                if (day.books.isNotEmpty() && day.books.first().rating != null) {
+                    Row(modifier = Modifier.fillMaxWidth().padding(top = 2.dp)) {
+                        repeat(day.books.first().rating!!) {
+                            Icon(
+                                imageVector = Icons.Filled.Star,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.tertiary,
+                                modifier = Modifier.size(10.dp),
+                            )
+                        }
                     }
                 }
             }

@@ -18,6 +18,7 @@ import org.robolectric.RobolectricTestRunner
 import ru.antonkw.kwbooktrack.data.NoOpCoverStorage
 import ru.antonkw.kwbooktrack.data.NoOpPhotoStorage
 import ru.antonkw.kwbooktrack.data.TestDb
+import ru.antonkw.kwbooktrack.data.TestViewModels
 import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
 import ru.antonkw.kwbooktrack.data.db.entity.NoteEntity
@@ -50,6 +51,7 @@ class NotesListViewModelTest {
 
     @After
     fun tearDown() {
+        TestViewModels.cancelAll(dispatcher.scheduler)
         db.close()
         Dispatchers.resetMain()
     }
@@ -57,6 +59,7 @@ class NotesListViewModelTest {
     @Test
     fun emptyDbReportsNoNotes() = runTest(dispatcher) {
         val vm = NotesListViewModel(noteRepository, bookRepository)
+        TestViewModels.track(vm)
         advanceUntilIdle()
         val state = vm.uiState.first { it is NotesListUiState.Loaded } as NotesListUiState.Loaded
         assertThat(state.items).isEmpty()
@@ -78,6 +81,7 @@ class NotesListViewModelTest {
         )
 
         val vm = NotesListViewModel(noteRepository, bookRepository)
+        TestViewModels.track(vm)
         advanceUntilIdle()
         val state = vm.uiState.first { it is NotesListUiState.Loaded } as NotesListUiState.Loaded
         // Review is filtered out, only Note + Quote are listed.
@@ -99,6 +103,7 @@ class NotesListViewModelTest {
         )
 
         val vmBefore = NotesListViewModel(noteRepository, bookRepository)
+        TestViewModels.track(vmBefore)
         advanceUntilIdle()
         val before = vmBefore.uiState.first { it is NotesListUiState.Loaded } as NotesListUiState.Loaded
         assertThat(before.items).hasSize(1)
@@ -106,6 +111,7 @@ class NotesListViewModelTest {
         bookRepository.deleteById(bookId)
 
         val vmAfter = NotesListViewModel(noteRepository, bookRepository)
+        TestViewModels.track(vmAfter)
         advanceUntilIdle()
         val after = vmAfter.uiState.first { it is NotesListUiState.Loaded } as NotesListUiState.Loaded
         assertThat(after.items).isEmpty()
