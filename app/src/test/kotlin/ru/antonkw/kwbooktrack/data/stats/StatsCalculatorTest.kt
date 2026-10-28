@@ -2,6 +2,7 @@ package ru.antonkw.kwbooktrack.data.stats
 
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
+import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
 import ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity
 import ru.antonkw.kwbooktrack.data.time.toEpochMs
 import java.time.LocalDate
@@ -154,4 +155,32 @@ class StatsCalculatorTest {
         assertThat(deltas[1L]).isEqualTo(300)
         assertThat(deltas[2L]).isEqualTo(40)
     }
+
+    @Test
+    fun purchasedBooksAndSpendGroupByMonth() {
+        val books = listOf(
+            purchasedBook("A", LocalDate.of(2026, 1, 10), 100.0),
+            purchasedBook("B", LocalDate.of(2026, 1, 20), 50.5),
+            purchasedBook("C", LocalDate.of(2026, 2, 5), 20.0),
+            purchasedBook("D", LocalDate.of(2026, 3, 5), null),
+        )
+        val stats = StatsCalculator.compute(emptyList(), emptyList(), books)
+        // Куплены все четыре: даты покупки есть у каждой.
+        assertThat(stats.monthlyPurchased.map { it.month to it.count })
+            .containsExactly(1 to 2, 2 to 1, 3 to 1).inOrder()
+        // Сумма считается только по книгам с ценой — март без цены в неё не попадает.
+        assertThat(stats.monthlySpend.map { it.month to it.amount })
+            .containsExactly(1 to 150.5, 2 to 20.0).inOrder()
+        assertThat(stats.yearlySpend.map { it.year to it.amount })
+            .containsExactly(2026 to 170.5)
+    }
+
+    private fun purchasedBook(title: String, date: LocalDate, price: Double?) = BookEntity(
+        title = title,
+        author = "Author",
+        createdAt = 0L,
+        updatedAt = 0L,
+        purchaseDate = date.toEpochMs(),
+        purchasePrice = price,
+    )
 }

@@ -39,12 +39,18 @@ fun MonthYearPickerDialog(
     initial: YearMonth,
     min: YearMonth? = null,
     max: YearMonth? = null,
+    initialWholeYear: Boolean = false,
     onDismiss: () -> Unit,
     onConfirm: (YearMonth) -> Unit,
+    onConfirmYear: ((Int) -> Unit)? = null,
 ) {
     val months = stringArrayResource(R.array.months_long)
+    // Режим «весь год» появляется только если вызывающая сторона умеет его принять.
+    val canPickYear = onConfirmYear != null
+    val wholeYearLabel = stringResource(R.string.period_whole_year)
     var selectedYear by remember { mutableStateOf(initial.year) }
     var selectedMonth by remember { mutableStateOf(initial.monthValue) }
+    var wholeYear by remember { mutableStateOf(initialWholeYear && canPickYear) }
     var yearExpanded by remember { mutableStateOf(false) }
     var monthExpanded by remember { mutableStateOf(false) }
 
@@ -57,7 +63,13 @@ fun MonthYearPickerDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.dialog_choose_month)) },
+        title = {
+            Text(
+                stringResource(
+                    if (canPickYear) R.string.dialog_choose_period else R.string.dialog_choose_month,
+                ),
+            )
+        },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(
@@ -70,7 +82,7 @@ fun MonthYearPickerDialog(
                             onExpandedChange = { monthExpanded = !monthExpanded },
                         ) {
                             OutlinedTextField(
-                                value = months[selectedMonth - 1],
+                                value = if (wholeYear) wholeYearLabel else months[selectedMonth - 1],
                                 onValueChange = {},
                                 readOnly = true,
                                 label = { Text(stringResource(R.string.label_month)) },
@@ -85,11 +97,21 @@ fun MonthYearPickerDialog(
                                 onDismissRequest = { monthExpanded = false },
                                 modifier = Modifier.fillMaxWidth(),
                             ) {
+                                if (canPickYear) {
+                                    DropdownMenuItem(
+                                        text = { Text(wholeYearLabel) },
+                                        onClick = {
+                                            wholeYear = true
+                                            monthExpanded = false
+                                        },
+                                    )
+                                }
                                 months.forEachIndexed { idx, name ->
                                     DropdownMenuItem(
                                         text = { Text(name) },
                                         onClick = {
                                             selectedMonth = idx + 1
+                                            wholeYear = false
                                             monthExpanded = false
                                         },
                                     )
@@ -134,17 +156,22 @@ fun MonthYearPickerDialog(
                     }
                 }
 
-                MonthGrid(
-                    year = selectedYear,
-                    selectedMonth = selectedMonth,
-                    onMonthClick = { selectedMonth = it },
-                    max = max,
-                    min = min,
-                )
+                if (!wholeYear) {
+                    MonthGrid(
+                        year = selectedYear,
+                        selectedMonth = selectedMonth,
+                        onMonthClick = { selectedMonth = it },
+                        max = max,
+                        min = min,
+                    )
+                }
             }
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(YearMonth.of(selectedYear, selectedMonth)) }) {
+            TextButton(onClick = {
+                if (wholeYear) onConfirmYear?.invoke(selectedYear)
+                else onConfirm(YearMonth.of(selectedYear, selectedMonth))
+            }) {
                 Text(stringResource(R.string.action_ok))
             }
         },

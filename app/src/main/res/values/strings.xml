@@ -86,8 +86,9 @@
 
     <!-- Period labels -->
     <string name="period_all">За всё время</string>
-    <string name="period_year">%1$d год</string>
+    <string name="period_year">%1$s год</string>
     <string name="period_year_month">%1$d · %2$s</string>
+    <string name="period_whole_year">Весь год</string>
 
     <!-- Filter types -->
     <string name="filter_all">Все</string>
@@ -226,6 +227,7 @@
 
     <!-- Picker -->
     <string name="dialog_choose_month">Выбрать месяц</string>
+    <string name="dialog_choose_period">Выбрать период</string>
     <string name="label_month">Месяц</string>
 
     <!-- Stats tabs -->
@@ -235,6 +237,10 @@
     <string name="stats_chart_pages_by_year">Страниц по годам</string>
     <string name="stats_chart_finished_by_month">Завершено книг по месяцам — %1$s</string>
     <string name="stats_chart_finished_by_year">Завершено книг по годам</string>
+    <string name="stats_chart_purchased_by_month">Куплено книг по месяцам — %1$s</string>
+    <string name="stats_chart_purchased_by_year">Куплено книг по годам</string>
+    <string name="stats_chart_spent_by_month">Сумма покупок по месяцам — %1$s</string>
+    <string name="stats_chart_spent_by_year">Сумма покупок по годам</string>
     <string name="stats_label_all_years">По годам</string>
 
     <!-- Calendar -->

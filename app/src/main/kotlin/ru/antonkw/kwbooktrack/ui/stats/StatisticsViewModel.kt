@@ -57,7 +57,7 @@ class StatisticsViewModel @Inject constructor(
     ) { books, sessions ->
         val finishedDates = books.filter { it.status == BookStatus.FINISHED && it.finishedAt != null }
             .mapNotNull { it.finishedAt }
-        StatsCalculator.compute(sessions, finishedDates)
+        StatsCalculator.compute(sessions, finishedDates, books)
     }
         // StatsCalculator walks every session twice (Instant/LocalDate per row),
         // so keep it off the main thread — it re-runs on every book/session
@@ -66,7 +66,22 @@ class StatisticsViewModel @Inject constructor(
         .stateIn(
         viewModelScope,
         SharingStarted.Eagerly,
-        ReadingStats(0, 0, 0, emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), 0, 0),
+        ReadingStats(
+            totalSessions = 0,
+            totalPages = 0,
+            totalMinutes = 0,
+            dailyPages = emptyList(),
+            monthlyCompleted = emptyList(),
+            monthlyPages = emptyList(),
+            monthlyPurchased = emptyList(),
+            monthlySpend = emptyList(),
+            yearlyCompleted = emptyList(),
+            yearlyPages = emptyList(),
+            yearlyPurchased = emptyList(),
+            yearlySpend = emptyList(),
+            minYear = 0,
+            maxYear = 0,
+        ),
     )
 
     fun setMode(mode: ChartMode) {

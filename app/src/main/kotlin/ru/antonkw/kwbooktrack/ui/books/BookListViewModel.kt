@@ -40,6 +40,8 @@ data class PeriodOption(
     val formatArg: String? = null,
     val startMillis: Long? = null,
     val endMillis: Long? = null,
+    /** Период покрывает целый год, а не один месяц. */
+    val wholeYear: Boolean = false,
 ) {
     fun matches(epochMs: Long?): Boolean {
         if (epochMs == null) return false
@@ -60,6 +62,7 @@ data class PeriodOption(
                 formatArg = year.toString(),
                 startMillis = start,
                 endMillis = end,
+                wholeYear = true,
             )
         }
 

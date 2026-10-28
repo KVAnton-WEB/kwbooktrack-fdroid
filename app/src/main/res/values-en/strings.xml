@@ -86,8 +86,9 @@
 
     <!-- Period labels -->
     <string name="period_all">All time</string>
-    <string name="period_year">Year %1$d</string>
+    <string name="period_year">Year %1$s</string>
     <string name="period_year_month">%1$d · %2$s</string>
+    <string name="period_whole_year">Whole year</string>
 
     <!-- Filter types -->
     <string name="filter_all">All</string>
@@ -226,6 +227,7 @@
 
     <!-- Picker -->
     <string name="dialog_choose_month">Choose month</string>
+    <string name="dialog_choose_period">Choose period</string>
     <string name="label_month">Month</string>
 
     <!-- Stats tabs -->
@@ -235,6 +237,10 @@
     <string name="stats_chart_pages_by_year">Pages per year</string>
     <string name="stats_chart_finished_by_month">Books finished per month — %1$s</string>
     <string name="stats_chart_finished_by_year">Books finished per year</string>
+    <string name="stats_chart_purchased_by_month">Books purchased per month — %1$s</string>
+    <string name="stats_chart_purchased_by_year">Books purchased per year</string>
+    <string name="stats_chart_spent_by_month">Spent per month — %1$s</string>
+    <string name="stats_chart_spent_by_year">Spent per year</string>
     <string name="stats_label_all_years">By year</string>
 
     <!-- Calendar -->

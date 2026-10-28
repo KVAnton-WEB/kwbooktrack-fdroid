@@ -4,6 +4,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -16,9 +17,12 @@ import org.robolectric.RobolectricTestRunner
 import ru.antonkw.kwbooktrack.data.TestDb
 import ru.antonkw.kwbooktrack.data.TestViewModels
 import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
+import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
 import ru.antonkw.kwbooktrack.data.repository.SessionRepository
+import ru.antonkw.kwbooktrack.data.time.toEpochMs
+import java.time.LocalDate
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -91,4 +95,25 @@ class BookListViewModelTest {
         TestViewModels.track(viewModel)
         assertThat(viewModel.currentLayout.value).isTrue()
     }
+
+    @Test
+    fun yearPeriodKeepsEveryMonthOfThatYear() = runTest(dispatcher) {
+        repository.insert(purchased("Январь", LocalDate.of(2026, 1, 10)))
+        repository.insert(purchased("Декабрь", LocalDate.of(2026, 12, 31)))
+        repository.insert(purchased("Прошлый год", LocalDate.of(2025, 12, 31)))
+        val viewModel = BookListViewModel(repository, sessionRepository, androidx.lifecycle.SavedStateHandle())
+        TestViewModels.track(viewModel)
+        viewModel.setFilterType(BookFilterType.PURCHASED)
+        viewModel.setPeriod(PeriodOption.year(2026))
+        val loaded = viewModel.uiState.first { it is BookListUiState.Loaded } as BookListUiState.Loaded
+        assertThat(loaded.books.map { it.book.title }).containsExactly("Январь", "Декабрь")
+    }
+
+    private fun purchased(title: String, date: LocalDate) = BookEntity(
+        title = title,
+        author = "Author",
+        createdAt = 0L,
+        updatedAt = 0L,
+        purchaseDate = date.toEpochMs(),
+    )
 }

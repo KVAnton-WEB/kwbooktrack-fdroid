@@ -320,11 +320,16 @@ fun BookListScreen(
             initial = initial,
             min = min,
             max = max,
+            initialWholeYear = period.wholeYear,
             onDismiss = { showDatePicker = false },
             onConfirm = { ym ->
                 viewModel.setPeriod(
                     PeriodOption.month(ym.year, ym.monthValue, PeriodOptions.monthRes(ym.monthValue)),
                 )
+                showDatePicker = false
+            },
+            onConfirmYear = { year ->
+                viewModel.setPeriod(PeriodOption.year(year))
                 showDatePicker = false
             },
         )
