@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.KwBooktrack" parent="@android:style/Theme.Material.Light.NoActionBar" />
+    <!-- Тёмная тема + чёрный фон окна: AMOLED, без белой вспышки при запуске. -->
+    <style name="Theme.KwBooktrack" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@android:color/black</item>
+    </style>
 </resources>
