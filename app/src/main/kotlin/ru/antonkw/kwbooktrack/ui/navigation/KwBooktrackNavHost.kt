@@ -29,7 +29,7 @@ object Routes {
     const val ABOUT = "about"
     const val BOOK_DETAIL = "books/{bookId}"
     const val NOTE_EDITOR = "books/{bookId}/notes/new"
-    const val NOTE_EDITOR_REVIEW = "books/{bookId}/notes/new?kind=REVIEW"
+    const val NOTE_EDITOR_REVIEW = "books/{bookId}/notes/new?kind={kind}"
     const val NOTE_EDIT = "notes/{noteId}/edit"
     const val NOTE_DETAIL = "notes/{noteId}"
     fun bookDetail(bookId: Long) = "books/$bookId"

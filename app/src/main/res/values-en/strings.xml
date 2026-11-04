@@ -150,6 +150,7 @@
 
     <!-- Note editor -->
     <string name="note_editor_title">Note</string>
+    <string name="note_editor_review_title">Review</string>
     <string name="label_page_optional">Page (optional)</string>
     <string name="label_note_body">Note</string>
     <string name="action_attach_photo">Attach photo</string>

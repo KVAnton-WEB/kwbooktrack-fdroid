@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -45,6 +46,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -64,6 +66,15 @@ fun NoteEditorScreen(
     viewModel: NoteEditorViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val loadedKind by viewModel.loadedKind.collectAsStateWithLifecycle()
+    // У новой заметки loadedKind == null (её kind ещё не из чего взять) —
+    // берём тип из маршрута: «Написать рецензию» должно открывать
+    // редактор рецензии, а не «заметку/цитату».
+    val effectiveKind = loadedKind ?: viewModel.initialKind
+    val isReviewFlow = effectiveKind == NoteKind.REVIEW
+    val editorTitle = stringResource(
+        if (isReviewFlow) R.string.note_editor_review_title else R.string.note_editor_title,
+    )
 
     val photoPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
@@ -79,7 +90,7 @@ fun NoteEditorScreen(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.note_editor_title)) },
+                title = { Text(editorTitle) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
@@ -88,8 +99,6 @@ fun NoteEditorScreen(
             )
         },
     ) { padding ->
-        val loadedKind by viewModel.loadedKind.collectAsStateWithLifecycle()
-        val isReviewFlow = loadedKind == NoteKind.REVIEW
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -103,13 +112,14 @@ fun NoteEditorScreen(
                 onValueChange = viewModel::setPage,
                 label = { Text(stringResource(R.string.label_page_optional)) },
                 singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth(),
             )
 
             OutlinedTextField(
                 value = state.body,
                 onValueChange = viewModel::setBody,
-                label = { Text(stringResource(R.string.note_editor_title)) },
+                label = { Text(editorTitle) },
                 minLines = 6,
                 modifier = Modifier.fillMaxWidth(),
             )

@@ -52,7 +52,7 @@ class NoteEditorViewModel @Inject constructor(
     // Pre-selected note kind from the nav route (e.g. REVIEW for the
     // "Write review" entry point). Edits always keep the existing kind —
     // when noteId > 0 the loaded value below overrides this.
-    private val initialKind: NoteKind = savedStateHandle.get<String>(KEY_KIND)
+    val initialKind: NoteKind = savedStateHandle.get<String>(KEY_KIND)
         ?.let { runCatching { NoteKind.valueOf(it) }.getOrNull() } ?: NoteKind.NOTE
 
     // Holds the kind of an existing note being edited. Null until the

@@ -150,6 +150,7 @@
 
     <!-- Note editor -->
     <string name="note_editor_title">Заметка</string>
+    <string name="note_editor_review_title">Рецензия</string>
     <string name="label_page_optional">Страница (опционально)</string>
     <string name="label_note_body">Заметка</string>
     <string name="action_attach_photo">Прикрепить фото</string>

@@ -11,6 +11,7 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -55,6 +56,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -246,6 +248,7 @@ fun AddBookScreen(
                 onValueChange = viewModel::setIsbn,
                 label = { Text("ISBN-13") },
                 singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 trailingIcon = {
                     IconButton(
                         onClick = {
@@ -277,6 +280,7 @@ fun AddBookScreen(
                     onValueChange = viewModel::setPageCount,
                     label = { Text(stringResource(R.string.label_page_count)) },
                     singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.weight(1f),
                 )
                 OutlinedTextField(
@@ -284,6 +288,7 @@ fun AddBookScreen(
                     onValueChange = viewModel::setYear,
                     label = { Text(stringResource(R.string.label_year)) },
                     singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -317,6 +322,7 @@ fun AddBookScreen(
                     onValueChange = viewModel::setPurchasePrice,
                     label = { Text(stringResource(R.string.label_purchase_price)) },
                     singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -448,6 +454,7 @@ fun AddBookScreen(
                             onValueChange = viewModel::setPrintYear,
                             label = { Text(stringResource(R.string.field_print_year)) },
                             singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             modifier = Modifier.weight(1f),
                         )
                         OutlinedTextField(
@@ -455,6 +462,7 @@ fun AddBookScreen(
                             onValueChange = viewModel::setPrintPages,
                             label = { Text(stringResource(R.string.field_print_pages)) },
                             singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             modifier = Modifier.weight(1f),
                         )
                     }

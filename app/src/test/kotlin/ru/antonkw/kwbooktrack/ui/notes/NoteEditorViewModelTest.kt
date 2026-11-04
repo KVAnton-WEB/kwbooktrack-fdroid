@@ -116,6 +116,29 @@ class NoteEditorViewModelTest {
     }
 
     @Test
+    fun reviewRouteSavesNoteAsReview() = runTest(dispatcher) {
+        // «Написать рецензию» открывает редактор с kind=REVIEW в маршруте.
+        // Без этого save() сохранял бы заметку: kind неявно был NOTE, и
+        // рецензию было не сохранить вовсе.
+        val bookId = insertBook()
+        val vm = NoteEditorViewModel(
+            androidx.lifecycle.SavedStateHandle(mapOf("bookId" to bookId, "kind" to "REVIEW")),
+            noteRepository,
+            photoRepository,
+            ApplicationProvider.getApplicationContext(),
+        )
+        assertThat(vm.initialKind).isEqualTo(NoteKind.REVIEW)
+        vm.setBody("Отличная книга.")
+        vm.save()
+        advanceUntilIdle()
+
+        val reviews = db.noteDao().observeByKind(NoteKind.REVIEW).first { it.isNotEmpty() }
+        assertThat(reviews).hasSize(1)
+        assertThat(reviews.first().bodyMd).isEqualTo("Отличная книга.")
+        assertThat(reviews.first().bookId).isEqualTo(bookId)
+    }
+
+    @Test
     fun emptyBodyIsNotSaved() = runTest(dispatcher) {
         val bookId = insertBook()
         val vm = newVm(bookId)
