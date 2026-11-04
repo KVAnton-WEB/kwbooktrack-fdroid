@@ -4,7 +4,6 @@ import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,7 +21,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.Add
@@ -30,7 +28,6 @@ import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.FilterAltOff
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MenuBook
@@ -41,8 +38,11 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -51,6 +51,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -72,6 +73,9 @@ import com.journeyapps.barcodescanner.ScanOptions
 import ru.antonkw.kwbooktrack.R
 import ru.antonkw.kwbooktrack.data.time.toLocalDate
 import ru.antonkw.kwbooktrack.ui.common.MonthYearPickerDialog
+import ru.antonkw.kwbooktrack.ui.common.rememberScrollbarController
+import ru.antonkw.kwbooktrack.ui.common.rememberScrollbarController
+import ru.antonkw.kwbooktrack.ui.common.scrollbarGestures
 import ru.antonkw.kwbooktrack.ui.common.labelRes
 import ru.antonkw.kwbooktrack.ui.common.seriesLabel
 import java.time.LocalDate
@@ -107,6 +111,7 @@ fun BookListScreen(
     }
 
     val scanPrompt = stringResource(R.string.scan_prompt)
+    val filterOptions = BookFilterType.entries.map { stringResource(it.labelRes) }
 
     Scaffold(
         modifier = modifier,
@@ -174,58 +179,43 @@ fun BookListScreen(
                 singleLine = true,
             )
 
-            // Фильтры — чипы в прокручиваемой строке: длинные названия
-            // («Не прочитано») не обрезаются, выбранный фильтр виден сразу,
-            // и строка не прыгает, когда появляется «Сброс».
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 8.dp),
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Row(
+                OutlinedTextField(
+                    value = periodText(period),
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text(stringResource(R.string.label_period)) },
+                    trailingIcon = {
+                        Icon(Icons.Filled.CalendarToday, contentDescription = stringResource(R.string.cd_choose_period))
+                    },
                     modifier = Modifier
                         .weight(1f)
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    FilterChip(
-                        selected = !period.isAllTime,
-                        onClick = { showDatePicker = true },
-                        label = {
-                            Text(
-                                if (period.isAllTime) {
-                                    stringResource(R.string.label_period)
-                                } else {
-                                    stringResource(R.string.label_period) + ": " + periodText(period)
-                                },
-                            )
-                        },
-                        leadingIcon = {
-                            Icon(
-                                Icons.Filled.CalendarToday,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp),
-                            )
-                        },
-                    )
-                    BookFilterType.entries.forEach { type ->
-                        FilterChip(
-                            selected = filterType == type,
-                            onClick = { viewModel.setFilterType(type) },
-                            label = { Text(stringResource(type.labelRes)) },
-                        )
-                    }
-                }
-                IconButton(
-                    onClick = viewModel::clearFilters,
-                    enabled = filter.isActive,
-                ) {
-                    Icon(
-                        Icons.Filled.FilterAltOff,
-                        contentDescription = stringResource(R.string.cd_reset_filters),
-                    )
+                        .clickable { showDatePicker = true },
+                    singleLine = true,
+                    enabled = false,
+                    colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                        disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                        disabledBorderColor = MaterialTheme.colorScheme.outline,
+                        disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    ),
+                )
+                FilterDropdown(
+                    label = stringResource(R.string.label_type),
+                    selectedLabel = stringResource(filterType.labelRes),
+                    options = filterOptions,
+                    onSelected = { idx -> viewModel.setFilterType(BookFilterType.entries[idx]) },
+                    modifier = Modifier.weight(1f),
+                )
+                if (filter.isActive) {
+                    TextButton(onClick = viewModel::clearFilters) { Text(stringResource(R.string.action_reset)) }
                 }
             }
 
@@ -255,13 +245,13 @@ fun BookListScreen(
                         }
                     } else {
                         val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+                        val controller = rememberScrollbarController(listState)
                         Box(modifier = Modifier.fillMaxSize()) {
-                            // Полоса прокрутки живёт в правом поле экрана:
-                            // поле листа равно ширине полосы, поэтому она не
-                            // заезжает на карточки и поля списка остаются
-                            // симметричными слева и справа.
+                            // Видимая полоса — 8dp в правом поле экрана, поля
+                            // списка симметричны. Зона захвата (40dp) живёт
+                            // в списке: полоса не залезает на карточки, но
+                            // поймать её пальцем можно широко.
                             val scrollbarWidth = 8.dp
-                            val scrollbarTouchWidth = 16.dp
                             // Нижний отступ — под FAB, иначе последняя карточка
                             // прячется под кнопкой «Добавить».
                             val contentPadding = PaddingValues(
@@ -276,7 +266,9 @@ fun BookListScreen(
                                     state = listState,
                                     contentPadding = contentPadding,
                                     verticalArrangement = Arrangement.spacedBy(12.dp),
-                                    modifier = Modifier.fillMaxSize(),
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .scrollbarGestures(controller),
                                 ) {
                                     itemsIndexed(rows, key = { i, row -> "${row.firstOrNull()?.book?.id ?: 0L}_$i" }) { i, row ->
                                         Row(
@@ -305,7 +297,9 @@ fun BookListScreen(
                                     state = listState,
                                     contentPadding = contentPadding,
                                     verticalArrangement = Arrangement.spacedBy(8.dp),
-                                    modifier = Modifier.fillMaxSize(),
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .scrollbarGestures(controller),
                                 ) {
                                     items(s.books, key = { it.book.id }) {
                                         BookListCard(it, onClick = { onBookClick(it.book.id) })
@@ -313,10 +307,9 @@ fun BookListScreen(
                                 }
                             }
                             ru.antonkw.kwbooktrack.ui.common.VerticalListScrollbar(
-                                listState = listState,
+                                controller = controller,
                                 modifier = Modifier.align(Alignment.CenterEnd),
                                 width = scrollbarWidth,
-                                touchWidth = scrollbarTouchWidth,
                             )
                         }
                     }
@@ -547,5 +540,47 @@ internal fun BookCoverImage(
             modifier = interactive,
             contentScale = androidx.compose.ui.layout.ContentScale.Crop,
         )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FilterDropdown(
+    label: String,
+    selectedLabel: String,
+    options: List<String>,
+    onSelected: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = !expanded },
+        modifier = modifier,
+    ) {
+        OutlinedTextField(
+            value = selectedLabel,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text(label) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier = Modifier.menuAnchor().fillMaxWidth(),
+            singleLine = true,
+        )
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            options.forEachIndexed { idx, opt ->
+                DropdownMenuItem(
+                    text = { Text(opt) },
+                    onClick = {
+                        onSelected(idx)
+                        expanded = false
+                    },
+                )
+            }
+        }
     }
 }

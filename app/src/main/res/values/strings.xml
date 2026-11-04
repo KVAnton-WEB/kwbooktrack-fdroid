@@ -64,7 +64,7 @@
     <string name="cd_open_notes">Заметки и цитаты</string>
     <string name="cd_about">О приложении</string>
     <string name="cd_clear_query">Очистить поиск</string>
-    <string name="cd_reset_filters">Сбросить фильтры</string>
+    <string name="cd_choose_period">Выбрать период</string>
     <string name="cd_back">Назад</string>
 
     <!-- Book list -->
@@ -80,6 +80,7 @@
     <string name="empty_search">Ничего не найдено по «%1$s»</string>
     <string name="empty_no_matches">Нет книг, подходящих под фильтр</string>
     <string name="label_period">Период</string>
+    <string name="label_type">Тип</string>
     <string name="matches_count">Количество совпадений: %1$d</string>
     <string name="scan_prompt">Наведите камеру на штрихкод книги</string>
 

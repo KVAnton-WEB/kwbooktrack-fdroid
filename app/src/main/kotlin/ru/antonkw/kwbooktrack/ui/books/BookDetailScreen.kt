@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -52,6 +53,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -66,6 +68,8 @@ import ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity
 import ru.antonkw.kwbooktrack.ui.common.PhotoGalleryDialog
 import ru.antonkw.kwbooktrack.ui.common.PhotoSource
 import ru.antonkw.kwbooktrack.ui.common.labelRes
+import ru.antonkw.kwbooktrack.ui.common.rememberScrollbarController
+import ru.antonkw.kwbooktrack.ui.common.scrollbarGestures
 import ru.antonkw.kwbooktrack.ui.common.seriesLabel
 import java.time.Instant
 import ru.antonkw.kwbooktrack.data.time.toLocalDate
@@ -178,14 +182,13 @@ fun BookDetailScreen(
         }
 
         val detailListState = androidx.compose.foundation.lazy.rememberLazyListState()
-        // Полоса прокрутки живёт в правом поле экрана: поле листа равно
-        // ширине полосы, поэтому она не заезжает на контент и поля списка
-        // остаются симметричными слева и справа.
-        val scrollbarTouchWidth = 16.dp
+        val scrollbarController = rememberScrollbarController(detailListState)
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             LazyColumn(
                 state = detailListState,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .scrollbarGestures(scrollbarController),
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
@@ -311,6 +314,9 @@ fun BookDetailScreen(
                             label = { Text(stringResource(R.string.label_current_page)) },
                             singleLine = true,
                             isError = pageError,
+                            // Сразу цифровая клавиатура, без переключения
+                            // с буквенной по кнопке «123».
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             supportingText = if (pageError) {
                                 { Text(stringResource(R.string.error_page_exceeds_total, total!!)) }
                             } else null,
@@ -515,10 +521,9 @@ fun BookDetailScreen(
             item { Spacer(modifier = Modifier.height(72.dp)) }
             }
             ru.antonkw.kwbooktrack.ui.common.VerticalListScrollbar(
-                listState = detailListState,
+                controller = scrollbarController,
                 modifier = Modifier.align(Alignment.CenterEnd),
                 width = 8.dp,
-                touchWidth = scrollbarTouchWidth,
             )
         }
     }

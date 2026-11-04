@@ -39,6 +39,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.antonkw.kwbooktrack.R
+import ru.antonkw.kwbooktrack.ui.common.rememberScrollbarController
+import ru.antonkw.kwbooktrack.ui.common.scrollbarGestures
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -97,18 +99,20 @@ fun NotesListScreen(
                         }
                     } else {
                         val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+                        val controller = rememberScrollbarController(listState)
                         Box(modifier = Modifier.fillMaxSize()) {
+                            // Видимая полоса — 8dp в правом поле экрана, поля
+                            // списка симметричны. Зона захвата (40dp) живёт
+                            // в списке: полоса не залезает на строки, но
+                            // поймать её пальцем можно широко.
                             val scrollbarWidth = 8.dp
-                            // Полоса прокрутки живёт в правом поле экрана:
-                            // поле листа равно ширине полосы, поэтому она не
-                            // заезжает на строки и поля списка остаются
-                            // симметричными слева и справа.
-                            val scrollbarTouchWidth = 16.dp
                             LazyColumn(
                                 state = listState,
                                 contentPadding = PaddingValues(16.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp),
-                                modifier = Modifier.fillMaxSize(),
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .scrollbarGestures(controller),
                             ) {
                                 items(s.items, key = { it.note.id }) { item ->
                                     NoteListRow(
@@ -118,10 +122,9 @@ fun NotesListScreen(
                                 }
                             }
                             ru.antonkw.kwbooktrack.ui.common.VerticalListScrollbar(
-                                listState = listState,
+                                controller = controller,
                                 modifier = Modifier.align(Alignment.CenterEnd),
                                 width = scrollbarWidth,
-                                touchWidth = scrollbarTouchWidth,
                             )
                         }
                     }
