@@ -5,22 +5,25 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyListLayoutInfo
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -33,10 +36,11 @@ import kotlin.math.roundToInt
 /**
  * Material 3-styled vertical scrollbar for a [LazyListState].
  *
- * Layout: the bar occupies [touchWidth] on the right edge — pair it with
- * `LazyColumn(modifier = …padding(end = touchWidth))` so content doesn't
- * sit under the touch lane (the bar is the later sibling in the Box, so it
- * wins hit-test in that strip and the content there would be untappable).
+ * Layout: the bar occupies [touchWidth] on the right edge — pair it with a
+ * list whose content padding leaves that strip empty (the book list uses a
+ * 16dp gutter, the scrollbar lane sits exactly in it). The scrollbar is the
+ * later sibling in the Box, so it wins hit-test in that strip; keeping the
+ * strip free of content means nothing becomes untappable.
  * Only the inner [width]-wide rectangle is painted, so the visual stays
  * slim while the finger gets a full [touchWidth] lane. The bar is hidden
  * entirely when the content fits the viewport (no scroll possible).
@@ -49,7 +53,7 @@ import kotlin.math.roundToInt
  *   1.7.x — it is hard-coded to `-beforeContentPadding` and only changes when
  *   padding does. Use `firstVisibleItemIndex` / `firstVisibleItemScrollOffset`.
  * - LazyListState exposes no total content height, so it has to be estimated.
- *   See the `ponytail:` note on the frozen estimate in the composable.
+ *   See the `ponytail:` note on the frozen estimate in [AvgItemHeight].
  *
  * Interaction — the whole [touchWidth] lane is **one** gesture surface:
  * - Release without crossing touch slop → jump, so the thumb's centre lands
@@ -69,6 +73,13 @@ import kotlin.math.roundToInt
  * mutex, so this is a pre-existing ceiling, not something the pixel deltas
  * introduced. Composition has no mutex-free scroll entry point to swap in.
  *
+ * Performance: every per-frame value lives in a [derivedStateOf] that is
+ * read **only from the draw phase** (the thumb is drawn by `drawBehind` and
+ * moved by `graphicsLayer`). A scroll therefore redraws the bar without
+ * recomposing or re-laying-out anything — the list scrolls without dragging
+ * a recomposition behind it. The previous version read the same state in the
+ * composable body, so every scroll tick invalidated composition and layout.
+ *
  * ponytail: Compose Foundation's `rememberScrollbarState` /
  * `Modifier.verticalScrollbar` API didn't ship in our Foundation 1.7.2 —
  * verified: the 1.7.2 `foundation` artifact contains zero `Scrollbar`
@@ -80,118 +91,89 @@ fun VerticalListScrollbar(
     listState: LazyListState,
     modifier: Modifier = Modifier,
     width: Dp = 8.dp,
-    touchWidth: Dp = 24.dp,
+    touchWidth: Dp = 16.dp,
 ) {
     val density = LocalDensity.current
     val trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f)
     val thumbColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.65f)
+    val dragColor = MaterialTheme.colorScheme.primary
 
-    // Read the list state straight out of the composable body. Every field we
-    // need is snapshot-backed in Foundation 1.7.x — `layoutInfo` reads
-    // `layoutInfoState.value`, `firstVisibleItemIndex` /
-    // `firstVisibleItemScrollOffset` are `MutableIntState` delegates on
-    // LazyListScrollPosition — so these plain property reads register normal
-    // recomposition subscriptions and the thumb lands in the SAME frame the
-    // list scrolls in. The previous `snapshotFlow { … } + collectAsState`
-    // pair emitted from a snapshot-apply observer, i.e. one frame late, plus
-    // a coroutine hop: during flings that read as the thumb sliding behind
-    // the content.
-    val info = listState.layoutInfo
-    val viewportPx = (info.viewportEndOffset - info.viewportStartOffset -
-        info.beforeContentPadding - info.afterContentPadding).toFloat()
+    // ponytail: LazyListState 1.7.x has no total-content-height, so the
+    // content height is estimated from the mean of the *visible* items — and
+    // that estimate is FROZEN. Re-deriving it per frame (the previous
+    // behaviour) made the thumb visibly breathe as the visible mix changed,
+    // made the scrub ratio drift mid-gesture, and could even flip
+    // `hasOverflow` so the bar vanished mid-scroll. Re-measuring only when
+    // the list's shape changes trades a slightly stale ratio for a stable
+    // bar. The tallest visible item is part of the key because
+    // BookDetailScreen packs every note into one item: its height changes as
+    // notes are added or filtered without `totalItemsCount` moving, and the
+    // mean would otherwise stay frozen at the value it had on the first frame.
+    val estimate = remember { AvgItemHeight() }
 
-    // ponytail: LazyListState 1.7.x has no total-content-height, so we
-    // estimate it from the mean of the *visible* items — and FREEZE that
-    // estimate. Re-deriving it per frame (the previous behaviour) made the
-    // thumb visibly breathe as the visible mix changed, made the scrub ratio
-    // drift mid-gesture, and could even flip `hasOverflow` so the bar
-    // vanished mid-scroll. Re-measuring only when the list's shape changes
-    // trades a slightly stale ratio for a stable bar. The tallest visible
-    // item is part of the key because BookDetailScreen packs every note into
-    // one item: its height changes as notes are added or filtered without
-    // `totalItemsCount` moving, and the mean would otherwise stay frozen at
-    // the value it had on the first frame.
-    val avgItemPx = remember(
-        info.totalItemsCount,
-        viewportPx.roundToInt(),
-        info.visibleItemsInfo.maxOfOrNull { it.size },
-    ) {
-        val visible = info.visibleItemsInfo
-        if (visible.isEmpty()) 0f
-        else visible.sumOf { it.size }.toFloat() / visible.size
+    // Scroll metrics — derived, so the block only re-runs when the list
+    // actually moved. Read from the draw phase and from the gesture, never
+    // from the composable body, so scrolling doesn't invalidate composition.
+    val metrics = remember(listState) {
+        derivedStateOf {
+            val info = listState.layoutInfo
+            val viewportPx = (info.viewportEndOffset - info.viewportStartOffset -
+                info.beforeContentPadding - info.afterContentPadding).toFloat()
+            computeScrollMetrics(
+                firstVisibleItemIndex = listState.firstVisibleItemIndex,
+                firstVisibleItemScrollOffset = listState.firstVisibleItemScrollOffset,
+                avgItemPx = estimate.update(info, viewportPx),
+                totalItemsCount = info.totalItemsCount,
+                viewportPx = viewportPx,
+                // Both are derived from snapshot-backed state (item index +
+                // layoutInfo), so reading them here re-subscribes on every
+                // scroll tick — but only the derived state is invalidated,
+                // not the composition.
+                canScrollBackward = listState.canScrollBackward,
+                canScrollForward = listState.canScrollForward,
+            )
+        }
     }
-    val metrics = computeScrollMetrics(
-        firstVisibleItemIndex = listState.firstVisibleItemIndex,
-        firstVisibleItemScrollOffset = listState.firstVisibleItemScrollOffset,
-        avgItemPx = avgItemPx,
-        totalItemsCount = info.totalItemsCount,
-        viewportPx = viewportPx,
-        // Both are derived from snapshot-backed state (item index + layoutInfo),
-        // so reading them in composition re-subscribes on every scroll tick.
-        canScrollBackward = listState.canScrollBackward,
-        canScrollForward = listState.canScrollForward,
-    )
 
-    // All three must be remembered *above* the early return: `hasOverflow` is
-    // derived from an estimate, so a flip mid-gesture used to dispose the
+    // Overflow is the one value the composition itself needs (it decides
+    // whether the bar exists at all). It flips only when the list gains or
+    // loses the ability to scroll, so the subscription is rare.
+    val hasOverflow = listState.canScrollBackward || listState.canScrollForward
+
+    // All of these must be remembered *above* the early return: `hasOverflow`
+    // is derived from an estimate, so a flip mid-gesture used to dispose the
     // whole scrollbar subtree — drag state and all — and rebuild it from
     // scratch.
     var trackHeightPx by remember { mutableIntStateOf(0) }
     var dragOffsetPx by remember { mutableStateOf<Int?>(null) }
     var isDragging by remember { mutableStateOf(false) }
 
-    // One minimum rule, not two. The 0.08 floor in [computeScrollMetrics] is
-    // the usual winner on a phone-sized track; the hard 24dp only binds on
-    // tracks shorter than that, where it must not exceed the track itself.
-    val minThumbPx = with(density) { 24.dp.toPx() }.roundToInt()
-        .coerceAtMost(trackHeightPx)
-    val thumbHeightPx = (metrics.thumbFraction * trackHeightPx)
-        .roundToInt()
-        .coerceAtLeast(minThumbPx)
-    val scrollableTrackPx = (trackHeightPx - thumbHeightPx).coerceAtLeast(1)
-    // roundToInt, not toInt: truncation made the thumb sit still for a few
-    // frames then jump a pixel on every slow scroll.
-    val thumbOffsetPx = (metrics.scrollFraction * scrollableTrackPx)
-        .roundToInt()
-        .coerceIn(0, scrollableTrackPx)
+    // Thumb geometry — pixel values the draw phase needs. Derived from the
+    // metrics plus the track height, so a scroll moves only the thumb.
+    val thumb = remember(metrics, density) {
+        derivedStateOf {
+            val m = metrics.value
+            // One minimum rule, not two. The 0.08 floor in
+            // [computeScrollMetrics] is the usual winner on a phone-sized
+            // track; the hard 24dp only binds on tracks shorter than that,
+            // where it must not exceed the track itself.
+            val minThumbPx = with(density) { 24.dp.toPx() }.roundToInt()
+                .coerceAtMost(trackHeightPx)
+            val thumbHeightPx = (m.thumbFraction * trackHeightPx)
+                .roundToInt()
+                .coerceAtLeast(minThumbPx)
+            val scrollableTrackPx = (trackHeightPx - thumbHeightPx).coerceAtLeast(1)
+            // roundToInt, not toInt: truncation made the thumb sit still for a
+            // few frames then jump a pixel on every slow scroll.
+            val offsetPx = dragOffsetPx
+                ?: (m.scrollFraction * scrollableTrackPx).roundToInt()
+                    .coerceIn(0, scrollableTrackPx)
+            ThumbGeometry(thumbHeightPx, scrollableTrackPx, offsetPx)
+        }
+    }
 
     // If the content fits the viewport there's nothing to scroll.
-    if (!metrics.hasOverflow) return
-
-    // Visual thumb position. We use a concrete `.offset(y = …)` (not the
-    // lambda overload `.offset { IntOffset(...) }`) because Compose Foundation
-    // 1.7.x's deferred-state-read offset modifier does not reliably subscribe
-    // to the state — the lambda re-runs on layout but the layout phase doesn't
-    // always pick up fresh state writes that happened inside a pointer event
-    // callback, so the thumb visually stayed put during drags. Reading the
-    // State<T> directly in the composable body registers a normal recomposition
-    // subscription, which the snapshot system drives correctly on every
-    // write (recomposition + relayout + redraw in the same frame).
-    //
-    // While not scrubbing the offset comes straight from the metrics, so the
-    // thumb tracks the list. During a scrub the finger-driven offset wins:
-    // scrollFraction lags behind dispatchRawDelta and is approximate (it
-    // averages item heights), so letting it overwrite the in-progress visual
-    // position makes the thumb snap back to a stale spot. The drag offset is
-    // cleared on release — otherwise the finger's last position wins forever
-    // and the thumb detaches from the list for the rest of the session.
-    val effectiveOffsetPx = dragOffsetPx ?: thumbOffsetPx
-    val thumbOffsetY = with(density) { effectiveOffsetPx.toDp() }
-
-    // Geometry read from inside the gesture loop. Keying `pointerInput` on
-    // these is what used to restart the gesture detectors: avgItemPx is the mean
-    // height of the *visible* items, so crossing one item boundary moves
-    // thumbFraction → thumbHeightPx → scrollableTrackPx, and the detector was
-    // torn down and rebuilt dozens of times per fling. Keyed on
-    // rememberUpdatedState instead, so the detector is built once.
-    val geo by rememberUpdatedState(
-        ScrollbarGeo(
-            metrics = metrics,
-            thumbHeightPx = thumbHeightPx,
-            scrollableTrackPx = scrollableTrackPx,
-            offsetPx = effectiveOffsetPx,
-        ),
-    )
+    if (!hasOverflow) return
 
     Box(
         modifier = modifier
@@ -212,7 +194,7 @@ fun VerticalListScrollbar(
                     val downY = down.position.y
                     // Thumb position at grab time; the scrub is 1:1 from there,
                     // so the finger's offset within the thumb doesn't matter.
-                    val grabOffsetPx = geo.offsetPx
+                    val grabOffsetPx = thumb.value.offsetPx
                     var lastY = downY
                     var totalDeltaY = 0f
 
@@ -241,10 +223,10 @@ fun VerticalListScrollbar(
                             // the dead zone at the ends ever bothers anyone.
                             dragOffsetPx = (grabOffsetPx + totalDeltaY)
                                 .roundToInt()
-                                .coerceIn(0, geo.scrollableTrackPx)
-                            val totalScrollable = (geo.metrics.totalScrollPx -
-                                geo.metrics.viewportPx).coerceAtLeast(0f)
-                            val pxPerTrackPx = totalScrollable / geo.scrollableTrackPx
+                                .coerceIn(0, thumb.value.scrollableTrackPx)
+                            val m = metrics.value
+                            val totalScrollable = (m.totalScrollPx - m.viewportPx).coerceAtLeast(0f)
+                            val pxPerTrackPx = totalScrollable / thumb.value.scrollableTrackPx
                             if (pxPerTrackPx > 0f) {
                                 listState.dispatchRawDelta(delta * pxPerTrackPx)
                             }
@@ -263,12 +245,14 @@ fun VerticalListScrollbar(
                     // most of the track, and swallowing those taps is what made
                     // the bar feel dead exactly where people reach for it.
                     if (abs(totalDeltaY) <= viewConfiguration.touchSlop) {
-                        val ratio = ((downY - geo.thumbHeightPx / 2f) / geo.scrollableTrackPx)
+                        val g = thumb.value
+                        val m = metrics.value
+                        val ratio = ((downY - g.thumbHeightPx / 2f) / g.scrollableTrackPx)
                             .coerceIn(0f, 1f)
                         val targetScrollPx = ratio *
-                            (geo.metrics.totalScrollPx - geo.metrics.viewportPx)
+                            (m.totalScrollPx - m.viewportPx)
                                 .coerceAtLeast(0f)
-                        listState.dispatchRawDelta(targetScrollPx - geo.metrics.scrollPx)
+                        listState.dispatchRawDelta(targetScrollPx - m.scrollPx)
                     }
                 }
             },
@@ -286,16 +270,26 @@ fun VerticalListScrollbar(
         )
         // Thumb. Purely visual: gestures are handled by the lane above, so it
         // needs no pointerInput of its own.
+        //
+        // Position and size are applied in the DRAW phase: `graphicsLayer`
+        // moves the box, `drawBehind` paints the rounded bar with the height
+        // the metrics say it should have. Nothing here changes the layout, so
+        // a scroll costs one redraw of this node and no recomposition.
         Box(
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .offset(y = thumbOffsetY)
                 .width(width)
-                .height(with(density) { thumbHeightPx.toDp() })
-                .background(
-                    if (isDragging) MaterialTheme.colorScheme.primary else thumbColor,
-                    RoundedCornerShape(width / 2),
-                ),
+                .fillMaxHeight()
+                .graphicsLayer { translationY = thumb.value.offsetPx.toFloat() }
+                .drawBehind {
+                    val g = thumb.value
+                    drawRoundRect(
+                        color = if (isDragging) dragColor else thumbColor,
+                        topLeft = Offset.Zero,
+                        size = Size(size.width, g.thumbHeightPx.toFloat()),
+                        cornerRadius = CornerRadius(size.width / 2f),
+                    )
+                },
         )
     }
 }
@@ -373,14 +367,40 @@ internal data class ScrollMetrics(
     val hasOverflow: Boolean,
 )
 
-/**
- * Everything the gesture loop needs that changes while scrolling. Held in a
- * [rememberUpdatedState] so the `pointerInput` block can be keyed on
- * `listState` alone.
- */
-private class ScrollbarGeo(
-    val metrics: ScrollMetrics,
+/** Pixel geometry of the thumb for the current track size. */
+private data class ThumbGeometry(
     val thumbHeightPx: Int,
     val scrollableTrackPx: Int,
     val offsetPx: Int,
 )
+
+/**
+ * Mean height of the visible items, frozen between shape changes.
+ *
+ * The key is (item count, viewport height, tallest visible item) — the same
+ * triple the previous `remember` call used. The value is re-derived only when
+ * that key changes, so the thumb doesn't breathe while the visible mix
+ * shifts under a fling.
+ */
+private class AvgItemHeight {
+    private var key: Triple<Int, Int, Int?>? = null
+    private var value = 0f
+
+    fun update(info: LazyListLayoutInfo, viewportPx: Float): Float {
+        val newKey = Triple(
+            info.totalItemsCount,
+            viewportPx.roundToInt(),
+            info.visibleItemsInfo.maxOfOrNull { it.size },
+        )
+        if (newKey != key) {
+            key = newKey
+            val visible = info.visibleItemsInfo
+            value = if (visible.isEmpty()) {
+                0f
+            } else {
+                visible.sumOf { it.size }.toFloat() / visible.size
+            }
+        }
+        return value
+    }
+}

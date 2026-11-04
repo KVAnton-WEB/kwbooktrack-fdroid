@@ -63,12 +63,12 @@
     <string name="cd_add_book">Добавить книгу</string>
     <string name="cd_open_notes">Заметки и цитаты</string>
     <string name="cd_about">О приложении</string>
-    <string name="cd_choose_period">Выбрать период</string>
     <string name="cd_clear_query">Очистить поиск</string>
+    <string name="cd_reset_filters">Сбросить фильтры</string>
     <string name="cd_back">Назад</string>
 
     <!-- Book list -->
-    <string name="book_list_title">kwbooktrack — книги</string>
+    <string name="book_list_title">Книги</string>
     <string name="action_stats">Статистика</string>
     <string name="action_grid">Сетка</string>
     <string name="action_list">Список</string>
@@ -80,7 +80,6 @@
     <string name="empty_search">Ничего не найдено по «%1$s»</string>
     <string name="empty_no_matches">Нет книг, подходящих под фильтр</string>
     <string name="label_period">Период</string>
-    <string name="label_type">Тип</string>
     <string name="matches_count">Количество совпадений: %1$d</string>
     <string name="scan_prompt">Наведите камеру на штрихкод книги</string>
 
@@ -93,6 +92,7 @@
     <!-- Filter types -->
     <string name="filter_all">Все</string>
     <string name="filter_wishlist">К прочтению</string>
+    <string name="filter_unread">Не прочитано</string>
     <string name="filter_reading">В процессе</string>
     <string name="filter_finished">Прочитано</string>
     <string name="status_abandoned">Брошено</string>

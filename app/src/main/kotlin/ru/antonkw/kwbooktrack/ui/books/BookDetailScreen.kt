@@ -178,16 +178,14 @@ fun BookDetailScreen(
         }
 
         val detailListState = androidx.compose.foundation.lazy.rememberLazyListState()
-        // padding(end = scrollbarTouchWidth) reserves the scrollbar's whole
-        // touch lane — the bar is the later sibling in this Box, so it wins
-        // hit-test there and content inside the lane would be untappable.
-        val scrollbarTouchWidth = 24.dp
+        // Полоса прокрутки живёт в правом поле экрана: поле листа равно
+        // ширине полосы, поэтому она не заезжает на контент и поля списка
+        // остаются симметричными слева и справа.
+        val scrollbarTouchWidth = 16.dp
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             LazyColumn(
                 state = detailListState,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(end = scrollbarTouchWidth),
+                modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {

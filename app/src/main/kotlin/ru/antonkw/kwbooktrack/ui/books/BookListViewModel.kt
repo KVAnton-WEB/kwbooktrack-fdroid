@@ -31,8 +31,9 @@ import javax.inject.Inject
 
 enum class BookFilterType(@StringRes val labelRes: Int) {
     ALL(R.string.filter_all),
-    FINISHED(R.string.filter_finished),
+    UNREAD(R.string.filter_unread),
     READING(R.string.filter_reading),
+    FINISHED(R.string.filter_finished),
     PURCHASED(R.string.filter_purchased),
 }
 
@@ -191,6 +192,12 @@ class BookListViewModel @Inject constructor(
                 // дат не попадает ни в какой ограниченный период.
                 BookFilterType.ALL ->
                     p.matchesAny(book.finishedAt, book.startedAt, book.purchaseDate)
+                // «Не прочитано» — обратная сторона «Прочитано»: всё, что ещё
+                // не дочитано (к прочтению, в процессе, брошено). Период для
+                // такой книги — по дате начала чтения или покупки.
+                BookFilterType.UNREAD ->
+                    book.status != BookStatus.FINISHED &&
+                        p.matchesAny(book.startedAt, book.purchaseDate)
                 BookFilterType.FINISHED ->
                     book.status == BookStatus.FINISHED && p.matches(book.finishedAt)
                 BookFilterType.READING ->

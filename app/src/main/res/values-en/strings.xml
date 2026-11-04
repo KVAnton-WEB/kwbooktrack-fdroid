@@ -65,12 +65,12 @@
     <string name="cd_about">About the app</string>
     <string name="notes_search_hint">Search notes…</string>
     <string name="notes_no_results">Nothing found for «%1$s»</string>
-    <string name="cd_choose_period">Choose period</string>
     <string name="cd_clear_query">Clear search</string>
+    <string name="cd_reset_filters">Reset filters</string>
     <string name="cd_back">Back</string>
 
     <!-- Book list -->
-    <string name="book_list_title">kwbooktrack — books</string>
+    <string name="book_list_title">Books</string>
     <string name="action_stats">Statistics</string>
     <string name="action_grid">Grid</string>
     <string name="action_list">List</string>
@@ -80,7 +80,6 @@
     <string name="empty_search">Nothing found for «%1$s»</string>
     <string name="empty_no_matches">No books match the current filter</string>
     <string name="label_period">Period</string>
-    <string name="label_type">Type</string>
     <string name="matches_count">Matches: %1$d</string>
     <string name="scan_prompt">Point the camera at the book barcode</string>
 
@@ -93,6 +92,7 @@
     <!-- Filter types -->
     <string name="filter_all">All</string>
     <string name="filter_wishlist">Wishlist</string>
+    <string name="filter_unread">Not read</string>
     <string name="filter_reading">Reading</string>
     <string name="filter_finished">Finished</string>
     <string name="status_abandoned">Abandoned</string>

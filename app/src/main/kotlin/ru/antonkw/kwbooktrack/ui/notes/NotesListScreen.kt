@@ -99,20 +99,16 @@ fun NotesListScreen(
                         val listState = androidx.compose.foundation.lazy.rememberLazyListState()
                         Box(modifier = Modifier.fillMaxSize()) {
                             val scrollbarWidth = 8.dp
-                            // Touch lane is 3× the visual thumb width — wide
-                            // enough to grab with a finger. padding(end =
-                            // scrollbarTouchWidth) reserves it: the scrollbar
-                            // is the later sibling in this Box, so it wins
-                            // hit-test there and content inside the lane would
-                            // be untappable.
-                            val scrollbarTouchWidth = 24.dp
+                            // Полоса прокрутки живёт в правом поле экрана:
+                            // поле листа равно ширине полосы, поэтому она не
+                            // заезжает на строки и поля списка остаются
+                            // симметричными слева и справа.
+                            val scrollbarTouchWidth = 16.dp
                             LazyColumn(
                                 state = listState,
                                 contentPadding = PaddingValues(16.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp),
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(end = scrollbarTouchWidth),
+                                modifier = Modifier.fillMaxSize(),
                             ) {
                                 items(s.items, key = { it.note.id }) { item ->
                                     NoteListRow(

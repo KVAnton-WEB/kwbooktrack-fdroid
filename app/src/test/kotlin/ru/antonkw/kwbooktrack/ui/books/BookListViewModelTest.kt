@@ -18,6 +18,7 @@ import ru.antonkw.kwbooktrack.data.TestDb
 import ru.antonkw.kwbooktrack.data.TestViewModels
 import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
+import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
 import ru.antonkw.kwbooktrack.data.repository.SessionRepository
@@ -141,6 +142,18 @@ class BookListViewModelTest {
         val viewModel = BookListViewModel(repository, sessionRepository, saved)
         TestViewModels.track(viewModel)
         assertThat(viewModel.currentPeriod.value.wholeYear).isTrue()
+    }
+
+    @Test
+    fun unreadFilterKeepsEverythingButFinished() = runTest(dispatcher) {
+        repository.insert(purchased("Прочитана", LocalDate.of(2026, 3, 1)).copy(status = BookStatus.FINISHED))
+        repository.insert(purchased("В процессе", LocalDate.of(2026, 4, 1)).copy(status = BookStatus.READING))
+        repository.insert(purchased("К прочтению", LocalDate.of(2026, 5, 1)).copy(status = BookStatus.WISHLIST))
+        val viewModel = BookListViewModel(repository, sessionRepository, androidx.lifecycle.SavedStateHandle())
+        TestViewModels.track(viewModel)
+        viewModel.setFilterType(BookFilterType.UNREAD)
+        val loaded = viewModel.uiState.first { it is BookListUiState.Loaded } as BookListUiState.Loaded
+        assertThat(loaded.books.map { it.book.title }).containsExactly("В процессе", "К прочтению")
     }
 
     private fun purchased(title: String, date: LocalDate) = BookEntity(
