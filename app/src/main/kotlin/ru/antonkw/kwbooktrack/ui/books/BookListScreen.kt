@@ -74,7 +74,6 @@ import ru.antonkw.kwbooktrack.R
 import ru.antonkw.kwbooktrack.data.time.toLocalDate
 import ru.antonkw.kwbooktrack.ui.common.MonthYearPickerDialog
 import ru.antonkw.kwbooktrack.ui.common.rememberScrollbarController
-import ru.antonkw.kwbooktrack.ui.common.rememberScrollbarController
 import ru.antonkw.kwbooktrack.ui.common.scrollbarGestures
 import ru.antonkw.kwbooktrack.ui.common.labelRes
 import ru.antonkw.kwbooktrack.ui.common.seriesLabel

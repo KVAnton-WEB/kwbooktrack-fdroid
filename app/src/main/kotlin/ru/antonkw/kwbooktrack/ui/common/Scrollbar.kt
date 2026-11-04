@@ -132,12 +132,15 @@ fun rememberScrollbarController(listState: LazyListState): ScrollbarController {
 /**
  * Жесты полосы прокрутки — вешаются на сам список.
  *
- * Зона захвата — [grabWidth] справа: полоса 8dp, а поймать её пальцем
- * можно за [grabWidth]. Тап в свободном поле списка ([marginWidth] справа,
- * там, где контента нет) прыгает по странице; тап по карточке остаётся
- * карточке. Перетаскивание скрабит ползунок, но только если палец начал
- * рядом с ним — жест в стороне от ползунка остаётся обычной прокруткой
- * списка.
+ * Зона захвата — [grabWidth] справа: полоса 8dp, а поймать её пальцем можно
+ * за всю зону. Скраб начинается только в этой зоне и только если палец попал
+ * по вертикали на ползунок — то есть это осознанный захват полосы. Любой
+ * другой свайп остаётся обычной прокруткой списка (иначе свайп по списку
+ * превращался в скраб: контент ехал в обратную сторону, а жест «залипал» —
+ * проверено на устройстве).
+ *
+ * Тап в свободном поле у края ([marginWidth] справа, там, где контента нет)
+ * прыгает по странице; тап по карточке остаётся карточке.
  */
 fun Modifier.scrollbarGestures(
     controller: ScrollbarController,
@@ -147,6 +150,7 @@ fun Modifier.scrollbarGestures(
     // Зона захвата: grabWidth справа. Сама полоса — 8dp, но поймать её
     // пальцем можно за всю зону.
     val marginPx = marginWidth.toPx()
+    val grabPx = grabWidth.toPx()
     val listWidthPx = size.width.toFloat()
     // Насколько выше/ниже ползунка жест ещё считается «захватом ползунка».
     val tolerancePx = 8.dp.toPx()
@@ -171,7 +175,6 @@ fun Modifier.scrollbarGestures(
         launch {
             while (true) {
                 val first = commands.receive()
-                if (first !is ScrubCommand.Start) continue
                 controller.listState.scroll(MutatePriority.PreventUserInput) {
                     var applied = 0f
                     var cmd: ScrubCommand = first
@@ -192,15 +195,17 @@ fun Modifier.scrollbarGestures(
                                 }
                             }
                             is ScrubCommand.Stop -> {
-                                // Финальная цель: докручиваем до неё (обычно
-                                // мелкий шаг — список успевал идти вровень) и
-                                // отпускаем мьютекс. Без этого ползунок
-                                // откатывался бы назад при отпускании.
-                                val rest = cmd.px - applied
+                                // Финальная цель: докручиваем остаток, но не
+                                // больше одного элемента — большой остаток
+                                // перемерил бы полсотни карточек и держал
+                                // мьютекс (PreventUserInput) на секунды — новый
+                                // свайп пользователя ждал бы его и «догонял».
+                                val maxStep = controller.metrics.value.avgItemPx
+                                    .coerceAtLeast(1f)
+                                val rest = (cmd.px - applied).coerceIn(-maxStep, maxStep)
                                 if (rest != 0f) scrollBy(rest)
                                 return@scroll
                             }
-                            is ScrubCommand.Start -> Unit
                         }
                         cmd = commands.receive()
                     }
@@ -215,10 +220,18 @@ fun Modifier.scrollbarGestures(
                 val downX = down.position.x
                 val downY = down.position.y
                 val inMargin = downX >= listWidthPx - marginPx
+                // Зона захвата полосы — [grabWidth] справа. Скраб начинается
+                // только в ней: полоса живёт у самого края, и жест в этой
+                // полосе — осознанный захват полосы, а не обычный скролл.
+                // Раньше скраб начинался в любом месте, где палец по вертикали
+                // совпал с ползунком, — обычный свайп по списку превращался в
+                // скраб: контент ехал в противоположную сторону и жест
+                // «залипал» (проверено на устройстве).
+                val inGrab = downX >= listWidthPx - grabPx
                 val g0 = controller.thumb.value
                 val nearThumb = downY >= g0.offsetPx - tolerancePx &&
                     downY <= g0.offsetPx + g0.thumbHeightPx + tolerancePx
-                val mayScrub = inMargin || nearThumb
+                val mayScrub = inGrab && nearThumb
                 // Положение ползунка в момент касания; скраб идёт 1:1 от него,
                 // поэтому смещение пальца внутри ползунка не важно.
                 val grabOffsetPx = g0.offsetPx
@@ -244,12 +257,6 @@ fun Modifier.scrollbarGestures(
                         // consume в Initial-проходе отменяет перетаскивание
                         // списка: событие увидит и скролл, но уже «съеденным».
                         change.consume()
-                        if (!scrubbed) {
-                            // Старт скраба: воркер берёт мьютекс и сразу
-                            // отменяет флинг списка.
-                            scrubbed = true
-                            commands.trySend(ScrubCommand.Start)
-                        }
                         controller.isDragging = true
                         // ponytail: ползунок упирается в дорожку, а список
                         // прокручивается только на сырое смещение, поэтому за
@@ -264,7 +271,10 @@ fun Modifier.scrollbarGestures(
                         val pxPerTrackPx = totalScrollable / controller.thumb.value.scrollableTrackPx
                         if (pxPerTrackPx > 0f) {
                             // Накопленная дельта с начала скраба — цель, к
-                            // которой воркер докручивает.
+                            // которой воркер докручивает. Первая дельта сама
+                            // запускает скраб: воркер берёт мьютекс и сразу
+                            // отменяет флинг списка.
+                            scrubbed = true
                             lastTargetPx = totalDeltaY * pxPerTrackPx
                             commands.trySend(ScrubCommand.Delta(lastTargetPx))
                         }
@@ -280,8 +290,8 @@ fun Modifier.scrollbarGestures(
                 }
 
                 // Тап без перетаскивания: ставим ползунок под палец. Только в
-                // свободном поле — тап по карточке должен открыть карточку, а не
-                // прыгнуть по списку.
+                // свободном поле у края — тап по карточке должен открыть
+                // карточку, а не прыгнуть по списку.
                 if (!scrubbed && abs(totalDeltaY) <= viewConfiguration.touchSlop && inMargin) {
                     val g = controller.thumb.value
                     val m = controller.metrics.value
@@ -303,9 +313,7 @@ fun Modifier.scrollbarGestures(
 
 /** Команды воркеру скролла. */
 private sealed interface ScrubCommand {
-    /** Начало скраба: воркер берёт мьютекс и отменяет флинг. */
-    data object Start : ScrubCommand
-    /** Сдвиг контента на [px]. */
+    /** Сдвиг контента на [px] — цель от начала скраба. */
     data class Delta(val px: Float) : ScrubCommand
     /** Конец скраба: [px] — финальная цель, до неё воркер докручивает. */
     data class Stop(val px: Float) : ScrubCommand

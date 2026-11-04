@@ -28,13 +28,16 @@ object Routes {
     const val NOTES = "notes"
     const val ABOUT = "about"
     const val BOOK_DETAIL = "books/{bookId}"
-    const val NOTE_EDITOR = "books/{bookId}/notes/new"
-    const val NOTE_EDITOR_REVIEW = "books/{bookId}/notes/new?kind={kind}"
+    // Один маршрут на редактор заметки. Тип (заметка/цитата/рецензия) —
+    // обязательный query-аргумент: иначе шаблон с `kind={kind}` и
+    // defaultValue матчился бы и на маршрут без query, и FAB «добавить
+    // заметку» открывал бы рецензию (kind по умолчанию).
+    const val NOTE_EDITOR = "books/{bookId}/notes/new?kind={kind}"
     const val NOTE_EDIT = "notes/{noteId}/edit"
     const val NOTE_DETAIL = "notes/{noteId}"
     fun bookDetail(bookId: Long) = "books/$bookId"
-    fun noteEditor(bookId: Long) = "books/$bookId/notes/new"
-    fun noteEditorReview(bookId: Long) = "books/$bookId/notes/new?kind=REVIEW"
+    fun noteEditor(bookId: Long) = "books/$bookId/notes/new?kind=${NoteKind.NOTE.name}"
+    fun noteEditorReview(bookId: Long) = "books/$bookId/notes/new?kind=${NoteKind.REVIEW.name}"
     fun noteEdit(noteId: Long) = "notes/$noteId/edit"
     fun editBook(bookId: Long) = "books/$bookId/edit"
     fun noteDetail(noteId: Long) = "notes/$noteId"
@@ -117,17 +120,11 @@ fun KwBooktrackNavHost() {
         }
         composable(
             route = Routes.NOTE_EDITOR,
-            arguments = listOf(navArgument("bookId") { type = NavType.LongType }),
-        ) {
-            NoteEditorScreen(onBack = { navController.popBackStack() })
-        }
-        composable(
-            route = Routes.NOTE_EDITOR_REVIEW,
             arguments = listOf(
                 navArgument("bookId") { type = NavType.LongType },
                 navArgument("kind") {
                     type = NavType.StringType
-                    defaultValue = NoteKind.REVIEW.name
+                    defaultValue = NoteKind.NOTE.name
                 },
             ),
         ) {
