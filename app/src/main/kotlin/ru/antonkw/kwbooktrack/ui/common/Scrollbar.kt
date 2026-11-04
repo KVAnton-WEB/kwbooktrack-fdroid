@@ -70,12 +70,31 @@ class ScrollbarController internal constructor(
         val info = listState.layoutInfo
         val viewportPx = (info.viewportEndOffset - info.viewportStartOffset -
             info.beforeContentPadding - info.afterContentPadding).toFloat()
+        // Самый высокий измеренный элемент — нижняя граница высоты
+        // контента. На странице книги все заметки лежат в одном item'е, и
+        // он в разы выше карточек: пока он не измерен, «среднее ×
+        // количество» считало контент короче экрана и полоса врала.
+        // После первого измерения оценка не схлопывается обратно.
+        if (info.totalItemsCount != lastItemCount) {
+            lastItemCount = info.totalItemsCount
+            maxSeenItemPx = 0f
+        }
+        maxSeenItemPx = maxOf(
+            maxSeenItemPx,
+            (info.visibleItemsInfo.maxOfOrNull { it.size } ?: 0).toFloat(),
+        )
         computeScrollMetrics(
             firstVisibleItemIndex = listState.firstVisibleItemIndex,
             firstVisibleItemScrollOffset = listState.firstVisibleItemScrollOffset,
             avgItemPx = estimate.update(info, viewportPx),
             totalItemsCount = info.totalItemsCount,
             viewportPx = viewportPx,
+            // Сумма полных высот видимых элементов: один элемент может быть
+            // выше экрана, и средняя оценка без него считала контент короче
+            // экрана — ползунок занимал всю дорожку, не двигаясь.
+            visibleContentPx = info.visibleItemsInfo.sumOf { it.size }.toFloat(),
+            visibleCount = info.visibleItemsInfo.size,
+            minContentPx = maxOf(maxSeenItemPx, viewportPx),
             // Оба значения — из snapshot-состояния, поэтому производное
             // пересчитывается на каждом тике скролла, но перерисовывает
             // только полосу — композиция не трогается.
@@ -83,6 +102,9 @@ class ScrollbarController internal constructor(
             canScrollForward = listState.canScrollForward,
         )
     }
+
+    private var lastItemCount = -1
+    private var maxSeenItemPx = 0f
 
     /** Высота дорожки; полоса выставляет её по факту измерения. */
     var trackHeightPx by mutableIntStateOf(0)
@@ -406,6 +428,9 @@ internal fun computeScrollMetrics(
     avgItemPx: Float,
     totalItemsCount: Int,
     viewportPx: Float,
+    visibleContentPx: Float = 0f,
+    visibleCount: Int = 0,
+    minContentPx: Float = 0f,
     canScrollBackward: Boolean = true,
     canScrollForward: Boolean = true,
 ): ScrollMetrics {
@@ -421,7 +446,15 @@ internal fun computeScrollMetrics(
             hasOverflow = false,
         )
     }
-    val totalScrollPx = avgItemPx * totalItemsCount
+    // Общая высота контента. У LazyList её нет, поэтому берём оценку
+    // «среднее × количество», но не ниже суммы полных высот видимых
+    // элементов и не ниже нижней границы (измеренный самый высокий
+    // элемент и сам экран): иначе оценка считала контент короче экрана,
+    // и ползунок занимал всю дорожку, не двигаясь.
+    val estimatedTotalPx = avgItemPx * totalItemsCount
+    val visibleBasedPx = visibleContentPx +
+        (totalItemsCount - visibleCount).coerceAtLeast(0) * avgItemPx
+    val totalScrollPx = maxOf(estimatedTotalPx, visibleBasedPx, minContentPx)
     // scrollPx = avgItemPx * firstVisibleItemIndex + firstVisibleItemScrollOffset
     // — same formula LazyListState.calculateScrollOffset() uses for its
     // ScrollIndicatorState. viewportStartOffset in Foundation 1.7.x is fixed to

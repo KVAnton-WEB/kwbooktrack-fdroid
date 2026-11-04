@@ -15,6 +15,9 @@ class ScrollbarMetricsTest {
         avg: Float = avgItemPx,
         count: Int = itemCount,
         viewport: Float = viewportPx,
+        visibleContentPx: Float = 0f,
+        visibleCount: Int = 0,
+        minContentPx: Float = 0f,
         canBackward: Boolean = true,
         canForward: Boolean = true,
     ) = computeScrollMetrics(
@@ -23,6 +26,9 @@ class ScrollbarMetricsTest {
         avgItemPx = avg,
         totalItemsCount = count,
         viewportPx = viewport,
+        visibleContentPx = visibleContentPx,
+        visibleCount = visibleCount,
+        minContentPx = minContentPx,
         canScrollBackward = canBackward,
         canScrollForward = canForward,
     )
@@ -129,6 +135,47 @@ class ScrollbarMetricsTest {
         assertThat(atIndex10.hasOverflow).isTrue()
         assertThat(atIndex10.totalScrollPx).isEqualTo(10_000f)
         assertThat(atIndex10.scrollFraction).isWithin(1e-4f).of(5000f / 8500f)
+    }
+
+    @Test
+    fun `tall visible item raises the estimated content height`() {
+        // BookDetailScreen: все заметки лежат в одном item'е высотой 4000px.
+        // Оценка «среднее × количество» считала контент короче экрана
+        // (4 × 400 = 1600 при viewport 800 — то есть почти впритык), и
+        // ползунок занимал всю дорожку, не двигаясь при прокрутке.
+        val m = metrics(
+            count = 4,
+            avg = 400f,
+            viewport = 800f,
+            visibleContentPx = 4000f,
+            visibleCount = 1,
+        )
+        assertThat(m.totalScrollPx).isEqualTo(4000f + 3 * 400f)
+        assertThat(m.thumbFraction).isLessThan(1f)
+    }
+
+    @Test
+    fun `content height is never below the viewport`() {
+        // Замерено на устройстве: на странице книги оценка «среднее ×
+        // количество» дала 1681 px при экране 2019 px — контент «короче
+        // экрана», ползунок занимал всю дорожку и не двигался. Нижняя
+        // граница — экран и измеренный самый высокий элемент.
+        val m = metrics(
+            count = 8,
+            avg = 210f,
+            viewport = 2019f,
+            minContentPx = 2019f,
+        )
+        assertThat(m.totalScrollPx).isAtLeast(2019f)
+        assertThat(m.thumbFraction).isAtMost(1f)
+    }
+
+    @Test
+    fun `estimate is unchanged when visible items are ordinary`() {
+        // Обычный список: сумма видимых элементов меньше оценки
+        // «среднее × количество» — считаем как раньше.
+        val m = metrics(count = 100, avg = 80f, viewport = 800f, visibleContentPx = 5 * 80f, visibleCount = 5)
+        assertThat(m.totalScrollPx).isEqualTo(8000f)
     }
 
     @Test
