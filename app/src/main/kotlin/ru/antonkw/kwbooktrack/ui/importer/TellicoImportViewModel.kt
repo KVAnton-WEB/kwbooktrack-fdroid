@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import ru.antonkw.kwbooktrack.R
+import ru.antonkw.kwbooktrack.data.importer.ImportFormatDetector
 import ru.antonkw.kwbooktrack.data.importer.ImportTellicoResult
 import ru.antonkw.kwbooktrack.data.importer.ImportTellicoZipUseCase
 import java.io.File
@@ -61,7 +62,10 @@ class TellicoImportViewModel @Inject constructor(
                     return@launch
                 }
                 val coversDir = File(context.filesDir, "covers").apply { mkdirs() }
-                val result = importTellicoZipUseCase(tempZip, coversDir)
+                // Формат определяем по содержимому: `.tc` — это zip, но расширение
+                // у него то же, что у обычного архива.
+                val format = ImportFormatDetector.detect(tempZip)
+                val result = importTellicoZipUseCase(tempZip, format, coversDir)
                 _state.value = ImportUiState(inProgress = false, result = result)
             } catch (e: Exception) {
                 val msg = e.message

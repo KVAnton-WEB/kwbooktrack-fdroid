@@ -77,10 +77,47 @@ class TellicoCsvReaderTest {
         assertThat(TellicoFields.nameFromTitle("Усл. печ. л.")).isEqualTo("усл.-печ.-л.")
     }
 
+    @Test
+    fun rowShorterThanHeaderDoesNotThrow() {
+        // commons-csv бросает на get(header), если в строке не хватает значений:
+        // одна кривая строка не должна ронять весь импорт.
+        val csv = "Заголовок;Автор;Жанр\nДюна\n"
+
+        val record = TellicoCsvReader().read(StringReader(csv)).single()
+
+        assertThat(record.fields["title"]).isEqualTo("Дюна")
+        assertThat(record.fields).doesNotContainKey("author")
+        assertThat(record.fields).doesNotContainKey("genre")
+    }
+
+    @Test
+    fun columnWithoutNameIsSkipped() {
+        // Заголовок из одних знаков препинания имени не даёт — в extra[""] ему не место.
+        val csv = "Заголовок;???\nДюна;что-то\n"
+
+        val record = TellicoCsvReader().read(StringReader(csv)).single()
+
+        assertThat(record.fields["title"]).isEqualTo("Дюна")
+        assertThat(record.extra).doesNotContainKey("")
+    }
+
+    @Test
+    fun quotesInsideValueAreKept() {
+        val record = record("Заголовок" to "Дюна", "Аннотация" to "Он сказал \"привет\"")
+
+        assertThat(record.fields["comments"]).isEqualTo("Он сказал \"привет\"")
+    }
+
     private fun record(vararg pairs: Pair<String, String>): TellicoRecord {
         val headers = pairs.map { it.first }
-        val values = pairs.map { (_, v) -> if (v.contains(';') || v.contains('"')) "\"$v\"" else v }
+        val values = pairs.map { (_, v) -> csvValue(v) }
         val csv = headers.joinToString(";") + "\n" + values.joinToString(";") + "\n"
-        return TellicoCsvReader().readRecords(StringReader(csv)).single()
+        return TellicoCsvReader().read(StringReader(csv)).single()
+    }
+
+    /** Значение CSV: кавычки экранируются удвоением. */
+    private fun csvValue(value: String): String {
+        if (value.none { it == ';' || it == '"' || it == '\n' }) return value
+        return "\"" + value.replace("\"", "\"\"") + "\""
     }
 }

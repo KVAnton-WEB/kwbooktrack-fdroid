@@ -1,10 +1,7 @@
 package ru.antonkw.kwbooktrack.data.importer
 
-import ru.antonkw.kwbooktrack.data.storage.CoverTranscoder
-
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -13,11 +10,17 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import ru.antonkw.kwbooktrack.data.NoOpCoverStorage
+import ru.antonkw.kwbooktrack.data.NoOpPhotoStorage
 import ru.antonkw.kwbooktrack.data.TestDb
 import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.NoteRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
+import ru.antonkw.kwbooktrack.data.repository.SessionRepository
+import ru.antonkw.kwbooktrack.data.repository.TagRepository
+import ru.antonkw.kwbooktrack.data.snapshot.SnapshotApplier
+import ru.antonkw.kwbooktrack.data.storage.CoverTranscoder
 import ru.antonkw.kwbooktrack.data.tellico.TellicoCsvReader
 import java.io.File
 import java.io.FileReader
@@ -28,7 +31,6 @@ class TellicoImportIntegrationTest {
 
     private lateinit var db: KwBooktrackDatabase
     private lateinit var repo: BookRepository
-    private lateinit var noteRepo: NoteRepository
     private lateinit var useCase: ImportTellicoUseCase
     private lateinit var tempOut: File
     private lateinit var tellicoCsv: File
@@ -46,22 +48,27 @@ class TellicoImportIntegrationTest {
 
         val envCovers = System.getenv("KWBOOKTRACK_TELLICO_COVERS")
         coversDir = if (envCovers != null) File(envCovers) else File("tellico/Books_files")
-        val coversAvailable = coversDir.exists() && coversDir.isDirectory
 
         db = TestDb.createInMemory(ApplicationProvider.getApplicationContext())
+        val photoRepository = PhotoRepository(db.photoDao(), NoOpPhotoStorage)
         repo = BookRepository(
             db.bookDao(),
             db.tagDao(),
-            ru.antonkw.kwbooktrack.data.NoOpCoverStorage,
-            PhotoRepository(db.photoDao(), ru.antonkw.kwbooktrack.data.NoOpPhotoStorage),
+            NoOpCoverStorage,
+            photoRepository,
         )
-        noteRepo = NoteRepository(db.noteDao(), ru.antonkw.kwbooktrack.data.NoOpPhotoStorage)
         useCase = ImportTellicoUseCase(
             csvReader = TellicoCsvReader(),
             mapper = TellicoBookMapper(),
-            bookRepository = repo,
-            noteRepository = noteRepo,
-            transcoder = CoverTranscoder(),
+            applier = SnapshotApplier(
+                bookRepository = repo,
+                noteRepository = NoteRepository(db.noteDao(), NoOpPhotoStorage),
+                sessionRepository = SessionRepository(db.readingSessionDao()),
+                tagRepository = TagRepository(db.tagDao()),
+                photoRepository = photoRepository,
+                photoStorage = NoOpPhotoStorage,
+                transcoder = CoverTranscoder(),
+            ),
         )
         tempOut = Files.createTempDirectory("kwbooktrack-test-").toFile()
     }
@@ -98,7 +105,7 @@ class TellicoImportIntegrationTest {
             useCase(
                 input = reader,
                 options = ImportTellicoOptions(
-                    coverSourceDir = coversDir,
+                    assetRoot = coversDir,
                     coverOutputDir = tempOut,
                 ),
             )
@@ -124,7 +131,7 @@ class TellicoImportIntegrationTest {
         FileReader(tellicoCsv).use { reader ->
             useCase(
                 input = reader,
-                options = ImportTellicoOptions(coverSourceDir = coversDir, coverOutputDir = tempOut),
+                options = ImportTellicoOptions(assetRoot = coversDir, coverOutputDir = tempOut),
             )
         }
         val countAfterFirst = repo.count()
@@ -132,7 +139,7 @@ class TellicoImportIntegrationTest {
         FileReader(tellicoCsv).use { reader ->
             useCase(
                 input = reader,
-                options = ImportTellicoOptions(coverSourceDir = coversDir, coverOutputDir = tempOut),
+                options = ImportTellicoOptions(assetRoot = coversDir, coverOutputDir = tempOut),
             )
         }
 

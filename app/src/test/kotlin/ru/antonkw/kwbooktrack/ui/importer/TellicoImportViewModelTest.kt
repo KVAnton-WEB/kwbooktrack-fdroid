@@ -22,10 +22,14 @@ import ru.antonkw.kwbooktrack.data.TestDb
 import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.importer.ImportTellicoZipUseCase
 import ru.antonkw.kwbooktrack.data.importer.TellicoBookMapper
+import ru.antonkw.kwbooktrack.data.snapshot.SnapshotApplier
 import ru.antonkw.kwbooktrack.data.tellico.TellicoCsvReader
+import ru.antonkw.kwbooktrack.data.tellico.TellicoXmlReader
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.NoteRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
+import ru.antonkw.kwbooktrack.data.repository.SessionRepository
+import ru.antonkw.kwbooktrack.data.repository.TagRepository
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -51,10 +55,17 @@ class TellicoImportViewModelTest {
         noteRepository = NoteRepository(db.noteDao(), NoOpPhotoStorage)
         useCase = ImportTellicoZipUseCase(
             TellicoCsvReader(),
+            TellicoXmlReader(),
             TellicoBookMapper(),
-            bookRepository,
-            noteRepository,
-            CoverTranscoder(),
+            SnapshotApplier(
+                bookRepository = bookRepository,
+                noteRepository = noteRepository,
+                sessionRepository = SessionRepository(db.readingSessionDao()),
+                tagRepository = TagRepository(db.tagDao()),
+                photoRepository = photoRepository,
+                photoStorage = NoOpPhotoStorage,
+                transcoder = CoverTranscoder(),
+            ),
         )
         vm = TellicoImportViewModel(ApplicationProvider.getApplicationContext(), useCase)
     }
