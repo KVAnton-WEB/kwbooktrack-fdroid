@@ -1067,6 +1067,7 @@ git commit -m "v 0.5.45 — импорт любого формата и эксп
 
 **Files:**
 - Вне репозитория: `~/Документы/Tellico/tellico.xml`, `~/Документы/Tellico/Books.tc` (zip).
+- **Важно:** у пользователя три копии коллекции «Мои книги» разной свежести: `tellico.xml` на диске (605 записей, 54 поля), `Books.tc` (643 записи, 55 полей — свежайшая), `kwbook/backup.tc` (642 записи, резервная копия от 5 ноября). Правятся первые две (в `backup.tc` — резервная копия, её не трогаем). Вставка объявлений полей не меняет записи и фильтры ни в одной копии.
 
 **Interfaces:**
 - Consumes: имена полей из Task 8 (`брошено`, `дата-начала`, `теги`, `заметки`, `сессии-чтения`, `фото-заметок`).
@@ -1103,7 +1104,7 @@ cp ~/Документы/Tellico/Books.tc ~/Документы/Tellico/Books.tc.b
 </field>
 <field category="Личное" description="" flags="1" format="4" name="фото-заметок" title="Фото заметок" type="2">
  <prop name="column1">файл</prop>
- <prop name="column2">заметка</prop>
+ <prop name="column2">индекс заметки</prop>
  <prop name="column3">дата</prop>
  <prop name="columns">3</prop>
 </field>
