@@ -22,7 +22,7 @@ import ru.antonkw.kwbooktrack.data.TestDb
 import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.importer.ImportTellicoZipUseCase
 import ru.antonkw.kwbooktrack.data.importer.TellicoBookMapper
-import ru.antonkw.kwbooktrack.data.importer.TellicoCsvReader
+import ru.antonkw.kwbooktrack.data.tellico.TellicoCsvReader
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.NoteRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
