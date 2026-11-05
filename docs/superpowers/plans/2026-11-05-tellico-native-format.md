@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - **Язык ответов и коммитов** — русский. Код, идентификаторы, имена файлов — без перевода.
-- **Версия в каждом коммите**: pre-commit hook (`hooks/pre-commit`) требует, чтобы в `app/build.gradle.kts` изменились **и** `versionCode`, **и** `versionName`. Текущие: `versionCode = 43`, `versionName = "0.5.35"`. Задача N бампит их до `43 + N` / `0.5.{35 + N}`. Сообщение коммита — в стиле репозитория: `v 0.5.36 — <что сделано>`.
+- **Версия в каждом коммите**: pre-commit hook (`hooks/pre-commit`) требует, чтобы в `app/build.gradle.kts` изменились **и** `versionCode`, **и** `versionName`. Текущие: `versionCode = 43`, `versionName = "0.5.35"`. Задача N бампит их до `43 + N` / `0.5.{35 + N}` — но с учётом fix-коммита Task 1 (версия 45/0.5.37) фактические значения: Task 2 = 46/0.5.38, Task 3 = 47/0.5.39, … Task 10 = 54/0.5.46. Сообщение коммита — в стиле репозитория: `v 0.5.36 — <что сделано>`.
 - **Тесты**: `./gradlew testDebugUnitTest`. Production-сборку (`--production`) не запускать никогда.
 - **Никаких новых зависимостей.** `kotlinx.serialization.json` и `commons-csv` уже подключены; XML — чистый `javax.xml.parsers`; MD5 — `java.security.MessageDigest`.
 - **Даты** хранятся как epoch-millis в локальной зоне (`data/time/Epoch.kt`: `LocalDate.toEpochMs()`, `Long.toLocalDate()`).
@@ -314,7 +314,7 @@ Expected: PASS.
 - [ ] **Step 5: Коммит**
 
 ```bash
-# versionCode = 45, versionName = "0.5.37"
+# versionCode = 46, versionName = "0.5.38"
 git commit -m "v 0.5.37 — чужие поля Tellico в books.extra_fields, миграция 8→9"
 ```
 
@@ -403,7 +403,7 @@ Run: `./gradlew compileDebugKotlin testDebugUnitTest` — Expected: BUILD SUCCES
 - [ ] **Step 6: Коммит**
 
 ```bash
-# versionCode = 46, versionName = "0.5.38"
+# versionCode = 47, versionName = "0.5.39"
 git commit -m "v 0.5.38 — промежуточная модель Tellico и словарь полей, CSV-ридер"
 ```
 
@@ -484,7 +484,7 @@ Expected: PASS.
 - [ ] **Step 5: Коммит**
 
 ```bash
-# versionCode = 47, versionName = "0.5.39"
+# versionCode = 48, versionName = "0.5.40"
 git commit -m "v 0.5.39 — XML-ридер Tellico: контейнеры, таблицы, даты"
 ```
 
@@ -577,7 +577,7 @@ Expected: PASS.
 - [ ] **Step 5: Коммит**
 
 ```bash
-# versionCode = 48, versionName = "0.5.40"
+# versionCode = 49, versionName = "0.5.41"
 git commit -m "v 0.5.40 — слияние снимка в БД без дублей: заметки, сессии, теги, фото"
 ```
 
@@ -744,12 +744,14 @@ Assertions после `invoke(file, ImportFormat.TELLICO_XML, outputDir)`:
 - [ ] **Step 8: Запустить тесты — должны пройти**
 
 Run: `./gradlew testDebugUnitTest`
-Expected: PASS (включая обновлённые `TellicoImportIntegrationTest`, `TellicoZipImportRealTest`, `ImportKwBooktrackZipUseCaseTest` — поправить в них переименование `coverSourceDir` → `assetRoot` и тип `ImportResult` → `ImportTellicoResult`).
+Expected: PASS. Поправить при этом:
+- `TellicoImportIntegrationTest` — конструктор `ImportTellicoUseCase` теперь `(csvReader, mapper, applier)`; поле опции `coverSourceDir` → `assetRoot`;
+- `TellicoZipImportRealTest` — конструктор `ImportTellicoZipUseCase` теперь `(csvReader, xmlReader, mapper, applier)`, вызов — `useCase(zipFile, ImportFormat.TELLICO_CSV, tempOut)` (в тестовом `tellico.zip` лежит `tellico/tellico.csv`, не `tellico.xml`).
 
 - [ ] **Step 9: Коммит**
 
 ```bash
-# versionCode = 49, versionName = "0.5.41"
+# versionCode = 50, versionName = "0.5.42"
 git commit -m "v 0.5.41 — маппер Tellico и импорт .tc: снимки, статусы, цитаты, фото"
 ```
 
@@ -793,7 +795,7 @@ Expected: PASS.
 - [ ] **Step 5: Коммит**
 
 ```bash
-# versionCode = 50, versionName = "0.5.42"
+# versionCode = 51, versionName = "0.5.43"
 git commit -m "v 0.5.42 — импорт своего бэкапа: extra.json, фото, все поля книги"
 ```
 
@@ -900,7 +902,7 @@ Expected: PASS.
 - [ ] **Step 6: Коммит**
 
 ```bash
-# versionCode = 51, versionName = "0.5.43"
+# versionCode = 52, versionName = "0.5.44"
 git commit -m "v 0.5.43 — экспорт в Tellico .tc: tellico.xml, обложки, фото, контейнеры"
 ```
 
@@ -954,7 +956,7 @@ Expected: PASS.
 - [ ] **Step 5: Коммит**
 
 ```bash
-# versionCode = 52, versionName = "0.5.44"
+# versionCode = 53, versionName = "0.5.45"
 git commit -m "v 0.5.44 — экспорт books.csv без потерь: extra.json, фото, новые колонки"
 ```
 
@@ -1039,7 +1041,7 @@ Expected: PASS.
 - [ ] **Step 9: Коммит**
 
 ```bash
-# versionCode = 53, versionName = "0.5.45"
+# versionCode = 54, versionName = "0.5.46"
 git commit -m "v 0.5.45 — импорт любого формата и экспорт .tc в UI"
 ```
 
