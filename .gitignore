@@ -11,7 +11,8 @@ captures/
 *.aab
 *.keystore
 *.jks
-tellico/
+/tellico/
+app/src/test/resources/fixtures/tellico/
 Bookmory/
 ref/
 tellico.zip
