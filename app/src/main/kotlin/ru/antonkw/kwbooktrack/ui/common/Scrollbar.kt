@@ -102,6 +102,9 @@ class ScrollbarController internal constructor(
     private var lastItemCount = -1
     private var maxSeenItemPx = 0f
 
+    /** Последняя запрошенная позиция: пропускаем повторный запрос. */
+    private var lastRequestedTarget: ScrollTarget? = null
+
     /** Высота дорожки; полоса выставляет её по факту измерения. */
     var trackHeightPx by mutableIntStateOf(0)
 
@@ -141,10 +144,16 @@ class ScrollbarController internal constructor(
      * Снимок, а не живые метрики: оценка высоты карточки и длины контента
      * пересчитываются по мере прокрутки, и с живыми значениями цель
      * прыгала бы под пальцем на сотни пикселей.
+     *
+     * Средняя высота карточки — оценка, а не измерение: см. `shortcut:`
+     * в [AvgItemHeight].
      */
     internal fun thumbMap(): ThumbMap {
         val m = metrics.value
         val g = thumb.value
+        // Новый жест: прошлую цель сбрасываем — список между жестами могли
+        // прокрутить рукой, и пропускать запрос уже нельзя.
+        lastRequestedTarget = null
         return ThumbMap(
             avgItemPx = m.avgItemPx.coerceAtLeast(1f),
             contentRangePx = (m.totalScrollPx - m.viewportPx).coerceAtLeast(0f),
@@ -163,6 +172,9 @@ class ScrollbarController internal constructor(
      */
     internal fun scrollToThumbOffset(offsetPx: Int, map: ThumbMap) {
         val target = map.target(offsetPx)
+        // Палец дрожит: цель та же — список пересчитывать незачем.
+        if (target == lastRequestedTarget) return
+        lastRequestedTarget = target
         listState.requestScrollToItem(target.index, target.offset)
     }
 }
@@ -304,7 +316,10 @@ internal class ThumbMap(
         val scrollPx = offsetPx / scrollableTrackPx.toFloat() * contentRangePx
         val index = (scrollPx / avgItemPx).toInt()
             .coerceIn(0, (totalItemsCount - 1).coerceAtLeast(0))
-        return ScrollTarget(index, (scrollPx - index * avgItemPx).roundToInt())
+        // Сдвиг внутри элемента — не меньше нуля: отрицательный сдвиг в
+        // Compose двигает элемент вниз, и на экране остаётся пустое место.
+        val offset = (scrollPx - index * avgItemPx).roundToInt().coerceAtLeast(0)
+        return ScrollTarget(index, offset)
     }
 }
 
@@ -326,7 +341,7 @@ internal data class ScrollTarget(val index: Int, val offset: Int)
  *   он жёстко равен `-beforeContentPadding`. Нужны `firstVisibleItemIndex` /
  *   `firstVisibleItemScrollOffset`.
  * - Общей высоты контента у LazyListState нет, её приходится оценивать;
- *   см. `ponytail:` в [AvgItemHeight].
+ *   см. `shortcut:` в [AvgItemHeight].
  *
  * Производительность: покадровые величины живут в производном состоянии,
  * которое читается **только из draw-фазы** (ползунок рисуется через
@@ -492,6 +507,11 @@ internal data class ThumbGeometry(
  * triple the previous `remember` call used. The value is re-derived only when
  * that key changes, so the thumb doesn't breathe while the visible mix
  * shifts under a fling.
+ *
+ * shortcut: высота карточки — средняя по видимым, а не измерение каждой.
+ * Позиция списка при скрабе считается по этой средней, поэтому на списках
+ * с разной высотой карточек ползунок и список расходятся; когда понадобится
+ * точность, брать высоту из измеренных элементов.
  */
 private class AvgItemHeight {
     private var key: Triple<Int, Int, Int?>? = null

@@ -266,10 +266,12 @@ class ScrollbarMetricsTest {
     }
 
     @Test
-    fun `the list stays where the thumb was dropped`() {
-        // Round trip: the position the jump produces must map back to the
-        // very same thumb offset, otherwise the thumb snaps back to the
-        // list's position when the finger is released.
+    fun `the thumb offset and the content position are reversible`() {
+        // Round trip over the model: the content position the jump produces
+        // must map back to the very same thumb offset, otherwise the thumb
+        // snaps back to the list's position when the finger is released.
+        // This checks the arithmetic, not the list: the list only follows if
+        // the real card height equals the estimated avgItemPx.
         val map = thumbMap()
         for (offsetPx in listOf(0, 137, 500, 861, 1000)) {
             val target = map.target(offsetPx)
@@ -282,6 +284,7 @@ class ScrollbarMetricsTest {
     fun `the target never leaves the list`() {
         val map = thumbMap()
         assertThat(map.target(-500).index).isAtLeast(0)
+        assertThat(map.target(-500).offset).isAtLeast(0)
         assertThat(map.target(9999).index).isAtMost(itemCount - 1)
         assertThat(map.target(9999).offset).isAtLeast(0)
     }
