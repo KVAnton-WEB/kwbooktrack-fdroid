@@ -1,13 +1,19 @@
 package ru.antonkw.kwbooktrack.data.exporter
 
 import androidx.room.withTransaction
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
 import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
+import ru.antonkw.kwbooktrack.data.snapshot.BookExtras
 import ru.antonkw.kwbooktrack.data.snapshot.BookSnapshot
-import ru.antonkw.kwbooktrack.data.snapshot.ExtraField
+import ru.antonkw.kwbooktrack.data.snapshot.ExtraArchive
+import ru.antonkw.kwbooktrack.data.snapshot.NoteJson
+import ru.antonkw.kwbooktrack.data.snapshot.PhotoJson
+import ru.antonkw.kwbooktrack.data.snapshot.SessionJson
 import ru.antonkw.kwbooktrack.data.snapshot.SnapshotBuilder
 import ru.antonkw.kwbooktrack.data.text.formatDecimal
 import ru.antonkw.kwbooktrack.data.time.toLocalDate
@@ -30,6 +36,13 @@ data class ExportManifest(
     val counts: ExportCounts,
 )
 
+/**
+ * Счётчики манифеста — что попало в архив.
+ *
+ * [tags] — число связок «тег — книга», а не число уникальных тегов: тег,
+ * привязанный к трём книгам, считается трижды (счёт по снимку). Для экспорта
+ * `.tc` — так же.
+ */
 @Serializable
 data class ExportCounts(
     val books: Int,
@@ -74,35 +87,38 @@ class ExportZipUseCase @Inject constructor(
             counts = prepared.counts,
         )
 
-        ZipOutputStream(BufferedOutputStream(output)).use { zip ->
-            // manifest.json
-            zip.putNextEntry(ZipEntry("manifest.json"))
-            zip.write(JSON.encodeToString(ExportManifest.serializer(), manifest).toByteArray(StandardCharsets.UTF_8))
-            zip.closeEntry()
-
-            // books.csv (UTF-8 без BOM, разделитель `;`)
-            zip.putNextEntry(ZipEntry("books.csv"))
-            writeCsv(zip, prepared.books.map { it.book })
-            zip.closeEntry()
-
-            // extra.json — заметки, сессии, теги, фото и чужие поля по id книги.
-            zip.putNextEntry(ZipEntry("extra.json"))
-            val extra = JSON.encodeToString(ExtraArchive.serializer(), extraArchive(prepared.books))
-            zip.write(extra.toByteArray(StandardCharsets.UTF_8))
-            zip.closeEntry()
-
-            // covers/ — обложки книг.
-            prepared.covers.forEach { (name, file) ->
-                zip.putNextEntry(ZipEntry("covers/$name"))
-                file.inputStream().use { it.copyTo(zip) }
+        // Запись архива — блокирующий I/O: на большой библиотеке главный поток
+        // (вызов из `viewModelScope`) замрёт, поэтому уводим запись в IO.
+        withContext(Dispatchers.IO) {
+            ZipOutputStream(BufferedOutputStream(output)).use { zip ->
+                // manifest.json
+                zip.putNextEntry(ZipEntry("manifest.json"))
+                zip.write(JSON.encodeToString(ExportManifest.serializer(), manifest).toByteArray(StandardCharsets.UTF_8))
                 zip.closeEntry()
-            }
-
-            // photos/ — фото заметок (путь из `extra.json`).
-            prepared.photos.forEach { (path, file) ->
-                zip.putNextEntry(ZipEntry(path))
-                file.inputStream().use { it.copyTo(zip) }
+                // books.csv (UTF-8 без BOM, разделитель `;`)
+                zip.putNextEntry(ZipEntry("books.csv"))
+                writeCsv(zip, prepared.books.map { it.book })
                 zip.closeEntry()
+
+                // extra.json — заметки, сессии, теги, фото и чужие поля по id книги.
+                zip.putNextEntry(ZipEntry("extra.json"))
+                val extra = JSON.encodeToString(ExtraArchive.serializer(), extraArchive(prepared.books))
+                zip.write(extra.toByteArray(StandardCharsets.UTF_8))
+                zip.closeEntry()
+
+                // covers/ — обложки книг.
+                prepared.covers.forEach { (name, file) ->
+                    zip.putNextEntry(ZipEntry("covers/$name"))
+                    file.inputStream().use { it.copyTo(zip) }
+                    zip.closeEntry()
+                }
+
+                // photos/ — фото заметок (путь из `extra.json`).
+                prepared.photos.forEach { (path, file) ->
+                    zip.putNextEntry(ZipEntry(path))
+                    file.inputStream().use { it.copyTo(zip) }
+                    zip.closeEntry()
+                }
             }
         }
 
@@ -253,7 +269,12 @@ class ExportZipUseCase @Inject constructor(
     }
 
     companion object {
-        private val JSON = Json { prettyPrint = false }
+        /**
+         * `encodeDefaults = true`: ключи `extra.json` пишутся всегда — формат
+         * читается по именам, и «пустое» значение (пустой текст заметки,
+         * `page: null`) не должно выпадать из JSON.
+         */
+        private val JSON = Json { encodeDefaults = true }
         const val BOOKS_HEADER = "title;subtitle;author;isbn13;page_count;language;genre;publisher;year;cover_path;rating;status;started_at;finished_at;binding;purchase_place;series;series_number;condition;translator;print_year;print_pages;original_language;original_title;annotation;is_gift;is_lent;is_sold;purchase_date;purchase_price;source;id"
     }
 }
@@ -261,48 +282,3 @@ class ExportZipUseCase @Inject constructor(
 interface AppVersionProvider {
     val appVersion: String
 }
-
-/**
- * `extra.json`: содержимое по id книги.
- *
- * Формат — тот, что читает `ImportKwBooktrackZipUseCase`: заметки, сессии,
- * теги, фото и чужие поля Tellico. Поля без значений по умолчанию, чтобы
- * ключи в JSON были всегда — иначе «вид» заметки терялся бы.
- */
-@Serializable
-private data class ExtraArchive(val books: Map<String, BookExtras>)
-
-/** Данные книги из `extra.json`. */
-@Serializable
-private data class BookExtras(
-    val notes: List<NoteJson>,
-    val sessions: List<SessionJson>,
-    val tags: List<String>,
-    val photos: List<PhotoJson>,
-    val extraFields: Map<String, ExtraField>,
-)
-
-@Serializable
-private data class NoteJson(
-    val kind: String,
-    val page: Int?,
-    val body: String,
-    val createdAt: Long?,
-)
-
-@Serializable
-private data class SessionJson(
-    val startedAt: Long,
-    val endedAt: Long?,
-    val startPage: Int?,
-    val endPage: Int?,
-    val durationSec: Long?,
-    val note: String?,
-)
-
-@Serializable
-private data class PhotoJson(
-    val file: String,
-    val noteIndex: Int?,
-    val createdAt: Long?,
-)

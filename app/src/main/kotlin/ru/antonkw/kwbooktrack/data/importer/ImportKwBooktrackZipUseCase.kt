@@ -3,7 +3,6 @@ package ru.antonkw.kwbooktrack.data.importer
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.apache.commons.csv.CSVFormat
 import org.apache.commons.csv.CSVParser
@@ -13,8 +12,9 @@ import ru.antonkw.kwbooktrack.data.db.entity.BookSource
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
 import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
 import ru.antonkw.kwbooktrack.data.exporter.ExportManifest
+import ru.antonkw.kwbooktrack.data.snapshot.BookExtras
 import ru.antonkw.kwbooktrack.data.snapshot.BookSnapshot
-import ru.antonkw.kwbooktrack.data.snapshot.ExtraField
+import ru.antonkw.kwbooktrack.data.snapshot.ExtraArchive
 import ru.antonkw.kwbooktrack.data.snapshot.ImportAssets
 import ru.antonkw.kwbooktrack.data.snapshot.NoteSnapshot
 import ru.antonkw.kwbooktrack.data.snapshot.PhotoSnapshot
@@ -309,45 +309,6 @@ class ImportKwBooktrackZipUseCase @Inject constructor(
             .build()
     }
 }
-
-/** `extra.json`: содержимое по id книги. */
-@Serializable
-private data class ExtraArchive(val books: Map<String, BookExtras> = emptyMap())
-
-/** Данные книги из `extra.json`. */
-@Serializable
-private data class BookExtras(
-    val notes: List<NoteJson> = emptyList(),
-    val sessions: List<SessionJson> = emptyList(),
-    val tags: List<String> = emptyList(),
-    val photos: List<PhotoJson> = emptyList(),
-    val extraFields: Map<String, ExtraField> = emptyMap(),
-)
-
-@Serializable
-private data class NoteJson(
-    val kind: String = "NOTE",
-    val page: Int? = null,
-    val body: String = "",
-    val createdAt: Long? = null,
-)
-
-@Serializable
-private data class SessionJson(
-    val startedAt: Long = 0L,
-    val endedAt: Long? = null,
-    val startPage: Int? = null,
-    val endPage: Int? = null,
-    val durationSec: Long? = null,
-    val note: String? = null,
-)
-
-@Serializable
-private data class PhotoJson(
-    val file: String = "",
-    val noteIndex: Int? = null,
-    val createdAt: Long? = null,
-)
 
 private fun BookExtras.noteSnapshots(): List<NoteSnapshot> = notes.map { note ->
     NoteSnapshot(
