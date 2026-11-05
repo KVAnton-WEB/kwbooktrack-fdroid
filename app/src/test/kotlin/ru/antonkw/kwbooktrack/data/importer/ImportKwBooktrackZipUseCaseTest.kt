@@ -24,6 +24,7 @@ import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
 import ru.antonkw.kwbooktrack.data.repository.SessionRepository
 import ru.antonkw.kwbooktrack.data.repository.TagRepository
 import ru.antonkw.kwbooktrack.data.snapshot.SnapshotApplier
+import ru.antonkw.kwbooktrack.data.snapshot.SnapshotBuilder
 import ru.antonkw.kwbooktrack.data.storage.CoverTranscoder
 import java.io.File
 import java.nio.file.Files
@@ -68,11 +69,13 @@ class ImportKwBooktrackZipUseCaseTest {
             photoRepository = PhotoRepository(sourceDb.photoDao(), NoOpPhotoStorage),
         )
         export = ExportZipUseCase(
-            bookRepository = sourceRepo,
-            noteDao = sourceDb.noteDao(),
-            sessionDao = sourceDb.readingSessionDao(),
-            photoDao = sourceDb.photoDao(),
-            tagDao = sourceDb.tagDao(),
+            snapshotBuilder = SnapshotBuilder(
+                bookRepository = sourceRepo,
+                noteDao = sourceDb.noteDao(),
+                sessionDao = sourceDb.readingSessionDao(),
+                photoDao = sourceDb.photoDao(),
+                tagDao = sourceDb.tagDao(),
+            ),
             versionProvider = versionProvider,
             database = sourceDb,
         )

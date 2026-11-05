@@ -21,6 +21,7 @@ import ru.antonkw.kwbooktrack.data.exporter.AppVersionProvider
 import ru.antonkw.kwbooktrack.data.exporter.ExportZipUseCase
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
+import ru.antonkw.kwbooktrack.data.snapshot.SnapshotBuilder
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -46,11 +47,13 @@ class AboutExportViewModelTest {
             photoRepository,
         )
         useCase = ExportZipUseCase(
-            bookRepository = bookRepository,
-            noteDao = db.noteDao(),
-            sessionDao = db.readingSessionDao(),
-            photoDao = db.photoDao(),
-            tagDao = db.tagDao(),
+            snapshotBuilder = SnapshotBuilder(
+                bookRepository = bookRepository,
+                noteDao = db.noteDao(),
+                sessionDao = db.readingSessionDao(),
+                photoDao = db.photoDao(),
+                tagDao = db.tagDao(),
+            ),
             versionProvider = versionProvider,
             database = db,
         )
