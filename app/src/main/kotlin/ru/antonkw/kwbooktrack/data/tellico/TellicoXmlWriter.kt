@@ -281,14 +281,24 @@ object TellicoXmlWriter {
         .replace("'", "&apos;")
 
     /**
-     * Имя, пригодное для имени элемента XML: буквы, цифры, точка, дефис,
-     * подчёркивание.
+     * Имя, пригодное для имени элемента XML.
      *
-     * Чужие поля приходят из пользовательских данных (импорт чужой коллекции),
-     * а одно «кривое» имя ломает разбор всего `tellico.xml` — поэтому такое
-     * поле пропускаем, а не экранируем.
+     * По правилам XML 1.0 имя элемента начинается с NameStartChar (буква или `_`),
+     * дальше — буквы, цифры, `_`, `-`, `.`. Нарушение этого правила отвергает
+     * **весь документ**, а не одно поле, — поэтому чужие поля с небезопасным
+     * именем пропускаем, а не экранируем.
+     *
+     * Проверка Unicode- aware: `isLetter()`/`isLetterOrDigit()` знают любой
+     * алфавит (кириллица, грека, «café»), а рукописный список букв выбрасывал бы
+     * валидные имена. Имена с префиксом `xml` зарезервированы XML — их не пишем.
      */
-    private fun isSafeName(name: String): Boolean = SAFE_NAME.matches(name)
+    private fun isSafeName(name: String): Boolean {
+        if (name.isEmpty()) return false
+        if (name.startsWith("xml", ignoreCase = true)) return false
+        val first = name[0]
+        if (!first.isLetter() && first != '_') return false
+        return name.all { it.isLetterOrDigit() || it == '_' || it == '-' || it == '.' }
+    }
 
     /** Объявление поля в `<fields>`. */
     private data class FieldDef(
@@ -301,9 +311,6 @@ object TellicoXmlWriter {
         val columns: Int? = null,
         val columnTitles: List<String> = emptyList(),
     )
-
-    /** Допустимое имя элемента XML. */
-    private val SAFE_NAME = Regex("[A-Za-zА-Яа-яЁё0-9._-]+")
 
     /** Свои поля — с теми же `name`/`title`, что в живой коллекции Tellico. */
     private val ownFields: List<FieldDef> = listOf(

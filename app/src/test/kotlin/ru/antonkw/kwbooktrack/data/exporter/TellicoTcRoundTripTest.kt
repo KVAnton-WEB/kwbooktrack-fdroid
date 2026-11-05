@@ -266,21 +266,38 @@ class TellicoTcRoundTripTest {
     fun foreignFieldWithUnsafeNameIsSkipped() = runTest {
         sourceBooks.insert(
             BookEntity(
-                title = "Кривое поле",
+                title = "Кривые поля",
                 author = "Кто-то",
                 createdAt = 1L,
                 updatedAt = 1L,
-                extraFields = mapOf("плохое<имя" to ExtraField("Плохое", "значение")),
+                extraFields = mapOf(
+                    "поле2" to ExtraField("Поле 2", "разрешено"),
+                    "café" to ExtraField("Кафе", "тоже разрешено"),
+                    "Ελλάδα" to ExtraField("Греция", "и это разрешено"),
+                    "2-комментария" to ExtraField("Цифра", "запрещено"),
+                    ".поле" to ExtraField("Точка", "запрещено"),
+                    "-поле" to ExtraField("Дефис", "запрещено"),
+                    "xmlsomething" to ExtraField("Xml", "запрещено"),
+                ),
             ),
         )
 
         val xml = exportedXml()
 
-        // Имя элемента экранировать нельзя — поле пропускаем, XML остаётся целым.
-        assertThat(xml).doesNotContain("плохое")
+        // Имя элемента экранировать нельзя — поле с небезопасным именем пропускаем.
+        assertThat(xml).doesNotContain("2-комментария")
+        assertThat(xml).doesNotContain(".поле")
+        assertThat(xml).doesNotContain("-поле")
+        assertThat(xml).doesNotContain("xmlsomething")
+        // Валидные имена — в том числе не-ASCII — пишутся.
+        assertThat(xml).contains("<поле2>разрешено</поле2>")
+        assertThat(xml).contains("<café>тоже разрешено</café>")
+        assertThat(xml).contains("<Ελλάδα>и это разрешено</Ελλάδα>")
+
+        // XML остался целым: читается и содержит только безопасные поля.
         val records = TellicoXmlReader().read(xml.toByteArray())
         assertThat(records).hasSize(1)
-        assertThat(records.single().extra.keys).doesNotContain("плохое<имя")
+        assertThat(records.single().extra.keys).containsExactly("поле2", "café", "Ελλάδα")
     }
 
     @Test
