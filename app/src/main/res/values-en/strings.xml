@@ -10,6 +10,7 @@
     <string name="about_backup_title">Backup</string>
     <string name="about_backup_description">Export your library to a ZIP archive with CSV and covers, or import a previously saved archive.</string>
     <string name="action_export">Export</string>
+    <string name="action_export_tellico">Export to Tellico (.tc)</string>
     <string name="export_success_format">Export ready: %1$d books, %2$d photos</string>
     <string name="export_failed_format">Export failed: %1$s</string>
     <string name="export_failed_unknown">Export failed: unknown error</string>
@@ -219,9 +220,10 @@
     <string name="dialog_delete_book_message">The book and all related data will be permanently deleted.</string>
 
     <!-- Tellico -->
-    <string name="tellico_import_description">Import the ZIP archive exported from Tellico (CSV + Books_files/*.jpg). Covers will be copied to the cover library automatically.</string>
+    <string name="tellico_import_description">Import a native Tellico archive (.tc), a tellico.xml file, a Tellico CSV export or your own ZIP backup. The format is detected by file content; covers and photos are copied to the library.</string>
     <string name="tellico_import_done">Import complete</string>
-    <string name="tellico_import_total_format">CSV rows: %1$d</string>
+    <string name="tellico_import_done_with_errors">Import finished with errors</string>
+    <string name="tellico_import_total_format">Records in file: %1$d</string>
     <string name="tellico_import_imported_format">Books imported: %1$d</string>
     <string name="tellico_import_skipped_format">Skipped: %1$d</string>
     <string name="tellico_import_label_covers">Covers copied: %1$d</string>
@@ -321,12 +323,12 @@
     <!-- Tellico importer -->
     <string name="tellico_import_title">Import Tellico</string>
     <string name="tellico_import_pick_csv">Pick CSV file</string>
-    <string name="tellico_import_pick_zip">Pick ZIP file</string>
+    <string name="tellico_import_pick_file">Pick file</string>
     <string name="tellico_import_run">Run import</string>
     <string name="tellico_import_running">Importing…</string>
     <string name="tellico_import_result_format">Imported: %1$d, skipped: %2$d</string>
     <string name="tellico_import_covers_format">Covers copied: %1$d</string>
-    <string name="tellico_import_notes_format">Notes added: %1$d</string>
+    <string name="tellico_import_notes_format">Notes, sessions, tags and photos added: %1$d</string>
     <string name="tellico_import_dry_run">Dry run (no writes)</string>
     <string name="tellico_import_error">Import error</string>
 

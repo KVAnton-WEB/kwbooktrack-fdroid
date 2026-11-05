@@ -10,6 +10,7 @@
     <string name="about_backup_title">Резервные копии</string>
     <string name="about_backup_description">Экспорт библиотеки в ZIP-архив с CSV и обложками, либо импорт ранее сохранённого архива.</string>
     <string name="action_export">Экспорт</string>
+    <string name="action_export_tellico">Экспорт в Tellico (.tc)</string>
     <string name="export_success_format">Экспорт готов: %1$d книг, %2$d фото</string>
     <string name="export_failed_format">Не удалось экспортировать: %1$s</string>
     <string name="export_failed_unknown">Не удалось экспортировать: неизвестная ошибка</string>
@@ -219,9 +220,10 @@
     <string name="dialog_delete_book_message">Книга и все связанные данные будут удалены без возможности восстановления.</string>
 
     <!-- Tellico -->
-    <string name="tellico_import_description">Импортируйте ZIP-архив с экспортом из Tellico (CSV + Books_files/*.jpg). Обложки будут автоматически скопированы в библиотеку обложек.</string>
+    <string name="tellico_import_description">Импортируйте родной архив Tellico (.tc), файл tellico.xml, CSV-выгрузку Tellico или свой zip-бэкап приложения. Формат определяется по содержимому файла, обложки и фото переносятся в библиотеку.</string>
     <string name="tellico_import_done">Импорт завершён</string>
-    <string name="tellico_import_total_format">Записей в CSV: %1$d</string>
+    <string name="tellico_import_done_with_errors">Импорт завершён с ошибками</string>
+    <string name="tellico_import_total_format">Записей в файле: %1$d</string>
     <string name="tellico_import_imported_format">Импортировано книг: %1$d</string>
     <string name="tellico_import_skipped_format">Пропущено: %1$d</string>
     <string name="tellico_import_label_covers">Обложек скопировано: %1$d</string>
@@ -324,12 +326,12 @@
     <!-- Tellico importer -->
     <string name="tellico_import_title">Импорт Tellico</string>
     <string name="tellico_import_pick_csv">Выбрать CSV-файл</string>
-    <string name="tellico_import_pick_zip">Выбрать ZIP-файл</string>
+    <string name="tellico_import_pick_file">Выбрать файл</string>
     <string name="tellico_import_run">Запустить импорт</string>
     <string name="tellico_import_running">Идёт импорт…</string>
     <string name="tellico_import_result_format">Импортировано: %1$d, пропущено: %2$d</string>
     <string name="tellico_import_covers_format">Обложек скопировано: %1$d</string>
-    <string name="tellico_import_notes_format">Заметок добавлено: %1$d</string>
+    <string name="tellico_import_notes_format">Заметок, сессий, тегов и фото добавлено: %1$d</string>
     <string name="tellico_import_dry_run">Пробный прогон (без записи)</string>
     <string name="tellico_import_error">Ошибка импорта</string>
 

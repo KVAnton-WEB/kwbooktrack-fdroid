@@ -29,6 +29,16 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.antonkw.kwbooktrack.R
 
+/** Формат определяется по содержимому файла, поэтому фильтр в пикере — подсказка, а не правило. */
+private val MIME_TYPES = arrayOf(
+    "application/zip",
+    "application/xml",
+    "text/xml",
+    "text/csv",
+    "application/octet-stream",
+    "*/*",
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TellicoImportScreen(
@@ -67,12 +77,12 @@ fun TellicoImportScreen(
             )
 
             Button(
-                onClick = { picker.launch(arrayOf("application/zip", "application/octet-stream", "*/*")) },
+                onClick = { picker.launch(MIME_TYPES) },
                 enabled = !state.inProgress,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Icon(Icons.Filled.FileDownload, contentDescription = null)
-                Text("  " + stringResource(R.string.tellico_import_pick_zip))
+                Text("  " + stringResource(R.string.tellico_import_pick_file))
             }
 
             if (state.inProgress) {
@@ -82,7 +92,15 @@ fun TellicoImportScreen(
             state.result?.let { r ->
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text(stringResource(R.string.tellico_import_done), style = MaterialTheme.typography.titleMedium)
+                        // Частично упавший импорт — не «успех»: заголовок и карточка
+                        // ошибки ниже говорят, что что-то пошло не так.
+                        Text(
+                            stringResource(
+                                if (r.isSuccess) R.string.tellico_import_done
+                                else R.string.tellico_import_done_with_errors,
+                            ),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
                         Text(stringResource(R.string.tellico_import_total_format, r.total))
                         Text(stringResource(R.string.tellico_import_imported_format, r.imported))
                         Text(stringResource(R.string.tellico_import_skipped_format, r.skipped))

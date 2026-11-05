@@ -50,18 +50,21 @@ class TellicoTcImportTest {
         val photoRepository = PhotoRepository(db.photoDao(), FilePhotoStorage(ApplicationProvider.getApplicationContext()))
         val bookRepository = BookRepository(db.bookDao(), db.tagDao(), NoOpCoverStorage, photoRepository)
         useCase = ImportTellicoZipUseCase(
+            importUseCase = ImportTellicoUseCase(
+                csvReader = TellicoCsvReader(),
+                mapper = TellicoBookMapper(),
+                applier = SnapshotApplier(
+                    bookRepository = bookRepository,
+                    noteRepository = NoteRepository(db.noteDao(), ru.antonkw.kwbooktrack.data.NoOpPhotoStorage),
+                    sessionRepository = SessionRepository(db.readingSessionDao()),
+                    tagRepository = TagRepository(db.tagDao()),
+                    photoRepository = photoRepository,
+                    photoStorage = FilePhotoStorage(ApplicationProvider.getApplicationContext()),
+                    transcoder = CoverTranscoder(),
+                ),
+            ),
             csvReader = TellicoCsvReader(),
             xmlReader = TellicoXmlReader(),
-            mapper = TellicoBookMapper(),
-            applier = SnapshotApplier(
-                bookRepository = bookRepository,
-                noteRepository = NoteRepository(db.noteDao(), ru.antonkw.kwbooktrack.data.NoOpPhotoStorage),
-                sessionRepository = SessionRepository(db.readingSessionDao()),
-                tagRepository = TagRepository(db.tagDao()),
-                photoRepository = photoRepository,
-                photoStorage = FilePhotoStorage(ApplicationProvider.getApplicationContext()),
-                transcoder = CoverTranscoder(),
-            ),
         )
         tempDir = Files.createTempDirectory("kwbooktrack-tc-").toFile()
         outputDir = Files.createTempDirectory("kwbooktrack-tc-out-").toFile()

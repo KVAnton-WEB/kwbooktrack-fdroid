@@ -2,8 +2,6 @@ package ru.antonkw.kwbooktrack.data.importer
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import ru.antonkw.kwbooktrack.data.snapshot.ImportAssets
-import ru.antonkw.kwbooktrack.data.snapshot.SnapshotApplier
 import ru.antonkw.kwbooktrack.data.tellico.TellicoCsvReader
 import ru.antonkw.kwbooktrack.data.tellico.TellicoRecord
 import ru.antonkw.kwbooktrack.data.tellico.TellicoXmlReader
@@ -17,12 +15,14 @@ import javax.inject.Inject
  *
  * Архив распаковывается во временный каталог рядом с выходным — оттуда
  * апплиер берёт обложки и фото. Каталог удаляется в `finally`.
+ *
+ * Записи → снимки → БД сливает [ImportTellicoUseCase]: этот класс отвечает
+ * только за файл (архив, распаковка, формат).
  */
 class ImportTellicoZipUseCase @Inject constructor(
+    private val importUseCase: ImportTellicoUseCase,
     private val csvReader: TellicoCsvReader,
     private val xmlReader: TellicoXmlReader,
-    private val mapper: TellicoBookMapper,
-    private val applier: SnapshotApplier,
 ) {
 
     suspend operator fun invoke(
@@ -46,42 +46,14 @@ class ImportTellicoZipUseCase @Inject constructor(
         val staging = File(outputDir, ".import-staging")
         try {
             val prepared = withContext(Dispatchers.IO) { prepare(file, format, staging) }
-            val records = prepared.records
-            // Корень ассетов: распакованный архив или родительский каталог «голого» файла.
-            val assets = ImportAssets(prepared.root, outputDir)
-            var imported = 0
-            var skipped = 0
-            var coversCopied = 0
-            var notesImported = 0
-            val errors = mutableListOf<Throwable>()
-            for (record in records) {
-                val snapshot = mapper.map(record)
-                if (snapshot == null) {
-                    skipped++
-                    continue
-                }
-                if (dryRun) {
-                    imported++
-                    continue
-                }
-                try {
-                    val stats = withContext(Dispatchers.IO) { applier.apply(snapshot, assets) }
-                    imported++
-                    coversCopied += stats.covers
-                    notesImported += stats.notes + stats.sessions + stats.tags + stats.photos
-                } catch (e: Exception) {
-                    errors += e
-                    skipped++
-                }
-            }
-            return ImportTellicoResult(
-                total = records.size,
-                imported = imported,
-                skipped = skipped,
-                coversCopied = coversCopied,
-                notesImported = notesImported,
-                dryRun = dryRun,
-                errors = errors,
+            // Корень ассетов: распакованный архив; обложки кладутся в outputDir.
+            return importUseCase(
+                prepared.records,
+                ImportTellicoOptions(
+                    assetRoot = prepared.root,
+                    coverOutputDir = outputDir,
+                    dryRun = dryRun,
+                ),
             )
         } finally {
             staging.deleteRecursively()

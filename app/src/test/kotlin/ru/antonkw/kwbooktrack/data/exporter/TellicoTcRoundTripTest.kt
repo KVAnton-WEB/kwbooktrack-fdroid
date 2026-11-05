@@ -24,6 +24,7 @@ import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
 import ru.antonkw.kwbooktrack.data.db.entity.PhotoEntity
 import ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity
 import ru.antonkw.kwbooktrack.data.importer.ImportFormat
+import ru.antonkw.kwbooktrack.data.importer.ImportTellicoUseCase
 import ru.antonkw.kwbooktrack.data.importer.ImportTellicoZipUseCase
 import ru.antonkw.kwbooktrack.data.importer.TellicoBookMapper
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
@@ -92,18 +93,21 @@ class TellicoTcRoundTripTest {
         val targetPhotos = PhotoRepository(targetDb.photoDao(), FilePhotoStorage(context))
         val targetBooks = BookRepository(targetDb.bookDao(), targetDb.tagDao(), NoOpCoverStorage, targetPhotos)
         importUseCase = ImportTellicoZipUseCase(
+            importUseCase = ImportTellicoUseCase(
+                csvReader = TellicoCsvReader(),
+                mapper = TellicoBookMapper(),
+                applier = SnapshotApplier(
+                    bookRepository = targetBooks,
+                    noteRepository = NoteRepository(targetDb.noteDao(), FilePhotoStorage(context)),
+                    sessionRepository = SessionRepository(targetDb.readingSessionDao()),
+                    tagRepository = TagRepository(targetDb.tagDao()),
+                    photoRepository = targetPhotos,
+                    photoStorage = FilePhotoStorage(context),
+                    transcoder = CoverTranscoder(),
+                ),
+            ),
             csvReader = TellicoCsvReader(),
             xmlReader = TellicoXmlReader(),
-            mapper = TellicoBookMapper(),
-            applier = SnapshotApplier(
-                bookRepository = targetBooks,
-                noteRepository = NoteRepository(targetDb.noteDao(), FilePhotoStorage(context)),
-                sessionRepository = SessionRepository(targetDb.readingSessionDao()),
-                tagRepository = TagRepository(targetDb.tagDao()),
-                photoRepository = targetPhotos,
-                photoStorage = FilePhotoStorage(context),
-                transcoder = CoverTranscoder(),
-            ),
         )
 
         tempDir = Files.createTempDirectory("kwbooktrack-tc-").toFile()

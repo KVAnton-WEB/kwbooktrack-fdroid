@@ -52,18 +52,21 @@ class TellicoZipImportRealTest {
             photoRepository,
         )
         useCase = ImportTellicoZipUseCase(
+            importUseCase = ImportTellicoUseCase(
+                csvReader = TellicoCsvReader(),
+                mapper = TellicoBookMapper(),
+                applier = SnapshotApplier(
+                    bookRepository = repo,
+                    noteRepository = NoteRepository(db.noteDao(), NoOpPhotoStorage),
+                    sessionRepository = SessionRepository(db.readingSessionDao()),
+                    tagRepository = TagRepository(db.tagDao()),
+                    photoRepository = photoRepository,
+                    photoStorage = NoOpPhotoStorage,
+                    transcoder = CoverTranscoder(),
+                ),
+            ),
             csvReader = TellicoCsvReader(),
             xmlReader = TellicoXmlReader(),
-            mapper = TellicoBookMapper(),
-            applier = SnapshotApplier(
-                bookRepository = repo,
-                noteRepository = NoteRepository(db.noteDao(), NoOpPhotoStorage),
-                sessionRepository = SessionRepository(db.readingSessionDao()),
-                tagRepository = TagRepository(db.tagDao()),
-                photoRepository = photoRepository,
-                photoStorage = NoOpPhotoStorage,
-                transcoder = CoverTranscoder(),
-            ),
         )
         tempOut = Files.createTempDirectory("kwbooktrack-zip-").toFile()
     }
