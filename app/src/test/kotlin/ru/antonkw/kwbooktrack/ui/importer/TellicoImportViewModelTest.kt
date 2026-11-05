@@ -147,6 +147,22 @@ class TellicoImportViewModelTest {
     }
 
     @Test
+    fun archiveWithoutImagesReportsWarningAboutCovers() = runTest(dispatcher) {
+        // Записи ссылаются на обложку, но картинок в архиве нет — пользователь
+        // должен узнать об этом, а не получить «успешный» импорт без обложек.
+        val file = zip("books.tc", "tellico.xml" to TELLICO_XML_WITH_COVER)
+
+        vm.importFromUri(Uri.fromFile(file))
+        val state = vm.state.first { !it.inProgress }
+
+        assertThat(state.error).isNull()
+        assertThat(state.result).isNotNull()
+        assertThat(state.result!!.imported).isEqualTo(1)
+        assertThat(state.result!!.coversCopied).isEqualTo(0)
+        assertThat(state.result!!.warnings).isNotEmpty()
+    }
+
+    @Test
     fun foreignArchiveLandsOnErrorState() = runTest(dispatcher) {
         // Ни tellico.xml, ни manifest.json — формат не определить.
         val file = zip("other.zip", "readme.txt" to "ничего тут нет")
@@ -214,6 +230,27 @@ class TellicoImportViewModelTest {
                   <authors>
                     <author>Фрэнк Герберт</author>
                   </authors>
+                </entry>
+              </collection>
+            </tellico>
+        """.trimIndent()
+
+        /** Та же коллекция, но с обложкой: картинки в архиве нет. */
+        private val TELLICO_XML_WITH_COVER = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <tellico xmlns="http://www.tellico.org/" date="2024-01-01">
+              <collection type="2">
+                <fields>
+                  <field name="title" title="Заголовок" type="1"/>
+                  <field name="author" title="Автор" type="1"/>
+                  <field name="cover" title="Лицевая сторона обложки" type="10"/>
+                </fields>
+                <entry id="1">
+                  <title>Дюна</title>
+                  <authors>
+                    <author>Фрэнк Герберт</author>
+                  </authors>
+                  <cover>abc.webp</cover>
                 </entry>
               </collection>
             </tellico>

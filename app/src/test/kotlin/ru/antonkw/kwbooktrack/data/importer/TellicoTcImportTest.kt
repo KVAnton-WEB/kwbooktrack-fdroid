@@ -112,6 +112,32 @@ class TellicoTcImportTest {
     }
 
     @Test
+    fun archiveWithoutImagesWarnsAboutMissingCovers() = runTest {
+        // Архив, писанный самим Tellico: картинки лежат рядом с файлом коллекции
+        // (в папке `<имя>_files`), а не внутри архива — молчать об этом нельзя.
+        val file = File(tempDir, "books.tc")
+        ZipOutputStream(file.outputStream()).use { zip ->
+            zip.writeEntry("tellico.xml", TELLICO_XML.toByteArray())
+        }
+
+        val result = useCase(file, ImportFormat.TELLICO_XML, outputDir)
+
+        assertThat(result.imported).isEqualTo(1)
+        assertThat(result.coversCopied).isEqualTo(0)
+        assertThat(result.warnings).hasSize(1)
+        assertThat(result.warnings.single()).contains("рядом")
+    }
+
+    @Test
+    fun archiveWithImagesHasNoWarnings() = runTest {
+        val result = useCase(buildTc(), ImportFormat.TELLICO_XML, outputDir)
+
+        assertThat(result.imported).isEqualTo(1)
+        assertThat(result.coversCopied).isEqualTo(1)
+        assertThat(result.warnings).isEmpty()
+    }
+
+    @Test
     fun importsBareXmlFile() = runTest {
         // Файл не архив: имя может быть любым, формап определён по содержимому.
         val file = File(tempDir, "import-123.zip").apply { writeText(TELLICO_XML) }

@@ -320,7 +320,9 @@ object TellicoXmlWriter {
         ownField("прочитал-часть", type = 4, flags = 2, category = "Личное"),
         ownField("место-покупки", type = 1, category = "Покупка"),
         ownField("продано-new", type = 4, flags = 2, category = "Личное"),
-        ownField("усл.-печ.-л.", type = 6, category = "Издательство"),
+        // Тип 1 (текст), а не 6 (число): в живой коллекции Tellico это поле
+        // объявлено текстовым, значения — «28,2» с запятой.
+        ownField("усл.-печ.-л.", type = 1, category = "Издательство"),
         ownField("язык-оригинала", type = 1, category = "Издательство"),
         ownField("оригинальное-название", type = 1, category = "Общее"),
         ownField(

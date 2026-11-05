@@ -220,7 +220,7 @@
     <string name="dialog_delete_book_message">The book and all related data will be permanently deleted.</string>
 
     <!-- Tellico -->
-    <string name="tellico_import_description">Import a native Tellico archive (.tc), a tellico.xml file, a Tellico CSV export or your own ZIP backup. The format is detected by file content; covers and photos are copied to the library.</string>
+    <string name="tellico_import_description">Import a native Tellico archive (.tc), a tellico.xml file, a Tellico CSV export or your own ZIP backup. The format is detected by file content. Covers and photos are imported from the archive; archives written by Tellico itself keep the images next to the collection file (in a “&lt;name&gt;_files” folder) — import such an archive together with that folder.</string>
     <string name="tellico_import_done">Import complete</string>
     <string name="tellico_import_done_with_errors">Import finished with errors</string>
     <string name="tellico_import_total_format">Records in file: %1$d</string>
@@ -231,6 +231,7 @@
     <string name="tellico_import_error_read">Failed to read file</string>
     <string name="tellico_import_error_empty">No records found in the file</string>
     <string name="tellico_import_error_unknown">Unknown error</string>
+    <string name="tellico_import_warning_format">Warning: %1$s</string>
 
     <!-- Picker -->
     <string name="dialog_choose_month">Choose month</string>

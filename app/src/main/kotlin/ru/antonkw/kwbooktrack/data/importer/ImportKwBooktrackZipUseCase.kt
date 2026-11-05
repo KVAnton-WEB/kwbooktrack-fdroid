@@ -1,6 +1,7 @@
 package ru.antonkw.kwbooktrack.data.importer
 
 import android.util.Log
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -75,6 +76,9 @@ class ImportKwBooktrackZipUseCase @Inject constructor(
                     imported++
                     coversCopied += stats.covers
                     notesImported += stats.notes + stats.sessions + stats.tags + stats.photos
+                } catch (e: CancellationException) {
+                    // Отмена импорта — не ошибка записи: пробрасываем дальше.
+                    throw e
                 } catch (e: Exception) {
                     errors += e
                     skipped++
@@ -89,6 +93,9 @@ class ImportKwBooktrackZipUseCase @Inject constructor(
                 dryRun = false,
                 errors = errors,
             )
+        } catch (e: CancellationException) {
+            // Отмена импорта — не «ошибка архива».
+            throw e
         } catch (e: IllegalStateException) {
             // Архив не тот или не читается — это результат импорта, а не падение.
             return failure(e)
@@ -163,6 +170,8 @@ class ImportKwBooktrackZipUseCase @Inject constructor(
                 BookRow(id = row.cell("id")?.toLongOrNull(), book = row.toBook())
             }
         }
+    } catch (e: CancellationException) {
+        throw e
     } catch (e: Exception) {
         throw IllegalStateException("books.csv не прочитан: ${e.message}")
     }
@@ -177,6 +186,8 @@ class ImportKwBooktrackZipUseCase @Inject constructor(
         if (file == null) return emptyMap()
         val archive = try {
             JSON.decodeFromString(ExtraArchive.serializer(), file.readText())
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.w(TAG, "extra.json не прочитан", e)
             return emptyMap()
@@ -217,8 +228,10 @@ class ImportKwBooktrackZipUseCase @Inject constructor(
             status = cell("status")?.let { runCatching { BookStatus.valueOf(it) }.getOrNull() } ?: BookStatus.WISHLIST,
             startedAt = parseDate(cell("started_at")),
             finishedAt = parseDate(cell("finished_at")),
-            createdAt = now,
-            updatedAt = now,
+            // Метки времени — в миллисекундах epoch, как их хранит БД.
+            // В старых бэкапах колонок нет — тогда «сейчас», как было раньше.
+            createdAt = cell("created_at")?.toLongOrNull() ?: now,
+            updatedAt = cell("updated_at")?.toLongOrNull() ?: now,
             source = cell("source")?.let { runCatching { BookSource.valueOf(it) }.getOrNull() } ?: BookSource.MANUAL,
             purchaseDate = parseDate(cell("purchase_date")),
             purchasePrice = cell("purchase_price")?.let { parseDecimal(it) },

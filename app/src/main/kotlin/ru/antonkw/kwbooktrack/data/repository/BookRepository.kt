@@ -68,6 +68,15 @@ class BookRepository @Inject constructor(
     suspend fun update(book: BookEntity): Int =
         bookDao.update(withSearchKeys(book.copy(updatedAt = System.currentTimeMillis())))
 
+    /**
+     * Обновление после импорта: метку «изменено» не трогаем.
+     *
+     * Обычный [update] ставит `updatedAt = сейчас` — для импорта это неверно:
+     * книгу изменили не сейчас, а когда её редактировали в источнике
+     * (`mdate` в Tellico, `updated_at` в zip-бэкапе).
+     */
+    suspend fun updateFromImport(book: BookEntity): Int = bookDao.update(withSearchKeys(book))
+
     private fun withSearchKeys(book: BookEntity): BookEntity =
         book.copy(
             titleSearch = book.title.lowercase() + " " + (book.subtitle?.lowercase().orEmpty()),

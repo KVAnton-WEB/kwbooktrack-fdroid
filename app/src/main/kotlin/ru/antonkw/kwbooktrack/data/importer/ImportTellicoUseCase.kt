@@ -1,5 +1,6 @@
 package ru.antonkw.kwbooktrack.data.importer
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import ru.antonkw.kwbooktrack.data.snapshot.ImportAssets
@@ -15,6 +16,10 @@ import javax.inject.Inject
  *
  * [errors] — ошибки по записям: одна сломанная книга не должна ронять импорт
  * целиком, но и молча пропадать не должна.
+ *
+ * [warnings] — не ошибки, а предупреждения для пользователя: импорт прошёл,
+ * но часть данных перенести не удалось (например, обложки лежат рядом с
+ * архивом, а не внутри него).
  */
 data class ImportTellicoResult(
     val total: Int,
@@ -24,6 +29,7 @@ data class ImportTellicoResult(
     val notesImported: Int,
     val dryRun: Boolean,
     val errors: List<Throwable> = emptyList(),
+    val warnings: List<String> = emptyList(),
 ) {
     /** Последняя ошибка импорта или null, если всё прошло чисто. */
     val error: Throwable? get() = errors.lastOrNull()
@@ -62,6 +68,7 @@ class ImportTellicoUseCase @Inject constructor(
         var skipped = 0
         var coversCopied = 0
         var notesImported = 0
+        var coversReferenced = 0
         val errors = mutableListOf<Throwable>()
         for (record in records) {
             val snapshot = mapper.map(record)
@@ -69,6 +76,7 @@ class ImportTellicoUseCase @Inject constructor(
                 skipped++
                 continue
             }
+            if (!snapshot.book.coverPath.isNullOrBlank()) coversReferenced++
             if (options.dryRun) {
                 imported++
                 continue
@@ -79,6 +87,9 @@ class ImportTellicoUseCase @Inject constructor(
                 imported++
                 coversCopied += stats.covers
                 notesImported += stats.notes + stats.sessions + stats.tags + stats.photos
+            } catch (e: CancellationException) {
+                // Отмена импорта — не ошибка записи: пробрасываем дальше.
+                throw e
             } catch (e: Exception) {
                 errors += e
                 skipped++
@@ -92,11 +103,36 @@ class ImportTellicoUseCase @Inject constructor(
             notesImported = notesImported,
             dryRun = options.dryRun,
             errors = errors,
+            warnings = warnings(coversReferenced, coversCopied, options.dryRun),
         )
+    }
+
+    /**
+     * Предупреждения импорта.
+     *
+     * Обложки, на которые ссылаются записи, но которых нет в архиве: Tellico
+     * хранит картинки **рядом** с файлом коллекции (в папке `<имя>_files/`),
+     * а не внутри архива `.tc` — молчать об этом нельзя, пользователь ждёт
+     * переноса обложек.
+     */
+    private fun warnings(coversReferenced: Int, coversCopied: Int, dryRun: Boolean): List<String> {
+        if (dryRun || coversReferenced == 0 || coversCopied > 0) return emptyList()
+        return listOf(NO_COVERS_WARNING)
     }
 
     suspend operator fun invoke(
         input: Reader,
         options: ImportTellicoOptions = ImportTellicoOptions(),
     ): ImportTellicoResult = invoke(csvReader.read(input), options)
+
+    private companion object {
+        /**
+         * Обложки не нашлись: у архивов, писанных самим Tellico, картинки лежат
+         * рядом с файлом коллекции (в папке `<имя>_files/`), а не внутри `.tc`.
+         */
+        const val NO_COVERS_WARNING =
+            "Обложки не найдены: Tellico хранит картинки рядом с файлом коллекции " +
+                "(в папке «<имя>_files»), а не внутри архива. Скопируйте архив вместе " +
+                "с папкой картинок и повторите импорт."
+    }
 }

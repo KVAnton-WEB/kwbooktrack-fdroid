@@ -220,7 +220,7 @@
     <string name="dialog_delete_book_message">Книга и все связанные данные будут удалены без возможности восстановления.</string>
 
     <!-- Tellico -->
-    <string name="tellico_import_description">Импортируйте родной архив Tellico (.tc), файл tellico.xml, CSV-выгрузку Tellico или свой zip-бэкап приложения. Формат определяется по содержимому файла, обложки и фото переносятся в библиотеку.</string>
+    <string name="tellico_import_description">Импортируйте родной архив Tellico (.tc), файл tellico.xml, CSV-выгрузку Tellico или свой zip-бэкап приложения. Формат определяется по содержимому файла. Обложки и фото переносятся из архива; у архивов, писанных самим Tellico, картинки лежат рядом с файлом коллекции (в папке «&lt;имя&gt;_files») — такой архив импортируйте вместе с этой папкой.</string>
     <string name="tellico_import_done">Импорт завершён</string>
     <string name="tellico_import_done_with_errors">Импорт завершён с ошибками</string>
     <string name="tellico_import_total_format">Записей в файле: %1$d</string>
@@ -231,6 +231,7 @@
     <string name="tellico_import_error_read">Не удалось прочитать файл</string>
     <string name="tellico_import_error_empty">В файле не найдено ни одной записи</string>
     <string name="tellico_import_error_unknown">Неизвестная ошибка</string>
+    <string name="tellico_import_warning_format">Предупреждение: %1$s</string>
 
     <!-- Picker -->
     <string name="dialog_choose_month">Выбрать месяц</string>

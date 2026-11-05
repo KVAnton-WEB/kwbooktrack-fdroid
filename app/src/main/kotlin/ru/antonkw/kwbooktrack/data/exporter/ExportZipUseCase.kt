@@ -1,5 +1,6 @@
 package ru.antonkw.kwbooktrack.data.exporter
 
+import android.util.Log
 import androidx.room.withTransaction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -19,6 +20,7 @@ import ru.antonkw.kwbooktrack.data.text.formatDecimal
 import ru.antonkw.kwbooktrack.data.time.toLocalDate
 import java.io.BufferedOutputStream
 import java.io.File
+import java.io.FileNotFoundException
 import java.io.FileOutputStream
 import java.io.OutputStream
 import java.nio.charset.StandardCharsets
@@ -80,7 +82,9 @@ class ExportZipUseCase @Inject constructor(
         // относится, должны быть из одного состояния БД — иначе манифест
         // разойдётся с содержимым архива.
         val snapshots = database.withTransaction { snapshotBuilder.buildAll() }
-        val prepared = prepare(snapshots)
+        // Подготовка — stat по каждой книге и каждому фото: это файловый I/O,
+        // из `viewModelScope` он шёл бы на главном потоке.
+        val prepared = withContext(Dispatchers.IO) { prepare(snapshots) }
         val manifest = ExportManifest(
             appVersion = versionProvider.appVersion,
             exportedAt = System.currentTimeMillis(),
@@ -108,16 +112,12 @@ class ExportZipUseCase @Inject constructor(
 
                 // covers/ — обложки книг.
                 prepared.covers.forEach { (name, file) ->
-                    zip.putNextEntry(ZipEntry("covers/$name"))
-                    file.inputStream().use { it.copyTo(zip) }
-                    zip.closeEntry()
+                    writeFile(zip, "covers/$name", file)
                 }
 
                 // photos/ — фото заметок (путь из `extra.json`).
                 prepared.photos.forEach { (path, file) ->
-                    zip.putNextEntry(ZipEntry(path))
-                    file.inputStream().use { it.copyTo(zip) }
-                    zip.closeEntry()
+                    writeFile(zip, path, file)
                 }
             }
         }
@@ -163,6 +163,8 @@ class ExportZipUseCase @Inject constructor(
                 csvField(book.purchasePrice?.let { formatDecimal(it) }.orEmpty()),
                 csvField(book.source.name),
                 csvField(book.id.toString()),
+                csvField(book.createdAt.toString()),
+                csvField(book.updatedAt.toString()),
             ).joinToString(";")
             zip.write(line.toByteArray(StandardCharsets.UTF_8))
             zip.write("\n".toByteArray(StandardCharsets.UTF_8))
@@ -210,6 +212,25 @@ class ExportZipUseCase @Inject constructor(
             tags = tags,
         )
         return Prepared(books, covers, photos, counts)
+    }
+
+    /**
+     * Файл в архив.
+     *
+     * Файл мог исчезнуть между подготовкой и записью (пользователь удалил его
+     * с диска) — тогда его пропускаем, а не роняем весь экспорт: как с
+     * отсутствующими фото.
+     */
+    private fun writeFile(zip: ZipOutputStream, path: String, file: File) {
+        val input = try {
+            file.inputStream()
+        } catch (e: FileNotFoundException) {
+            Log.w(TAG, "файл пропущен: $path", e)
+            return
+        }
+        zip.putNextEntry(ZipEntry(path))
+        input.use { it.copyTo(zip) }
+        zip.closeEntry()
     }
 
     /** `extra.json`: содержимое по id книги (строкой). */
@@ -275,7 +296,17 @@ class ExportZipUseCase @Inject constructor(
          * `page: null`) не должно выпадать из JSON.
          */
         private val JSON = Json { encodeDefaults = true }
-        const val BOOKS_HEADER = "title;subtitle;author;isbn13;page_count;language;genre;publisher;year;cover_path;rating;status;started_at;finished_at;binding;purchase_place;series;series_number;condition;translator;print_year;print_pages;original_language;original_title;annotation;is_gift;is_lent;is_sold;purchase_date;purchase_price;source;id"
+
+        private const val TAG = "ExportZip"
+
+        /**
+         * Заголовок `books.csv`.
+         *
+         * Последние две колонки — метки времени книги в миллисекундах epoch
+         * (как их хранит БД): без них импорт ставил бы «создано/изменено» в
+         * «сейчас» и архив терял бы историю книги.
+         */
+        const val BOOKS_HEADER = "title;subtitle;author;isbn13;page_count;language;genre;publisher;year;cover_path;rating;status;started_at;finished_at;binding;purchase_place;series;series_number;condition;translator;print_year;print_pages;original_language;original_title;annotation;is_gift;is_lent;is_sold;purchase_date;purchase_price;source;id;created_at;updated_at"
     }
 }
 

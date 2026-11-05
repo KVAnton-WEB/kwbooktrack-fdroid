@@ -69,9 +69,9 @@ class TellicoBookMapper @Inject constructor() {
             originalLanguage = f(record, "язык-оригинала"),
             originalTitle = f(record, "оригинальное-название"),
             annotation = f(record, "comments")?.let { HtmlToMarkdown.convert(it) }?.takeUnless { it.isBlank() },
-            isGift = isTrue(f(record, "gift")),
-            isLent = isTrue(f(record, "loaned")),
-            isSold = isTrue(f(record, "продано-new")),
+            isGift = isTrue(f(record, "gift"), "подарок"),
+            isLent = isTrue(f(record, "loaned"), "одолжено"),
+            isSold = isTrue(f(record, "продано-new"), "продано"),
         )
         return BookSnapshot(
             book = book,
@@ -88,15 +88,20 @@ class TellicoBookMapper @Inject constructor() {
 
     /** Статус: три независимых флага Tellico, приоритет — брошено → прочитано → часть. */
     private fun status(record: TellicoRecord): BookStatus = when {
-        isTrue(f(record, "брошено")) -> BookStatus.ABANDONED
-        isTrue(f(record, "read")) -> BookStatus.FINISHED
-        isTrue(f(record, "прочитал-часть")) -> BookStatus.READING
+        isTrue(f(record, "брошено"), "брошено") -> BookStatus.ABANDONED
+        isTrue(f(record, "read"), "прочитано") -> BookStatus.FINISHED
+        isTrue(f(record, "прочитал-часть"), "прочитал-часть") -> BookStatus.READING
         else -> BookStatus.WISHLIST
     }
 
-    /** Tellico пишет флаги как «true», «да», «yes» или «1». */
-    private fun isTrue(raw: String?): Boolean =
-        raw != null && raw.lowercase() in TRUE_VALUES
+    /**
+     * Флаги Tellico: «true», «yes», «да», «1», «y» — и слово самого поля
+     * («Прочитано», «Подарок»): в выгрузке Tellico значение флага — его заголовок.
+     */
+    private fun isTrue(raw: String?, vararg words: String): Boolean {
+        val value = raw?.lowercase() ?: return false
+        return value in TRUE_VALUES || words.any { it == value }
+    }
 
     /**
      * Цитаты: строки через `\n`, страница — префикс `цифры:` или `цифры::`.
@@ -138,21 +143,38 @@ class TellicoBookMapper @Inject constructor() {
         return listOf(NoteSnapshot(kind = NoteKind.REVIEW, body = body))
     }
 
-    /** Заметки: `страница::текст::дата`. */
+    /**
+     * Заметки: `страница::текст::дата`.
+     *
+     * Текст заметки может содержать `::` (`std::string`, `Foo::bar`), поэтому
+     * строка делится на **все** части: страница — первая, дата — последняя
+     * (только если она пустая или разбирается как ISO-дата), текст — всё
+     * между ними, склеенное обратно через `::`.
+     */
     private fun noteNotes(record: TellicoRecord): List<NoteSnapshot> {
         val raw = f(record, "заметки") ?: return emptyList()
         return raw.split('\n').mapNotNull { line ->
             val trimmed = line.trim()
             if (trimmed.isEmpty()) return@mapNotNull null
-            val parts = trimmed.split("::", limit = 3)
+            val parts = trimmed.split("::")
             // Строка без разделителей — это сам текст заметки, страницы в ней нет.
-            val body = unescape(if (parts.size == 1) parts[0] else parts.getOrNull(1).orEmpty()).trim()
+            if (parts.size == 1) {
+                val body = unescape(parts[0]).trim()
+                if (body.isEmpty()) return@mapNotNull null
+                return@mapNotNull NoteSnapshot(kind = NoteKind.NOTE, body = body)
+            }
+            val last = parts.last().trim()
+            val date = parseNoteDate(last)
+            // Дата — последняя часть, только если она пустая или разбирается как дата.
+            val hasDate = last.isEmpty() || date != null
+            val text = if (hasDate) parts.subList(1, parts.size - 1) else parts.subList(1, parts.size)
+            val body = unescape(text.joinToString("::")).trim()
             if (body.isEmpty()) return@mapNotNull null
             NoteSnapshot(
                 kind = NoteKind.NOTE,
                 body = body,
-                page = if (parts.size >= 2) parts[0].trim().toIntOrNull() else null,
-                createdAt = parseDate(parts.getOrNull(2)?.trim()),
+                page = parts[0].trim().toIntOrNull(),
+                createdAt = if (hasDate) date else null,
             )
         }
     }
@@ -239,6 +261,18 @@ class TellicoBookMapper @Inject constructor() {
         return null
     }
 
+    /**
+     * Дата в колонке «Дата» таблицы заметок: строго ISO (`yyyy-MM-dd`).
+     *
+     * Строго — потому, что последняя часть строки может быть обычным текстом
+     * («версия 1999»): неразобранная дата не должна съедать текст заметки.
+     */
+    private fun parseNoteDate(raw: String): Long? {
+        val text = raw.trim()
+        if (text.isEmpty()) return null
+        return runCatching { LocalDate.parse(text, DateTimeFormatter.ISO_LOCAL_DATE).toEpochMs() }.getOrNull()
+    }
+
     /** «Год сдачи в печать» бывает списком («1984; 1986; 1988») — берём первый год. */
     private fun firstYear(raw: String?): Int? =
         raw?.let { FIRST_NUMBER.find(it)?.value?.toIntOrNull() }
@@ -272,7 +306,7 @@ class TellicoBookMapper @Inject constructor() {
     }
 
     private companion object {
-        val TRUE_VALUES = setOf("true", "да", "yes", "1")
+        val TRUE_VALUES = setOf("true", "yes", "да", "1", "y")
         val DATE_PATTERNS = listOf("yyyy-MM-dd", "yyyy-MM", "yyyy", "dd.MM.yyyy")
         val FIRST_NUMBER = Regex("\\d+")
         /** Страница цитаты: `1:текст` или `1::текст`. */

@@ -136,6 +136,43 @@ class ExportZipUseCaseTest {
         }
     }
 
+    @Test
+    fun fileVanishedBeforeWriteIsSkippedWithoutBreakingExport() {
+        runBlocking {
+            val cover = File(tempDir, "cover.jpg").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+            repo.insert(sampleBook("Book With Cover", "Author", coverPath = cover.absolutePath))
+            // Версия провайдера читается между подготовкой архива и его записью —
+            // «исчезаем» с файлом обложки именно тут.
+            val deleting = ExportZipUseCase(
+                snapshotBuilder = SnapshotBuilder(
+                    bookRepository = repo,
+                    noteDao = db.noteDao(),
+                    sessionDao = db.readingSessionDao(),
+                    photoDao = db.photoDao(),
+                    tagDao = db.tagDao(),
+                ),
+                versionProvider = object : AppVersionProvider {
+                    override val appVersion: String
+                        get() {
+                            cover.delete()
+                            return "0.1.0"
+                        }
+                },
+                database = db,
+            )
+
+            val outFile = File(tempDir, "export.zip")
+            val manifest = deleting(outFile)
+
+            // Файл исчез — экспорт не роняется, обложки в архиве нет.
+            assertThat(manifest.counts.books).isEqualTo(1)
+            assertThat(outFile.exists()).isTrue()
+            val entries = readZipEntries(outFile)
+            assertThat(entries.keys).contains("books.csv")
+            assertThat(entries.keys.none { it.startsWith("covers/") }).isTrue()
+        }
+    }
+
     private fun readZipEntries(zipFile: File): Map<String, String> {
         val out = mutableMapOf<String, ByteArray>()
         ZipInputStream(zipFile.inputStream().buffered()).use { zin ->

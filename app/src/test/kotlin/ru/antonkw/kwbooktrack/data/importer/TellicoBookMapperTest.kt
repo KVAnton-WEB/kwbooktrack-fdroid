@@ -279,6 +279,79 @@ class TellicoBookMapperTest {
     }
 
     @Test
+    fun noteWithDoubleColonInsideTextKeepsWholeText() {
+        // Текст заметки может содержать `::` — он не должен обрезаться.
+        val snapshot = mapper.map(
+            record("title" to "X", "author" to "Y", "заметки" to "12::мысль :: продолжение::2024-03-01"),
+        )!!
+
+        val note = snapshot.notes.single { it.kind == NoteKind.NOTE }
+        assertThat(note.body).isEqualTo("мысль :: продолжение")
+        assertThat(note.page).isEqualTo(12)
+        assertThat(note.createdAt).isEqualTo(LocalDate.parse("2024-03-01").toEpochMs())
+    }
+
+    @Test
+    fun noteWithDoubleColonAndWithoutDateKeepsWholeText() {
+        val snapshot = mapper.map(
+            record("title" to "X", "author" to "Y", "заметки" to "12::std::string"),
+        )!!
+
+        val note = snapshot.notes.single { it.kind == NoteKind.NOTE }
+        assertThat(note.body).isEqualTo("std::string")
+        assertThat(note.page).isEqualTo(12)
+        assertThat(note.createdAt).isNull()
+    }
+
+    @Test
+    fun noteWithEmptyDateKeepsTextAndHasNoDate() {
+        // Экспорт пишет пустую дату, когда её нет: `страница::текст::`.
+        val snapshot = mapper.map(record("title" to "X", "author" to "Y", "заметки" to "12::мысль::"))!!
+
+        val note = snapshot.notes.single { it.kind == NoteKind.NOTE }
+        assertThat(note.body).isEqualTo("мысль")
+        assertThat(note.page).isEqualTo(12)
+        assertThat(note.createdAt).isNull()
+    }
+
+    @Test
+    fun noteWithNumberAsTextIsNotTakenForDate() {
+        // «1999» — текст, а не дата: иначе заметка потеряла бы текст.
+        val snapshot = mapper.map(record("title" to "X", "author" to "Y", "заметки" to "12::1999"))!!
+
+        val note = snapshot.notes.single { it.kind == NoteKind.NOTE }
+        assertThat(note.body).isEqualTo("1999")
+        assertThat(note.createdAt).isNull()
+    }
+
+    @Test
+    fun flagsAcceptRussianWordsOfTheirFields() {
+        // Старый импорт понимал «прочитано»/«брошено»/… — поведение не должно отличаться.
+        assertThat(
+            mapper.map(record("title" to "X", "author" to "Y", "read" to "прочитано"))!!.book.status,
+        ).isEqualTo(BookStatus.FINISHED)
+        assertThat(
+            mapper.map(record("title" to "X", "author" to "Y", "брошено" to "брошено"))!!.book.status,
+        ).isEqualTo(BookStatus.ABANDONED)
+        assertThat(
+            mapper.map(record("title" to "X", "author" to "Y", "прочитал-часть" to "прочитал-часть"))!!.book.status,
+        ).isEqualTo(BookStatus.READING)
+
+        val flags = mapper.map(
+            record(
+                "title" to "X",
+                "author" to "Y",
+                "gift" to "подарок",
+                "loaned" to "одолжено",
+                "продано-new" to "продано",
+            ),
+        )!!.book
+        assertThat(flags.isGift).isTrue()
+        assertThat(flags.isLent).isTrue()
+        assertThat(flags.isSold).isTrue()
+    }
+
+    @Test
     fun partialDateIsCompletedToFirstDay() {
         val year = mapper.map(record("title" to "X", "author" to "Y", "дата-прочтения" to "2023"))!!.book
         val month = mapper.map(record("title" to "X", "author" to "Y", "дата-прочтения" to "2023-02"))!!.book

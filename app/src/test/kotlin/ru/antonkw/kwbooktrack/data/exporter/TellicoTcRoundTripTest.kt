@@ -40,6 +40,7 @@ import ru.antonkw.kwbooktrack.data.storage.FilePhotoStorage
 import ru.antonkw.kwbooktrack.data.tellico.TellicoCsvReader
 import ru.antonkw.kwbooktrack.data.tellico.TellicoXmlReader
 import ru.antonkw.kwbooktrack.data.time.toEpochMs
+import ru.antonkw.kwbooktrack.data.time.toLocalDate
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.nio.file.Files
@@ -214,8 +215,100 @@ class TellicoTcRoundTripTest {
     }
 
     @Test
-    fun reimportOfExportedFileDoesNotDuplicateAnything() = runTest {
+    fun roundTripKeepsEveryBookField() = runTest {
         seedLibrary()
+        val file = File(tempDir, "library.tc")
+        exportUseCase(file)
+
+        importUseCase(file, ImportFormat.TELLICO_XML, outputDir)
+
+        val source = sourceDb.bookDao().observeAll().first().single()
+        val book = targetDb.bookDao().observeAll().first().single()
+        assertThat(book.title).isEqualTo("Дюна")
+        assertThat(book.subtitle).isEqualTo("Песни пустыни")
+        assertThat(book.author).isEqualTo("Фрэнк Герберт")
+        assertThat(book.isbn13).isEqualTo("9780441013593")
+        assertThat(book.pageCount).isEqualTo(412)
+        assertThat(book.language).isEqualTo("ru")
+        assertThat(book.genre).isEqualTo("Фантастика")
+        assertThat(book.publisher).isEqualTo("Азбука")
+        assertThat(book.year).isEqualTo(2019)
+        assertThat(book.rating).isEqualTo(5)
+        assertThat(book.status).isEqualTo(BookStatus.FINISHED)
+        assertThat(book.startedAt).isEqualTo(day(2024, 1, 10))
+        assertThat(book.finishedAt).isEqualTo(day(2024, 1, 20))
+        assertThat(book.purchaseDate).isEqualTo(day(2023, 12, 1))
+        assertThat(book.purchasePrice).isEqualTo(599.0)
+        assertThat(book.binding).isEqualTo("Твёрдый")
+        assertThat(book.purchasePlace).isEqualTo("Магазин на Лесной")
+        assertThat(book.series).isEqualTo("Дюна")
+        assertThat(book.seriesNumber).isEqualTo("1")
+        assertThat(book.condition).isEqualTo("Новая")
+        assertThat(book.translator).isEqualTo("В. Иванов")
+        assertThat(book.printYear).isEqualTo(2018)
+        assertThat(book.printPages).isEqualTo(32.5)
+        assertThat(book.originalLanguage).isEqualTo("en")
+        assertThat(book.originalTitle).isEqualTo("Dune")
+        assertThat(book.annotation).isEqualTo("Аннотация")
+        assertThat(book.isGift).isTrue()
+        assertThat(book.isLent).isTrue()
+        assertThat(book.isSold).isTrue()
+        assertThat(book.extraFields["чтец"]?.value).isEqualTo("Иванова")
+        // Метки времени Tellico — даты, поэтому время суток не переносится.
+        assertThat(book.createdAt).isEqualTo(day(2024, 1, 1))
+        assertThat(book.updatedAt).isEqualTo(source.updatedAt.toLocalDate().toEpochMs())
+    }
+
+    @Test
+    fun fieldsBlockDeclaresOwnFieldsWithExpectedTypes() = runTest {
+        seedLibrary()
+
+        val xml = exportedXml()
+
+        // Свои поля объявляем с теми же типами, что и в живой коллекции Tellico:
+        // «усл.-печ.-л.» — текст (1), а не число (6).
+        assertThat(xml).contains(fieldTag("Личное", 2, 4, "брошено", "Брошено", 4))
+        assertThat(xml).contains(fieldTag("Личное", 0, 3, "дата-начала", "Дата начала", 12))
+        assertThat(xml).contains(fieldTag("Личное", 0, 3, "дата-прочтения", "Дата прочтения", 12))
+        assertThat(xml).contains(fieldTag("Личное", 2, 4, "прочитал-часть", "Прочитал часть", 4))
+        assertThat(xml).contains(fieldTag("Покупка", 0, 4, "место-покупки", "Место покупки", 1))
+        assertThat(xml).contains(fieldTag("Личное", 2, 4, "продано-new", "Продано?", 4))
+        assertThat(xml).contains(fieldTag("Издательство", 0, 4, "усл.-печ.-л.", "Усл. печ. л.", 1))
+        assertThat(xml).contains(fieldTag("Издательство", 0, 4, "язык-оригинала", "Язык оригинала", 1))
+        assertThat(xml).contains(fieldTag("Общее", 0, 4, "оригинальное-название", "Оригинальное название", 1))
+        assertThat(xml).contains(fieldTag("Цитаты", 1, 4, "цитаты", "Цитаты", 2))
+        assertThat(xml).contains(fieldTag("Рецензия", 0, 4, "рецензия", "Рецензия", 2))
+        assertThat(xml).contains(fieldTag("Личное", 1, 4, "заметки", "Заметки", 2))
+        assertThat(xml).contains(fieldTag("Классификация", 1, 4, "теги", "Теги", 1))
+        assertThat(xml).contains(fieldTag("Личное", 1, 4, "сессии-чтения", "Сессии чтения", 2))
+        assertThat(xml).contains(fieldTag("Личное", 1, 4, "фото-заметок", "Фото заметок", 2))
+
+        // Табличные поля объявляют число колонок.
+        assertThat(xml).contains("<prop name=\"columns\">3</prop>")
+        assertThat(xml).contains("<prop name=\"columns\">6</prop>")
+
+        // Чужие поля объявляем текстом (1) — встроенные поля Tellico знает сам.
+        assertThat(xml).contains(fieldTag("Общее", 0, 4, "чтец", "Чтец", 1))
+    }
+
+    @Test
+    fun photoStaysBoundToItsNoteAfterRoundTrip() = runTest {
+        seedLibrary()
+        val file = File(tempDir, "library.tc")
+        exportUseCase(file)
+
+        importUseCase(file, ImportFormat.TELLICO_XML, outputDir)
+
+        val book = targetDb.bookDao().observeAll().first().single()
+        val notes = targetDb.noteDao().observeByBook(book.id).first()
+        val photo = targetDb.photoDao().observeByBook(book.id).first().single()
+        // Фото привязано к цитате — первой заметке снимка (цитата → рецензия → заметка).
+        assertThat(photo.noteId).isEqualTo(notes.single { it.kind == NoteKind.QUOTE }.id)
+        assertThat(File(photo.path).exists()).isTrue()
+    }
+
+    @Test
+    fun reimportOfExportedFileDoesNotDuplicateAnything() = runTest {        seedLibrary()
         val file = File(tempDir, "library.tc")
         exportUseCase(file)
 
@@ -328,6 +421,7 @@ class TellicoTcRoundTripTest {
         val bookId = sourceBooks.insert(
             BookEntity(
                 title = "Дюна",
+                subtitle = "Песни пустыни",
                 author = "Фрэнк Герберт",
                 isbn13 = "9780441013593",
                 pageCount = 412,
@@ -355,6 +449,9 @@ class TellicoTcRoundTripTest {
                 originalLanguage = "en",
                 originalTitle = "Dune",
                 annotation = "Аннотация",
+                isGift = true,
+                isLent = true,
+                isSold = true,
                 extraFields = mapOf("чтец" to ExtraField("Чтец", "Иванова")),
             ),
         )
@@ -476,4 +573,16 @@ class TellicoTcRoundTripTest {
 
     private fun day(year: Int, month: Int, day: Int): Long =
         LocalDate.of(year, month, day).toEpochMs()
+
+    /** Начало объявления поля в `<fields>` — как его пишет TellicoXmlWriter. */
+    private fun fieldTag(
+        category: String,
+        flags: Int,
+        format: Int,
+        name: String,
+        title: String,
+        type: Int,
+    ): String =
+        "<field category=\"$category\" description=\"\" flags=\"$flags\" format=\"$format\" " +
+            "name=\"$name\" title=\"$title\" type=\"$type\""
 }

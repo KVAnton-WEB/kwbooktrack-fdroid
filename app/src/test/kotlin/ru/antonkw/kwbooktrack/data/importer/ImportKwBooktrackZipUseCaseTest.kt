@@ -2,6 +2,7 @@ package ru.antonkw.kwbooktrack.data.importer
 
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -9,6 +10,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import ru.antonkw.kwbooktrack.data.CancellingBookDao
 import ru.antonkw.kwbooktrack.data.NoOpCoverStorage
 import ru.antonkw.kwbooktrack.data.NoOpPhotoStorage
 import ru.antonkw.kwbooktrack.data.TestDb
@@ -277,6 +279,34 @@ class ImportKwBooktrackZipUseCaseTest {
             val book = targetRepo.observeAll().first().single()
             assertThat(book.title).isEqualTo("Старый бэкап")
             assertThat(targetNoteRepo.observeByBook(book.id).first()).isEmpty()
+            // В старом бэкапе колонок меток времени нет — откат на «сейчас».
+            assertThat(book.createdAt).isGreaterThan(1_000_000_000_000L)
+            assertThat(book.updatedAt).isGreaterThan(1_000_000_000_000L)
+        }
+    }
+
+    @Test
+    fun import_readsBookTimestampsFromCsv() {
+        runBlocking {
+            val zip = File(tempDir, "with-time.zip")
+            ZipOutputStream(zip.outputStream()).use { out ->
+                out.putNextEntry(ZipEntry("manifest.json"))
+                out.write(MANIFEST.toByteArray())
+                out.closeEntry()
+                out.putNextEntry(ZipEntry("books.csv"))
+                out.write(
+                    ("title;author;created_at;updated_at\n" +
+                        "С книгой времени;Автор;1700000000000;1700000009999\n").toByteArray(),
+                )
+                out.closeEntry()
+            }
+
+            val result = importer(zip, outputDir)
+
+            assertThat(result.isSuccess).isTrue()
+            val book = targetRepo.observeAll().first().single()
+            assertThat(book.createdAt).isEqualTo(1_700_000_000_000L)
+            assertThat(book.updatedAt).isEqualTo(1_700_000_009_999L)
         }
     }
 
@@ -293,6 +323,35 @@ class ImportKwBooktrackZipUseCaseTest {
             assertThat(targetSessionRepo.observeByBook(book.id).first()).hasSize(1)
             assertThat(targetPhotoRepo.observeByBook(book.id).first()).hasSize(1)
             assertThat(targetDb.tagDao().tagsForBook(book.id)).hasSize(1)
+        }
+    }
+
+    @Test
+    fun cancellationIsNotSwallowedAsSkippedRow() {
+        runBlocking {
+            // Отменённый импорт должен отмениться, а не «пропустить» книгу и
+            // отчитаться успехом.
+            val photoRepository = PhotoRepository(targetDb.photoDao(), NoOpPhotoStorage)
+            val cancelling = ImportKwBooktrackZipUseCase(
+                SnapshotApplier(
+                    bookRepository = BookRepository(
+                        CancellingBookDao(targetDb.bookDao()),
+                        targetDb.tagDao(),
+                        NoOpCoverStorage,
+                        photoRepository,
+                    ),
+                    noteRepository = NoteRepository(targetDb.noteDao(), NoOpPhotoStorage),
+                    sessionRepository = SessionRepository(targetDb.readingSessionDao()),
+                    tagRepository = TagRepository(targetDb.tagDao()),
+                    photoRepository = photoRepository,
+                    photoStorage = NoOpPhotoStorage,
+                    transcoder = CoverTranscoder(),
+                ),
+            )
+
+            val error = runCatching { cancelling(backupZip(), outputDir) }.exceptionOrNull()
+
+            assertThat(error).isInstanceOf(CancellationException::class.java)
         }
     }
 

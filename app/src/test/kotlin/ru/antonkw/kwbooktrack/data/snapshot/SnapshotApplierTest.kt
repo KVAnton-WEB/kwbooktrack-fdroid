@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -14,6 +15,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import ru.antonkw.kwbooktrack.data.NoOpCoverStorage
 import ru.antonkw.kwbooktrack.data.NoOpPhotoStorage
+import ru.antonkw.kwbooktrack.data.CancellingBookDao
 import ru.antonkw.kwbooktrack.data.TestDb
 import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
@@ -234,6 +236,35 @@ class SnapshotApplierTest {
         val imported = db.bookDao().observeAll().first().first { it.title == "Дорога" }
         assertThat(imported.id).isNotEqualTo(42L)
         assertThat(noteRepository.observeByBook(imported.id).first()).hasSize(2)
+    }
+
+    @Test
+    fun cancellationDuringCoverCopyIsNotSwallowed() = runTest {
+        // Отмена импорта не должна выглядеть как «плохая обложка»: общий
+        // `catch (e: Exception)` проглатывал бы отмену и импорт выглядел бы
+        // успешным.
+        val cancelling = BookRepository(
+            CancellingBookDao(db.bookDao()),
+            db.tagDao(),
+            NoOpCoverStorage,
+            photoRepository,
+        )
+        val cancellingApplier = SnapshotApplier(
+            bookRepository = cancelling,
+            noteRepository = noteRepository,
+            sessionRepository = sessionRepository,
+            tagRepository = tagRepository,
+            photoRepository = photoRepository,
+            photoStorage = NoOpPhotoStorage,
+            transcoder = CoverTranscoder(),
+        )
+        File(staging, "abc.webp").writeBytes(pngBytes())
+
+        val error = runCatching {
+            cancellingApplier.apply(snapshot(coverPath = "abc.webp"), assets)
+        }.exceptionOrNull()
+
+        assertThat(error).isInstanceOf(CancellationException::class.java)
     }
 
     private suspend fun bookId(): Long = db.bookDao().observeAll().first().single().id

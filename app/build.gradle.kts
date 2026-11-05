@@ -16,8 +16,8 @@ android {
         applicationId = "ru.antonkw.kwbooktrack"
         minSdk = 31
         targetSdk = 34
-        versionCode = 60
-        versionName = "0.5.52"
+        versionCode = 61
+        versionName = "0.5.53"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

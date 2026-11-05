@@ -133,12 +133,16 @@ class KwBooktrackZipRoundTripTest {
 
         // Новые колонки — в конце заголовка, значения — из книги.
         val csv = String(entries.getValue("books.csv"), Charsets.UTF_8)
-        assertThat(csv.lineSequence().first()).endsWith(";purchase_date;purchase_price;source;id")
+        assertThat(csv.lineSequence().first()).endsWith(";purchase_date;purchase_price;source;id;created_at;updated_at")
         val record = CSVParser(StringReader(csv), CSV_FORMAT).use { it.records.single() }
         assertThat(record.get("purchase_date")).isEqualTo("2023-12-01")
         assertThat(record.get("purchase_price")).isEqualTo("599,5")
         assertThat(record.get("source")).isEqualTo("MANUAL")
         assertThat(record.get("id")).isEqualTo(bookId.toString())
+        // Метки времени — в миллисекундах epoch, как их хранит БД.
+        val source = sourceDb.bookDao().observeAll().first().single()
+        assertThat(record.get("created_at")).isEqualTo(source.createdAt.toString())
+        assertThat(record.get("updated_at")).isEqualTo(source.updatedAt.toString())
 
         // extra.json — по id книги строкой.
         val extra = Json.parseToJsonElement(String(entries.getValue("extra.json"), Charsets.UTF_8)).jsonObject
@@ -190,6 +194,10 @@ class KwBooktrackZipRoundTripTest {
         assertThat(book.status).isEqualTo(BookStatus.FINISHED)
         assertThat(book.purchasePrice).isEqualTo(599.5)
         assertThat(book.purchaseDate).isEqualTo(day(2023, 12, 1))
+        // Метки времени книги переносятся, а не ставятся в «сейчас».
+        val source = sourceDb.bookDao().observeAll().first().single()
+        assertThat(book.createdAt).isEqualTo(source.createdAt)
+        assertThat(book.updatedAt).isEqualTo(source.updatedAt)
         assertThat(book.extraFields["посоветовал"]?.value).isEqualTo("Книжный поезд")
 
         val notes = targetDb.noteDao().observeByBook(book.id).first()

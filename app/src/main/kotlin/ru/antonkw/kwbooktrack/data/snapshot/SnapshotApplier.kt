@@ -1,6 +1,7 @@
 package ru.antonkw.kwbooktrack.data.snapshot
 
 import android.util.Log
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import ru.antonkw.kwbooktrack.data.db.entity.NoteEntity
 import ru.antonkw.kwbooktrack.data.db.entity.PhotoEntity
@@ -94,10 +95,14 @@ class SnapshotApplier @Inject constructor(
             val dest = File(destDir, "$bookId.$ext")
             dest.writeBytes(webp ?: raw)
             // Обновляем строку книги, а не снимок: что выигрывает при слиянии,
-            // уже решил upsertFromImport.
+            // уже решил upsertFromImport. Метку «изменено» не трогаем — книгу
+            // изменили не сейчас, а в источнике.
             val existing = bookRepository.findById(bookId) ?: return 0
-            bookRepository.update(existing.copy(coverPath = dest.absolutePath))
+            bookRepository.updateFromImport(existing.copy(coverPath = dest.absolutePath))
             1
+        } catch (e: CancellationException) {
+            // Отмена импорта — не «плохая обложка»: пробрасываем дальше.
+            throw e
         } catch (e: Exception) {
             // Плохая обложка не должна ронять импорт — как в остальных импортёрах.
             Log.w(TAG, "cover copy failed for bookId=$bookId src=$src", e)
