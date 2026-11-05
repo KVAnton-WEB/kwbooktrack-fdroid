@@ -28,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ru.antonkw.kwbooktrack.R
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
+import ru.antonkw.kwbooktrack.data.text.formatDecimal
 import ru.antonkw.kwbooktrack.data.time.toLocalDate
 
 /**
@@ -136,7 +137,7 @@ private fun buildRows(book: BookEntity): List<InfoRow> = buildList {
             book.year?.toString()?.let { InfoRow(R.string.label_year, it) },
             book.printYear?.toString()?.let { InfoRow(R.string.field_print_year, it) },
             book.pageCount?.toString()?.let { InfoRow(R.string.label_page_count, it) },
-            book.printPages?.toString()?.let { InfoRow(R.string.field_print_pages, it) },
+            book.printPages?.let { InfoRow(R.string.field_print_pages, formatDecimal(it)) },
             book.purchaseDate?.let { InfoRow(R.string.label_purchased_on, formatDate(it)) },
             book.purchasePrice?.let { InfoRow(R.string.label_price, "%.2f".format(it)) },
             book.startedAt?.let { InfoRow(R.string.label_started_on, formatDate(it)) },

@@ -11,6 +11,7 @@ import ru.antonkw.kwbooktrack.data.db.dao.ReadingSessionDao
 import ru.antonkw.kwbooktrack.data.db.dao.TagDao
 import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
+import ru.antonkw.kwbooktrack.data.text.formatDecimal
 import ru.antonkw.kwbooktrack.data.time.toLocalDate
 import java.io.BufferedOutputStream
 import java.io.File
@@ -117,7 +118,7 @@ class ExportZipUseCase @Inject constructor(
                     csvField(book.condition.orEmpty()),
                     csvField(book.translator.orEmpty()),
                     csvField(book.printYear?.toString().orEmpty()),
-                    csvField(book.printPages?.toString().orEmpty()),
+                    csvField(book.printPages?.let { formatDecimal(it) }.orEmpty()),
                     csvField(book.originalLanguage.orEmpty()),
                     csvField(book.originalTitle.orEmpty()),
                     csvField(book.annotation.orEmpty()),

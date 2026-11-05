@@ -85,8 +85,9 @@ data class BookEntity(
     val translator: String? = null,
     @ColumnInfo(name = "print_year")
     val printYear: Int? = null,
+    // Усл. печ. л. — дробное число («32,5»), колонка REAL (миграция v7→v8).
     @ColumnInfo(name = "print_pages")
-    val printPages: Int? = null,
+    val printPages: Double? = null,
     @ColumnInfo(name = "original_language")
     val originalLanguage: String? = null,
     @ColumnInfo(name = "original_title")

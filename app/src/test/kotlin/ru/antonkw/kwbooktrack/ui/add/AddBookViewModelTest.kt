@@ -158,7 +158,7 @@ class AddBookViewModelTest {
         assertThat(book.condition).isEqualTo("Новое")
         assertThat(book.translator).isEqualTo("А. Клементьев")
         assertThat(book.printYear).isEqualTo(2018)
-        assertThat(book.printPages).isEqualTo(32)
+        assertThat(book.printPages).isEqualTo(32.0)
         assertThat(book.originalLanguage).isEqualTo("en")
         assertThat(book.originalTitle).isEqualTo("Hyperion")
         assertThat(book.annotation).isEqualTo("Далёкое будущее...")
@@ -192,7 +192,7 @@ class AddBookViewModelTest {
     }
 
     @Test
-    fun printYearAndPrintPagesParseInt() = runTest(dispatcher) {
+    fun printYearAndPrintPagesParseDecimal() = runTest(dispatcher) {
         val vm = AddBookViewModel(
             androidx.lifecycle.SavedStateHandle(),
             bookRepository,
@@ -202,13 +202,33 @@ class AddBookViewModelTest {
         vm.setTitle("Foo")
         vm.setAuthor("Bar")
         vm.setPrintYear("20abc18")
-        vm.setPrintPages("3.2")
+        vm.setPrintPages("32,5")
         vm.save()
         advanceUntilIdle()
 
         val book = savedBook()
         assertThat(book.printYear).isEqualTo(2018)
-        assertThat(book.printPages).isEqualTo(32)
+        assertThat(book.printPages).isEqualTo(32.5)
+    }
+
+    @Test
+    fun printPagesAcceptsBothSeparatorsAndWholeNumbers() = runTest(dispatcher) {
+        val vm = AddBookViewModel(
+            androidx.lifecycle.SavedStateHandle(),
+            bookRepository,
+            ApplicationProvider.getApplicationContext(),
+            ru.antonkw.kwbooktrack.data.NoOpCoverStorage,
+        )
+        vm.setTitle("Foo")
+        vm.setPrintPages("3.2")
+        vm.save()
+        advanceUntilIdle()
+        assertThat(savedBook().printPages).isEqualTo(3.2)
+
+        vm.setPrintPages("32")
+        vm.save()
+        advanceUntilIdle()
+        assertThat(savedBook().printPages).isEqualTo(32.0)
     }
     // --- read flag + finished date ---------------------------------------
 

@@ -65,6 +65,7 @@
     <string name="cd_about">О приложении</string>
     <string name="cd_clear_query">Очистить поиск</string>
     <string name="cd_choose_period">Выбрать период</string>
+    <string name="cd_choose_date">Выбрать дату</string>
     <string name="cd_back">Назад</string>
 
     <!-- Book list -->
@@ -195,6 +196,7 @@
     <string name="action_pick_cover">Выбрать обложку</string>
     <string name="action_take_photo">Сделать фото</string>
     <string name="action_clear_cover">Убрать обложку</string>
+    <string name="action_clear_date">Очистить</string>
     <string name="action_write_review">Написать рецензию</string>
     <string name="action_save_review">Сохранить рецензию</string>
     <string name="note_editor_preview">Предпросмотр</string>

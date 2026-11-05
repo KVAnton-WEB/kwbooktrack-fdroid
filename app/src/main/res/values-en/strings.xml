@@ -67,6 +67,7 @@
     <string name="notes_no_results">Nothing found for «%1$s»</string>
     <string name="cd_clear_query">Clear search</string>
     <string name="cd_choose_period">Choose period</string>
+    <string name="cd_choose_date">Choose date</string>
     <string name="cd_back">Back</string>
 
     <!-- Book list -->
@@ -195,6 +196,7 @@
     <string name="action_pick_cover">Pick cover</string>
     <string name="action_take_photo">Take photo</string>
     <string name="action_clear_cover">Remove cover</string>
+    <string name="action_clear_date">Clear</string>
     <string name="action_write_review">Write review</string>
     <string name="action_save_review">Save review</string>
     <string name="note_editor_preview">Preview</string>

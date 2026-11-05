@@ -5,6 +5,7 @@ import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
 import ru.antonkw.kwbooktrack.data.db.entity.BookSource
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
 import ru.antonkw.kwbooktrack.data.text.HtmlToMarkdown
+import ru.antonkw.kwbooktrack.data.text.parseDecimal
 import ru.antonkw.kwbooktrack.data.time.toEpochMs
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -53,7 +54,7 @@ class TellicoBookMapper @Inject constructor() {
             condition = nullable(record, "Состояние"),
             translator = nullable(record, "Переводчик"),
             printYear = field(record, "Год сдачи в печать")?.toIntOrNull(),
-            printPages = field(record, "Усл. печ. л.")?.toIntOrNull(),
+            printPages = field(record, "Усл. печ. л.")?.let { parseDecimal(it) },
             originalLanguage = nullable(record, "Язык оригинала"),
             originalTitle = nullable(record, "Оригинальное название"),
             annotation = nullable(record, "Аннотация")?.let { HtmlToMarkdown.convert(it) }?.takeUnless { it.isBlank() },

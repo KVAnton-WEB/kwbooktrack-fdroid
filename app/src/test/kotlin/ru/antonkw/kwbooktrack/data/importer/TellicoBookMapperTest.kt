@@ -131,7 +131,7 @@ class TellicoBookMapperTest {
         assertThat(book.isLent).isFalse()
         assertThat(book.isSold).isFalse()
         assertThat(book.annotation).isEqualTo("Далёкое будущее...")
-        assertThat(book.printPages).isEqualTo(32)
+        assertThat(book.printPages).isEqualTo(32.0)
         assertThat(book.originalLanguage).isEqualTo("en")
         assertThat(book.originalTitle).isEqualTo("Hyperion")
         assertThat(book.printYear).isEqualTo(2018)
@@ -169,6 +169,17 @@ class TellicoBookMapperTest {
         // Quotes are split after conversion, so <p>-separated quotes don't
         // collapse into one note.
         assertThat(mapped.quotes).containsExactly("Первая цитата.", "Вторая «цитата».").inOrder()
+    }
+
+    @Test
+    fun printPagesAcceptsFractionWithComma() {
+        val record = csvRecord(
+            "Заголовок" to "Foo",
+            "Автор" to "Bar",
+            "Усл. печ. л." to "32,5",
+        )
+        val book = TellicoBookMapper().map(record)!!.book
+        assertThat(book.printPages).isEqualTo(32.5)
     }
 
     private fun csvRecord(vararg pairs: Pair<String, String>): CSVRecord {
