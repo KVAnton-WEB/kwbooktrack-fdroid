@@ -276,4 +276,65 @@ class Migrate7To8Test {
             helper.close()
         }
     }
+
+    @Test
+    fun orphansDoNotBreakTheMigration() {
+        // Реальный случай: в базе, собранной до внешних ключей, остаются
+        // заметки и сессии на удалённые книги. Их возврат на место роняет
+        // внешний ключ, а с ним — всю миграцию: база не открывается, и
+        // библиотека выглядит пустой. Миграция обязана их пережить.
+        val helper = openV7Helper()
+        try {
+            val db = helper.writableDatabase
+            seed(db)
+            // Сироты нельзя вставить при включённых внешних ключах — так
+            // они и попадают в базу: из версии, где ключей ещё не было.
+            db.execSQL("PRAGMA foreign_keys = OFF")
+            db.execSQL(
+                "INSERT INTO notes (id, book_id, body_md, kind, created_at, updated_at) " +
+                    "VALUES (11, 999, 'сирота', 'NOTE', 0, 0)",
+            )
+            db.execSQL(
+                "INSERT INTO reading_sessions (id, book_id, started_at, ended_at) " +
+                    "VALUES (21, 999, 100, 200)",
+            )
+            db.execSQL(
+                "INSERT INTO book_tags (book_id, tag_id) VALUES (999, 30)",
+            )
+            db.execSQL(
+                "INSERT INTO photos (id, book_id, note_id, path, created_at) " +
+                    "VALUES (41, 999, 11, '/tmp/orphan.jpg', 0)",
+            )
+            db.execSQL("PRAGMA foreign_keys = ON")
+            // Фото живой книги, но на удалённую заметку.
+            db.execSQL(
+                "INSERT INTO photos (id, book_id, note_id, path, created_at) " +
+                    "VALUES (42, 1, 11, '/tmp/dangling.jpg', 0)",
+            )
+
+            Migrate7To8.migrate(db)
+
+            // Живые строки вернулись, сироты — остались на месте (миграция
+            // ничего не теряет) и не сломали миграцию.
+            assertThat(count(db, "books")).isEqualTo(1)
+            assertThat(count(db, "notes")).isEqualTo(2)
+            assertThat(count(db, "reading_sessions")).isEqualTo(2)
+            assertThat(count(db, "book_tags")).isEqualTo(2)
+            assertThat(count(db, "photos")).isEqualTo(3)
+            db.query("SELECT body_md FROM notes WHERE id = 10").use { c ->
+                assertThat(c.moveToFirst()).isTrue()
+                assertThat(c.getString(0)).isEqualTo("мысль")
+            }
+            db.query("SELECT body_md FROM notes WHERE id = 11").use { c ->
+                assertThat(c.moveToFirst()).isTrue()
+                assertThat(c.getString(0)).isEqualTo("сирота")
+            }
+            db.query("SELECT note_id FROM photos WHERE id = 42").use { c ->
+                assertThat(c.moveToFirst()).isTrue()
+                assertThat(c.getInt(0)).isEqualTo(11)
+            }
+        } finally {
+            helper.close()
+        }
+    }
 }

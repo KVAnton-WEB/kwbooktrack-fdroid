@@ -1,5 +1,6 @@
 package ru.antonkw.kwbooktrack.ui.notes
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -63,12 +64,21 @@ class NotesListViewModel @Inject constructor(
             }
         NotesListUiState.Loaded(items) as NotesListUiState
     }
-        .catch { emit(NotesListUiState.Loaded(emptyList())) }
+        .catch { e ->
+            // Ошибка базы не должна выглядеть как «заметок нет»: молчаливый
+            // catch прятал сломанную миграцию. Пишем в лог, что сломалось.
+            Log.e(TAG, "не удалось прочитать заметки", e)
+            emit(NotesListUiState.Loaded(emptyList()))
+        }
         .stateIn(viewModelScope, SharingStarted.Eagerly, NotesListUiState.Loading)
 
     val currentQuery: StateFlow<String> = query
 
     fun setQuery(value: String) {
         query.value = value
+    }
+
+    private companion object {
+        const val TAG = "NotesListViewModel"
     }
 }

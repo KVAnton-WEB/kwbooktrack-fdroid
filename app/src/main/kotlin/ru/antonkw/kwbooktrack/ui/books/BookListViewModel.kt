@@ -1,5 +1,6 @@
 package ru.antonkw.kwbooktrack.ui.books
 
+import android.util.Log
 import androidx.annotation.StringRes
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -228,7 +229,13 @@ class BookListViewModel @Inject constructor(
     }
         .flatMapLatest { it }
         .onStart { emit(BookListUiState.Loading as BookListUiState) }
-        .catch { emit(BookListUiState.Loaded(emptyList(), query.value, isGrid.value, FilterState(period.value, filterType.value))) }
+        .catch { e ->
+            // Ошибка базы не должна выглядеть как «библиотека пуста»: молчаливый
+            // catch прятал сломанную миграцию, и человек видел пустую
+            // библиотеку вместо ошибки. Пишем в лог, что именно сломалось.
+            Log.e(TAG, "не удалось прочитать библиотеку", e)
+            emit(BookListUiState.Loaded(emptyList(), query.value, isGrid.value, FilterState(period.value, filterType.value)))
+        }
         .stateIn(viewModelScope, SharingStarted.Eagerly, BookListUiState.Loading)
 
     val currentQuery: StateFlow<String> = query
@@ -265,6 +272,7 @@ class BookListViewModel @Inject constructor(
     }
 
     companion object {
+        private const val TAG = "BookListViewModel"
         private const val KEY_QUERY = "query"
         private const val KEY_GRID = "isGrid"
         private const val KEY_FILTER = "filter"

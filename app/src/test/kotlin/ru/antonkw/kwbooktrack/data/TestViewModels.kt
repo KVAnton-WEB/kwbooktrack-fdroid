@@ -26,10 +26,16 @@ object TestViewModels {
      * снимается внутри finally, который выполнится только когда очередь
      * разберётся. Без этого advanceUntilIdle() close() всё ещё видит
      * подписанные коллекторы.
+     *
+     * В конце ждём поток Room'а: его выдака возвращается в корутину
+     * подписчика и читает Dispatchers.Main, а resetMain() в tearDown пишет
+     * в него же. Столкновение читателя и писателя роняет тест с
+     * «Dispatchers.Main is used concurrently with setting it».
      */
     fun cancelAll(scheduler: TestCoroutineScheduler) {
         tracked.forEach { it.viewModelScope.cancel() }
         tracked.clear()
         scheduler.advanceUntilIdle()
+        TestDb.drain()
     }
 }
