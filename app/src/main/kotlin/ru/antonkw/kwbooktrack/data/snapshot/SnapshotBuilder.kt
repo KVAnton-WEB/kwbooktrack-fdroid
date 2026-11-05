@@ -51,9 +51,8 @@ class SnapshotBuilder @Inject constructor(
                         createdAt = photo.createdAt,
                     )
                 },
-                // Колонка books.extra_fields появится в следующей задаче —
-                // до неё чужих полей у книги нет.
-                extraFields = emptyMap(),
+                // Чужие поля Tellico — из колонки books.extra_fields.
+                extraFields = book.extraFields,
             )
         }
     }

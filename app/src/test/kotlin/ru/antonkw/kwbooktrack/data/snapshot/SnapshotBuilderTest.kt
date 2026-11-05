@@ -21,6 +21,7 @@ import ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity
 import ru.antonkw.kwbooktrack.data.db.entity.TagEntity
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
+import ru.antonkw.kwbooktrack.data.snapshot.ExtraField
 import java.io.File
 import java.nio.file.Files
 
@@ -135,6 +136,24 @@ class SnapshotBuilderTest {
         assertThat(photo.localPath).isEqualTo(photoFile.absolutePath)
         // Фото привязано к заметке NOTE — третья в итоговом списке.
         assertThat(photo.noteIndex).isEqualTo(3)
+    }
+
+    @Test
+    fun buildAllCarriesExtraFields() = runTest {
+        val extraFields = mapOf("my_field" to ExtraField(title = "Моё поле", value = "42"))
+        db.bookDao().insert(
+            BookEntity(
+                title = "С чужим полем",
+                author = "Кто-то",
+                createdAt = 1L,
+                updatedAt = 1L,
+                extraFields = extraFields,
+            ),
+        )
+
+        val snapshot = builder.buildAll().single()
+
+        assertThat(snapshot.extraFields).isEqualTo(extraFields)
     }
 
     @Test
