@@ -379,7 +379,7 @@ Expected: FAIL — «Unresolved reference: TellicoCsvReader» в пакете `d
 встроенные: `title`→«Заголовок», `subtitle`→«Подзаголовок», `author`→«Автор», `publisher`→«Издательство», `pub_year`→«Год издания», `cr_year`→«Год сдачи в печать», `isbn`→«ISBN#», `pages`→«Количество страниц», `language`→«Язык», `genre`→«Жанр», `keyword`→«Ключевые слова», `series`→«Серия», `series_num`→«Номер серии», `condition`→«Состояние», `translator`→«Переводчик», `binding`→«Переплёт», `pur_price`→«Цена покупки», `pur_date`→«Дата покупки», `read`→«Прочитано», `gift`→«Подарок», `loaned`→«Одолжено», `rating`→«Рейтинг», `cover`→«Лицевая сторона обложки», `comments`→«Аннотация», `cdate`→«Создано», `mdate`→«Изменено»;
 приложение: `место-покупки`→«Место покупки», `продано-new`→«Продано?», `дата-прочтения`→«Дата прочтения», `дата-начала`→«Дата начала», `прочитал-часть`→«Прочитал часть», `брошено`→«Брошено», `усл.-печ.-л.`→«Усл. печ. л.», `язык-оригинала`→«Язык оригинала», `оригинальное-название`→«Оригинальное название», `цитаты`→«Цитаты», `рецензия`→«Рецензия», `заметки`→«Заметки», `теги`→«Теги», `сессии-чтения`→«Сессии чтения», `фото-заметок`→«Фото заметок».
 
-`nameFromTitle(title)`: `title.lowercase()`, каждый символ не `isLetterOrDigit()` и не `-` → `-`, затем схлопывание серий `-` в одну и обрезка `-` по краям. («ISBN#» → «isbn», «livelib/fantlab» → «livelib-fantlab», «Продано?» → «продано», но «Продано?» есть в словаре → «продано-new» ✓.)
+`nameFromTitle(title)`: `title.lowercase()`, каждый символ, который не `isLetterOrDigit()` и не `-` и не `.`, заменить на `-`, затем схлопывание серий `-` в одну и обрезка `-` по краям. **Точка сохраняется**: в реальной коллекции Tellico поле называется `усл.-печ.-л.`, и имя с точкой совпадает с существующим полем (иначе Tellico завёл бы дубликат). («ISBN#» → «isbn», «livelib/fantlab» → «livelib-fantlab», «Продано?» → «продано», «Усл. печ. l.» → «усл.-печ.-л.»; «Продано?» есть в словаре → «продано-new» ✓.)
 
 `TellicoCsvReader.readRecords(reader)`: использует текущий `CSVFormat` (разделитель `;`, кавычки `"`, перевод строки `\n`, `setHeader()`), но вместо `CSVRecord` собирает `TellicoRecord`:
 - для каждого заголовка: если он в `SKIP_TITLES` — пропустить;
@@ -413,6 +413,7 @@ git commit -m "v 0.5.38 — промежуточная модель Tellico и �
 
 **Files:**
 - Create: `app/src/main/kotlin/ru/antonkw/kwbooktrack/data/tellico/TellicoXmlReader.kt`
+- Modify: `.gitignore` (см. первый шаг ниже)
 - Test: `app/src/test/kotlin/ru/antonkw/kwbooktrack/data/tellico/TellicoXmlReaderTest.kt`
 
 **Interfaces:**
@@ -426,7 +427,15 @@ git commit -m "v 0.5.38 — промежуточная модель Tellico и �
   ```
   Бросает `IllegalStateException("Это не коллекция книг")`, если в файле нет коллекции с `type="2"`; при невалидном XML — `IllegalStateException` с причиной парсера.
 
-- [ ] **Step 1: Написать падающий тест `TellicoXmlReaderTest`**
+- [ ] **Step 1: Поправить `.gitignore` — новый пакет `data/tellico/` не должен игнорироваться**
+
+В `.gitignore` есть паттерн `tellico/` (без ведущего слэша) — он совпадает с **любым** каталогом `tellico` на любой глубине, включая новый пакет `app/src/main/kotlin/ru/antonkw/kwbooktrack/data/tellico/`. Из-за этого файлы пакета приходится добавлять через `git add -f`, а обычный `git add .` их молча пропустит.
+
+За anchors: `tellico/` → `/tellico/` (каталог с данными пользователя лежит в корне репозитория). Если нужно оставить игнорирование фикстур — добавь отдельную строку `app/src/test/resources/fixtures/tellico/`.
+
+Проверка: `git check-ignore -v app/src/main/kotlin/ru/antonkw/kwbooktrack/data/tellico/TellicoXmlReader.kt` должен **не** найти совпадения.
+
+- [ ] **Step 2: Написать падающий тест `TellicoXmlReaderTest`**
 
 Чистый JUnit (DOM-парсер — чистый JVM). Фикстура — короткий XML-строка.
 
@@ -443,12 +452,12 @@ Cases:
 - **Коллекция не книжная:** `<collection type="3">` → `IllegalStateException` с сообщением «Это не коллекция книг».
 - **XXE-защита:** XML с `<!DOCTYPE … [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>` и `&xxe;` в тексте → значение НЕ содержит содержимого `/etc/passwd` (внешние сущности не раскрываются).
 
-- [ ] **Step 2: Запустить тест — должен упасть**
+- [ ] **Step 3: Запустить тест — должен упасть**
 
 Run: `./gradlew testDebugUnitTest --tests "*TellicoXmlReaderTest*"`
 Expected: FAIL — «Unresolved reference: TellicoXmlReader».
 
-- [ ] **Step 3: Реализовать `TellicoXmlReader`**
+- [ ] **Step 4: Реализовать `TellicoXmlReader`**
 
 Парсер:
 ```kotlin
@@ -476,12 +485,12 @@ runCatching { dbf.setXIncludeAware(false) }
      - если имя поля в `TellicoFields.KNOWN` → `fields[name] = значение`; иначе → `extra[name] = ExtraField(title = title из <fields> или имя, value = значение)`.
    - пустые значения (пустая строка) в `fields` не пишем.
 
-- [ ] **Step 4: Запустить тест — должен пройти**
+- [ ] **Step 5: Запустить тест — должен пройти**
 
 Run: `./gradlew testDebugUnitTest --tests "*TellicoXmlReaderTest*"`
 Expected: PASS.
 
-- [ ] **Step 5: Коммит**
+- [ ] **Step 6: Коммит**
 
 ```bash
 # versionCode = 48, versionName = "0.5.40"
@@ -720,6 +729,11 @@ Assertions после `invoke(file, ImportFormat.TELLICO_XML, outputDir)`:
 - файл обложки существует, `book.coverPath` указывает на файл в `<outputDir>/covers/`.
 
 - [ ] **Step 7: Перевести импортёров на снимки**
+
+> **Перенесено из ревью задачи 3 (обязательно к выполнению здесь, `readRecords` становится боевым путём):**
+> - `TellicoCsvReader`: строка CSV короче заголовка не должна ронять импорт — commons-csv `CSVRecord.get(header)` при нехватке значений бросает `IllegalArgumentException`, а не возвращает null. Значение брать по индексу с проверкой `index < record.size()`, иначе пустая строка.
+> - `TellicoFields.nameFromTitle`: если выведенное имя пустое (заголовок из одних знаков препинания) — **пропускать колонку**, а не класть её в `extra[""]`.
+> - Тест-хелпер построения CSV в `TellicoCsvReaderTest` должен экранировать внутренние кавычки (`"` → `""`) — иначе следующий расширяющий тест получит молчаливо битый CSV.
 
 `TellicoCsvReader`: удалить `read(reader): List<CSVRecord>`, переименовать `readRecords` → `read`.
 
