@@ -8,7 +8,7 @@
     <string name="about_version">Version</string>
     <string name="about_library">Library</string>
     <string name="about_backup_title">Backup</string>
-    <string name="about_backup_description">Export your library to a ZIP archive with CSV and covers, or import a previously saved archive.</string>
+    <string name="about_backup_description">Export your library to a ZIP archive with CSV and covers, export it as a native Tellico archive (.tc), or import a previously saved archive.</string>
     <string name="action_export">Export</string>
     <string name="action_export_tellico">Export to Tellico (.tc)</string>
     <string name="export_success_format">Export ready: %1$d books, %2$d photos</string>
@@ -76,7 +76,7 @@
     <string name="action_stats">Statistics</string>
     <string name="action_grid">Grid</string>
     <string name="action_list">List</string>
-    <string name="action_import_tellico">Import Tellico</string>
+    <string name="action_import_tellico">Import catalogue</string>
     <string name="search_hint">Search by title, author, ISBN…</string>
     <string name="empty_library">Library is empty — add your first book</string>
     <string name="empty_search">Nothing found for «%1$s»</string>
@@ -229,6 +229,7 @@
     <string name="tellico_import_label_covers">Covers copied: %1$d</string>
     <string name="tellico_import_label_notes">Notes / quotes / reviews: %1$d</string>
     <string name="tellico_import_error_read">Failed to read file</string>
+    <string name="tellico_import_error_empty">No records found in the file</string>
     <string name="tellico_import_error_unknown">Unknown error</string>
 
     <!-- Picker -->
@@ -321,7 +322,7 @@
     <string name="stats_monthly_entry">%1$d-%2$02d    %3$d books</string>
 
     <!-- Tellico importer -->
-    <string name="tellico_import_title">Import Tellico</string>
+    <string name="tellico_import_title">Import catalogue</string>
     <string name="tellico_import_pick_csv">Pick CSV file</string>
     <string name="tellico_import_pick_file">Pick file</string>
     <string name="tellico_import_run">Run import</string>

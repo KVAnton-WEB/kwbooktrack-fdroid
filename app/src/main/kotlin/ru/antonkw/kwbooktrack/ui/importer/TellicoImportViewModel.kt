@@ -58,25 +58,21 @@ class TellicoImportViewModel @Inject constructor(
             // Имя без расширения: файл может оказаться не zip (голый XML или CSV).
             val tempFile = File(cacheDir, "import-${System.currentTimeMillis()}.tmp")
             try {
-                context.contentResolver.openInputStream(uri)?.use { input ->
-                    FileOutputStream(tempFile).use { output -> input.copyTo(output) }
-                } ?: run {
-                    _state.value = _state.value.copy(
+                // Копирование файла и импорт — тяжёлые: главный поток не блокируем
+                // (архив с фото — это десятки мегабайт).
+                val copied = withContext(Dispatchers.IO) { copyToTemp(uri, tempFile) }
+                if (!copied) {
+                    _state.value = ImportUiState(
                         inProgress = false,
                         error = UiText.Res(R.string.tellico_import_error_read),
                     )
                     return@launch
                 }
-                // Определение формата и импорт — тяжёлые: читаем файл и пишем в БД не с главного потока.
+                // Определение формата и импорт — тоже не с главного потока.
                 val result = withContext(Dispatchers.IO) { importFile(tempFile) }
-                _state.value = ImportUiState(
-                    inProgress = false,
-                    result = result,
-                    // Частично упавший импорт — не «успех»: ошибка показывается отдельно.
-                    error = result.error?.let { errorText(it) },
-                )
+                _state.value = importState(result)
             } catch (e: Exception) {
-                _state.value = _state.value.copy(
+                _state.value = ImportUiState(
                     inProgress = false,
                     error = errorText(e),
                 )
@@ -85,6 +81,36 @@ class TellicoImportViewModel @Inject constructor(
                 // without finally a thrown importer would leak it.
                 tempFile.delete()
             }
+        }
+    }
+
+    /**
+     * Копирует выбранный файл во временный. false — прочитать не удалось.
+     */
+    private fun copyToTemp(uri: Uri, target: File): Boolean {
+        val input = context.contentResolver.openInputStream(uri) ?: return false
+        input.use { source -> FileOutputStream(target).use { source.copyTo(it) } }
+        return true
+    }
+
+    /**
+     * Состояние по результату импорта: счётчики остаются на экране вместе с ошибкой,
+     * а «пустой» файл — это не успех, а ошибка.
+     */
+    private fun importState(result: ImportTellicoResult): ImportUiState {
+        val failure = result.error
+        return when {
+            failure != null -> ImportUiState(
+                inProgress = false,
+                result = result,
+                error = errorText(failure),
+            )
+            // Ни одной записи в файле — «успешного» импорта не было.
+            result.total == 0 && result.imported == 0 -> ImportUiState(
+                inProgress = false,
+                error = UiText.Res(R.string.tellico_import_error_empty),
+            )
+            else -> ImportUiState(inProgress = false, result = result)
         }
     }
 

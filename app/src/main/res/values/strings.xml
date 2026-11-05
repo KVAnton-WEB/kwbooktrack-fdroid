@@ -8,7 +8,7 @@
     <string name="about_version">Версия</string>
     <string name="about_library">Библиотека</string>
     <string name="about_backup_title">Резервные копии</string>
-    <string name="about_backup_description">Экспорт библиотеки в ZIP-архив с CSV и обложками, либо импорт ранее сохранённого архива.</string>
+    <string name="about_backup_description">Экспорт библиотеки в ZIP-архив с CSV и обложками, экспорт в родной формат Tellico (.tc) либо импорт ранее сохранённого архива.</string>
     <string name="action_export">Экспорт</string>
     <string name="action_export_tellico">Экспорт в Tellico (.tc)</string>
     <string name="export_success_format">Экспорт готов: %1$d книг, %2$d фото</string>
@@ -76,7 +76,7 @@
     <string name="action_list">Список</string>
     <string name="notes_search_hint">Поиск по заметкам…</string>
     <string name="notes_no_results">Ничего не найдено по «%1$s»</string>
-    <string name="action_import_tellico">Импорт Tellico</string>
+    <string name="action_import_tellico">Импорт каталога</string>
     <string name="search_hint">Поиск по названию, автору, ISBN…</string>
     <string name="empty_library">Библиотека пуста — добавьте первую книгу</string>
     <string name="empty_search">Ничего не найдено по «%1$s»</string>
@@ -229,6 +229,7 @@
     <string name="tellico_import_label_covers">Обложек скопировано: %1$d</string>
     <string name="tellico_import_label_notes">Заметок/цитат/рецензий: %1$d</string>
     <string name="tellico_import_error_read">Не удалось прочитать файл</string>
+    <string name="tellico_import_error_empty">В файле не найдено ни одной записи</string>
     <string name="tellico_import_error_unknown">Неизвестная ошибка</string>
 
     <!-- Picker -->
@@ -324,7 +325,7 @@
     <string name="stats_monthly_entry">%1$d-%2$02d    %3$d кн.</string>
 
     <!-- Tellico importer -->
-    <string name="tellico_import_title">Импорт Tellico</string>
+    <string name="tellico_import_title">Импорт каталога</string>
     <string name="tellico_import_pick_csv">Выбрать CSV-файл</string>
     <string name="tellico_import_pick_file">Выбрать файл</string>
     <string name="tellico_import_run">Запустить импорт</string>

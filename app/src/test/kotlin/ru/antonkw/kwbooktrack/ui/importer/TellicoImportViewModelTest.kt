@@ -158,6 +158,31 @@ class TellicoImportViewModelTest {
         assertThat(state.result).isNull()
     }
 
+    @Test
+    fun fileWithoutRecordsLandsOnErrorState() = runTest(dispatcher) {
+        // Текст без заголовка CSV: записей ноль — «успешного» импорта не было.
+        val file = File.createTempFile("notes", ".txt").apply { writeText("просто текст") }
+
+        vm.importFromUri(Uri.fromFile(file))
+        val state = vm.state.first { !it.inProgress }
+
+        assertThat(state.error).isNotNull()
+        assertThat(state.result).isNull()
+    }
+
+    @Test
+    fun failedImportClearsResultOfPreviousRun() = runTest(dispatcher) {
+        vm.importFromUri(Uri.fromFile(zip("books.tc", "tellico.xml" to TELLICO_XML)))
+        assertThat(vm.state.first { !it.inProgress }.result).isNotNull()
+
+        vm.importFromUri(Uri.fromFile(zip("other.zip", "readme.txt" to "ничего тут нет")))
+        val state = vm.state.first { !it.inProgress }
+
+        // Счётчики прошлого прогона не должны читаться как текущие.
+        assertThat(state.error).isNotNull()
+        assertThat(state.result).isNull()
+    }
+
     private fun zip(name: String, vararg entries: Pair<String, String>): File {
         val file = File.createTempFile(name, ".tmp")
         ZipOutputStream(file.outputStream()).use { zip ->
