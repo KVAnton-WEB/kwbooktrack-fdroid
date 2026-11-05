@@ -38,9 +38,10 @@ class TellicoBookMapper @Inject constructor() {
 
         val now = System.currentTimeMillis()
         val book = BookEntity(
-            title = title,
+            // Без названия или автора книга в списке не опознаётся — подставляем заглушку.
+            title = title.ifEmpty { "(без названия)" },
             subtitle = f(record, "subtitle"),
-            author = author,
+            author = author.ifEmpty { "(автор неизвестен)" },
             isbn13 = normalizeIsbn(f(record, "isbn")),
             pageCount = f(record, "pages")?.toIntOrNull(),
             language = normalizeLanguage(f(record, "language")),
@@ -100,14 +101,17 @@ class TellicoBookMapper @Inject constructor() {
     /**
      * Цитаты: строки через `\n`, страница — префикс `цифры:` или `цифры::`.
      * Строка из одних цифр — не цитата, а «страница без текста» — пропускаем.
+     *
+     * Сначала HTML → markdown: в выгрузке Tellico цитаты разделяются тегом
+     * `<br/>`, без конвертации они слиплись бы в одну заметку.
      */
     private fun quoteNotes(record: TellicoRecord): List<NoteSnapshot> {
         val raw = f(record, "цитаты") ?: return emptyList()
-        return raw.split('\n').mapNotNull { line ->
+        return HtmlToMarkdown.convert(raw).split('\n').mapNotNull { line ->
             val trimmed = line.trim()
             if (trimmed.isEmpty() || trimmed.all { it.isDigit() }) return@mapNotNull null
             val match = QUOTE_PAGE.matchEntire(trimmed)
-            val body = HtmlToMarkdown.convert(unescape(if (match != null) match.groupValues[3] else trimmed)).trim()
+            val body = unescape(if (match != null) match.groupValues[3] else trimmed).trim()
             if (body.isEmpty()) return@mapNotNull null
             NoteSnapshot(
                 kind = NoteKind.QUOTE,
@@ -133,13 +137,13 @@ class TellicoBookMapper @Inject constructor() {
             val trimmed = line.trim()
             if (trimmed.isEmpty()) return@mapNotNull null
             val parts = trimmed.split("::", limit = 3)
-            // Строка без разделителей — это сам текст заметки.
+            // Строка без разделителей — это сам текст заметки, страницы в ней нет.
             val body = unescape(if (parts.size == 1) parts[0] else parts.getOrNull(1).orEmpty()).trim()
             if (body.isEmpty()) return@mapNotNull null
             NoteSnapshot(
                 kind = NoteKind.NOTE,
                 body = body,
-                page = parts.getOrNull(0)?.trim()?.toIntOrNull(),
+                page = if (parts.size >= 2) parts[0].trim().toIntOrNull() else null,
                 createdAt = parseDate(parts.getOrNull(2)?.trim()),
             )
         }

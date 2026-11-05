@@ -37,6 +37,17 @@ class TellicoBookMapperTest {
     }
 
     @Test
+    fun missingTitleAndAuthorGetPlaceholders() {
+        val onlyAuthor = mapper.map(record("author" to "Кто-то"))!!.book
+        val onlyTitle = mapper.map(record("title" to "Дюна"))!!.book
+
+        assertThat(onlyAuthor.title).isEqualTo("(без названия)")
+        assertThat(onlyAuthor.author).isEqualTo("Кто-то")
+        assertThat(onlyTitle.title).isEqualTo("Дюна")
+        assertThat(onlyTitle.author).isEqualTo("(автор неизвестен)")
+    }
+
+    @Test
     fun isbnShorterThan13IsDropped() {
         val book = mapper.map(record("title" to "Foo", "author" to "Bar", "isbn" to "12345"))!!.book
 
@@ -162,6 +173,26 @@ class TellicoBookMapperTest {
     }
 
     @Test
+    fun htmlInAnnotationReviewAndQuotesBecomesMarkdown() {
+        // Выгрузка Tellico отдаёт эти поля HTML: цитаты разделяются тегом <br/>.
+        // Без конвертации до деления они слиплись бы в одну заметку.
+        val snapshot = mapper.map(
+            record(
+                "title" to "Дюна",
+                "author" to "Герберт",
+                "comments" to "<p>Пустыня и <b>песок</b>&nbsp;везде.</p><p>Вторая.</p>",
+                "рецензия" to "<p>Отличная <i>книга</i>.</p>",
+                "цитаты" to "<p>Первая цитата.</p><p>Вторая &laquo;цитата&raquo;.</p>",
+            ),
+        )!!
+
+        assertThat(snapshot.book.annotation).isEqualTo("Пустыня и **песок** везде.\n\nВторая.")
+        assertThat(snapshot.notes.single { it.kind == NoteKind.REVIEW }.body).isEqualTo("Отличная *книга*.")
+        assertThat(snapshot.notes.filter { it.kind == NoteKind.QUOTE }.map { it.body })
+            .containsExactly("Первая цитата.", "Вторая «цитата».").inOrder()
+    }
+
+    @Test
     fun quotesWithPagePrefixBecomeQuoteNotes() {
         val snapshot = mapper.map(
             record("title" to "X", "author" to "Y", "цитаты" to "1::первая\n3::вторая\n4"),
@@ -223,6 +254,16 @@ class TellicoBookMapperTest {
         assertThat(note.page).isEqualTo(12)
         assertThat(note.body).isEqualTo("мысль")
         assertThat(note.createdAt).isEqualTo(LocalDate.parse("2024-03-01").toEpochMs())
+    }
+
+    @Test
+    fun noteWithoutPageHasNoPage() {
+        // Строка без разделителей — весь текст заметки, страницы в ней нет.
+        val snapshot = mapper.map(record("title" to "X", "author" to "Y", "заметки" to "42"))!!
+
+        val note = snapshot.notes.single { it.kind == NoteKind.NOTE }
+        assertThat(note.body).isEqualTo("42")
+        assertThat(note.page).isNull()
     }
 
     @Test

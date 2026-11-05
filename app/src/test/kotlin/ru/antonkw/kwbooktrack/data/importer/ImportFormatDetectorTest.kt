@@ -66,6 +66,17 @@ class ImportFormatDetectorTest {
     }
 
     @Test
+    fun brokenZipIsReportedAsUnknownFormat() {
+        // Сигнатура zip есть, а сам архив битый — пользователю нужно понятное сообщение.
+        val file = file("broken.zip", "PK мусор")
+
+        val error = runCatching { ImportFormatDetector.detect(file) }.exceptionOrNull()
+
+        assertThat(error).isInstanceOf(IllegalStateException::class.java)
+        assertThat(error).hasMessageThat().contains("tellico.xml")
+    }
+
+    @Test
     fun xmlFileIsTellicoXml() {
         val file = file("books.xml", "<?xml version=\"1.0\"?><tellico><collection/></tellico>")
 

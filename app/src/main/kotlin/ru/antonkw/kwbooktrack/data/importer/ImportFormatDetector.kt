@@ -35,17 +35,20 @@ object ImportFormatDetector {
             val isXml = text.contains("<tellico") || text.contains("<collection")
             return if (isXml) ImportFormat.TELLICO_XML else ImportFormat.TELLICO_CSV
         }
-        ZipFile(file).use { zip ->
-            val names = zip.entries().asSequence().map { it.name }.toList()
-            if (names.any { it.substringAfterLast('/') == "manifest.json" }) {
-                return ImportFormat.KWBOOKTRACK_ZIP
-            }
-            if (names.any { it.substringAfterLast('/') == "tellico.xml" }) {
-                return ImportFormat.TELLICO_XML
-            }
-            if (names.any { it.endsWith(".csv", ignoreCase = true) }) {
-                return ImportFormat.TELLICO_CSV
-            }
+        val names = runCatching {
+            ZipFile(file).use { zip -> zip.entries().asSequence().map { it.name }.toList() }
+        }.getOrElse {
+            // Битый zip — не «формат не найден», но сообщение должно быть понятным.
+            throw IllegalStateException("в архиве нет ни tellico.xml, ни CSV")
+        }
+        if (names.any { it.substringAfterLast('/') == "manifest.json" }) {
+            return ImportFormat.KWBOOKTRACK_ZIP
+        }
+        if (names.any { it.substringAfterLast('/') == "tellico.xml" }) {
+            return ImportFormat.TELLICO_XML
+        }
+        if (names.any { it.endsWith(".csv", ignoreCase = true) }) {
+            return ImportFormat.TELLICO_CSV
         }
         throw IllegalStateException("в архиве нет ни tellico.xml, ни CSV")
     }

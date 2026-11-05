@@ -120,6 +120,30 @@ class TellicoTcImportTest {
     }
 
     @Test
+    fun importsBareXmlFileWithCoverFromItsFolder() = runTest {
+        // «Голый» XML: обложки лежат рядом с ним, корень ассетов — его каталог.
+        File(tempDir, "images").mkdirs()
+        File(tempDir, "images/$COVER_NAME").writeBytes(pngBytes())
+        val file = File(tempDir, "import-123.zip").apply { writeText(TELLICO_XML) }
+
+        val result = useCase(file, ImportFormat.TELLICO_XML, outputDir)
+
+        assertThat(result.imported).isEqualTo(1)
+        val cover = File(db.bookDao().observeAll().first().single().coverPath!!)
+        assertThat(cover.exists()).isTrue()
+        assertThat(cover.parentFile).isEqualTo(File(outputDir, "covers"))
+    }
+
+    @Test
+    fun missingFileIsReportedAsError() = runTest {
+        val result = useCase(File(tempDir, "нет-такого.tc"), ImportFormat.TELLICO_XML, outputDir)
+
+        assertThat(result.total).isEqualTo(0)
+        assertThat(result.isSuccess).isFalse()
+        assertThat(result.error).isNotNull()
+    }
+
+    @Test
     fun importsBareCsvFile() = runTest {
         val file = File(tempDir, "import-456.zip").apply {
             writeText("Заголовок;Автор\nДюна;Фрэнк Герберт\n")

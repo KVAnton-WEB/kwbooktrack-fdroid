@@ -32,12 +32,23 @@ class ImportTellicoZipUseCase @Inject constructor(
         dryRun: Boolean = false,
     ): ImportTellicoResult {
         if (!file.exists()) {
-            return ImportTellicoResult(0, 0, 0, 0, 0, dryRun)
+            // Не «успешный» импорт в пустоту: UI должен показать ошибку.
+            return ImportTellicoResult(
+                total = 0,
+                imported = 0,
+                skipped = 0,
+                coversCopied = 0,
+                notesImported = 0,
+                dryRun = dryRun,
+                errors = listOf(IllegalStateException("файл не найден: ${file.absolutePath}")),
+            )
         }
         val staging = File(outputDir, ".import-staging")
         try {
-            val records = withContext(Dispatchers.IO) { readRecords(file, format, staging) }
-            val assets = ImportAssets(staging, outputDir)
+            val prepared = withContext(Dispatchers.IO) { prepare(file, format, staging) }
+            val records = prepared.records
+            // Корень ассетов: распакованный архив или родительский каталог «голого» файла.
+            val assets = ImportAssets(prepared.root, outputDir)
             var imported = 0
             var skipped = 0
             var coversCopied = 0
@@ -77,8 +88,13 @@ class ImportTellicoZipUseCase @Inject constructor(
         }
     }
 
-    /** Читает записи Tellico из архива (или из самого файла, если это не zip). */
-    private fun readRecords(file: File, format: ImportFormat, staging: File): List<TellicoRecord> {
+    /**
+     * Готовит архив к чтению: распаковывает zip (или берёт родительский каталог
+     * «голого» файла) и читает записи.
+     *
+     * [Prepared.root] — корень ассетов: обложки и фото лежат внутри него.
+     */
+    private fun prepare(file: File, format: ImportFormat, staging: File): Prepared {
         val zipped = isZip(file)
         // Для «голого» файла корень — его родительский каталог: рядом лежат обложки и фото.
         val root = if (zipped) {
@@ -89,7 +105,7 @@ class ImportTellicoZipUseCase @Inject constructor(
         } else {
             file.parentFile ?: File(".")
         }
-        return when (format) {
+        val records = when (format) {
             ImportFormat.TELLICO_XML -> {
                 val xml = source(root, file, zipped) { it.name == "tellico.xml" }
                     ?: throw IllegalStateException("в архиве нет tellico.xml")
@@ -103,7 +119,11 @@ class ImportTellicoZipUseCase @Inject constructor(
             ImportFormat.KWBOOKTRACK_ZIP ->
                 throw IllegalStateException("свой бэкап импортируется отдельным импортёром")
         }
+        return Prepared(root, records)
     }
+
+    /** Корень ассетов и прочитанные записи. */
+    private class Prepared(val root: File, val records: List<TellicoRecord>)
 
     /**
      * Файл-источник: в zip ищем по имени, «голый» файл берём как есть —
