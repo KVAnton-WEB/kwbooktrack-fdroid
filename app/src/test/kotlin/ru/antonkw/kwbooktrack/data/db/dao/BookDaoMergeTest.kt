@@ -14,6 +14,7 @@ import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
 import ru.antonkw.kwbooktrack.data.db.entity.BookSource
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
+import ru.antonkw.kwbooktrack.data.snapshot.ExtraField
 
 /**
  * BookDao is the only place that mutates the books table on import. Tests
@@ -172,6 +173,37 @@ class BookDaoMergeTest {
         val row = dao.observeAll().first().first()
         assertThat(row.status).isEqualTo(BookStatus.FINISHED)
         assertThat(row.finishedAt).isEqualTo(1_700_000_000_000L)
+    }
+
+    @Test
+    fun extraFieldsAreMergedByKeyOnImport() = runBlocking {
+        // Чужие поля Tellico: импорт побеждает по ключу, а ключи, которых
+        // в импорте нет, сохраняются — пустой импорт не стирает данные.
+        dao.insert(
+            BookEntity(
+                title = "Hyperion",
+                author = "Dan Simmons",
+                createdAt = 0L,
+                updatedAt = 0L,
+                extraFields = mapOf(
+                    "чтец" to ExtraField("Чтец", "Иванова"),
+                    "переводчик" to ExtraField("Переводчик", "Сидоров"),
+                ),
+            ),
+        )
+        dao.upsertFromImport(
+            BookEntity(
+                title = "Hyperion",
+                author = "Dan Simmons",
+                createdAt = 0L,
+                updatedAt = 0L,
+                extraFields = mapOf("чтец" to ExtraField("Чтец", "Петрова")),
+            ),
+        )
+
+        val fields = dao.observeAll().first().first().extraFields
+        assertThat(fields["чтец"]?.value).isEqualTo("Петрова")
+        assertThat(fields["переводчик"]?.value).isEqualTo("Сидоров")
     }
 }
 

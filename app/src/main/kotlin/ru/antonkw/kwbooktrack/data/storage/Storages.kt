@@ -91,6 +91,15 @@ class FileCoverStorage @Inject constructor(
  */
 interface PhotoStorage {
     fun saveForNote(noteId: Long, source: InputStream, extension: String): String
+
+    /**
+     * Сохранить байты под заданным именем (без расширения) в каталог фото;
+     * вернуть абсолютный путь. Импорт архива так сохраняет фото под именем
+     * `{md5}_{bookId}` — одинаковое содержимое у двух книг не удаляется
+     * вместе с одной из них.
+     */
+    fun saveNamed(name: String, source: InputStream, extension: String): String
+
     fun deleteForNote(noteId: Long)
     fun deleteForBook(bookId: Long)
 
@@ -112,6 +121,14 @@ class FilePhotoStorage @Inject constructor(
         // UUID suffix to disambiguate parallel saves; `noteId_timestamp` collided
         // when two attaches happened within the same millisecond.
         val target = File(photosDir, "note_${noteId}_${UUID.randomUUID()}.${extension.ifEmpty { "jpg" }}")
+        source.use { input ->
+            target.outputStream().use { input.copyTo(it) }
+        }
+        return target.absolutePath
+    }
+
+    override fun saveNamed(name: String, source: InputStream, extension: String): String {
+        val target = File(photosDir, "$name.${extension.ifEmpty { "jpg" }}")
         source.use { input ->
             target.outputStream().use { input.copyTo(it) }
         }

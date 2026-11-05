@@ -145,4 +145,7 @@ private fun BookEntity.mergeWith(existing: BookEntity): BookEntity = copy(
     isGift = isGift.takeIf { it } ?: existing.isGift,
     isLent = isLent.takeIf { it } ?: existing.isLent,
     isSold = isSold.takeIf { it } ?: existing.isSold,
+    // Чужие поля Tellico: импорт побеждает по ключу, а ключи, которых в
+    // импорте нет, остаются (пустой импорт не стирает данные).
+    extraFields = existing.extraFields + extraFields,
 )

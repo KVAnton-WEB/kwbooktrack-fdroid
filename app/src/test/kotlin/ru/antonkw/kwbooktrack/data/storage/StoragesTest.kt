@@ -136,6 +136,14 @@ class StoragesTest {
     }
 
     @Test
+    fun photoSaveNamedWritesFileUnderTheGivenName() {
+        val path = photoStorage.saveNamed("5289df_42", ByteArrayInputStream(byteArrayOf(1, 2)), "jpg")
+        assertThat(File(path).name).isEqualTo("5289df_42.jpg")
+        assertThat(File(path).exists()).isTrue()
+        assertThat(File(path).readBytes()).isEqualTo(byteArrayOf(1, 2))
+    }
+
+    @Test
     fun photoDeleteForNoteRemovesOnlyThatNoteFiles() {
         val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
         val photosDir = File(ctx.filesDir, "photos")
