@@ -218,4 +218,71 @@ class ScrollbarMetricsTest {
         assertThat(atEnd.scrollPx).isEqualTo(7200f)
         assertThat(delta).isLessThan(0f)
     }
+
+    private fun thumbMap(
+        avg: Float = avgItemPx,
+        count: Int = itemCount,
+        viewport: Float = viewportPx,
+        track: Int = 1000,
+    ): ThumbMap {
+        val m = metrics(avg = avg, count = count, viewport = viewport)
+        return ThumbMap(
+            avgItemPx = m.avgItemPx,
+            contentRangePx = m.totalScrollPx - m.viewportPx,
+            scrollableTrackPx = track,
+            totalItemsCount = m.totalItemsCount,
+        )
+    }
+
+    /** Позиция списка в пикселях контента после прыжка в [target]. */
+    private fun ThumbMap.contentPx(target: ScrollTarget): Float =
+        avgItemPx * target.index + target.offset
+
+    @Test
+    fun `thumb at the top — the list starts at the first item`() {
+        val target = thumbMap().target(0)
+        assertThat(target.index).isEqualTo(0)
+        assertThat(target.offset).isEqualTo(0)
+    }
+
+    @Test
+    fun `thumb at the bottom — the list reaches its last screenful`() {
+        // 100 items * 80px = 8000, viewport 800 → 7200 scrollable px.
+        // The last screenful starts at item 90.
+        val target = thumbMap().target(1000)
+        assertThat(target.index).isEqualTo(90)
+        assertThat(target.offset).isEqualTo(0)
+    }
+
+    @Test
+    fun `a pixel of the thumb moves the list by the whole track ratio`() {
+        // The core of the drag: the list follows the finger, not a fixed
+        // number of cards per event. 7200 scrollable px over a 1000px track
+        // = 7.2px of content per pixel of the thumb.
+        val map = thumbMap()
+        val a = map.target(100)
+        val b = map.target(101)
+        assertThat(map.contentPx(b) - map.contentPx(a)).isWithin(0.5f).of(7.2f)
+    }
+
+    @Test
+    fun `the list stays where the thumb was dropped`() {
+        // Round trip: the position the jump produces must map back to the
+        // very same thumb offset, otherwise the thumb snaps back to the
+        // list's position when the finger is released.
+        val map = thumbMap()
+        for (offsetPx in listOf(0, 137, 500, 861, 1000)) {
+            val target = map.target(offsetPx)
+            val back = map.contentPx(target) / map.contentRangePx * map.scrollableTrackPx
+            assertThat(back).isWithin(1f).of(offsetPx.toFloat())
+        }
+    }
+
+    @Test
+    fun `the target never leaves the list`() {
+        val map = thumbMap()
+        assertThat(map.target(-500).index).isAtLeast(0)
+        assertThat(map.target(9999).index).isAtMost(itemCount - 1)
+        assertThat(map.target(9999).offset).isAtLeast(0)
+    }
 }

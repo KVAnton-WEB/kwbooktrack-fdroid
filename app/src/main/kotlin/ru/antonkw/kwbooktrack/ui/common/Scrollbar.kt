@@ -1,6 +1,5 @@
 package ru.antonkw.kwbooktrack.ui.common
 
-import androidx.compose.foundation.MutatePriority
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -35,9 +34,6 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -118,9 +114,9 @@ class ScrollbarController internal constructor(
     /**
      * Геометрия ползунка в пикселях дорожки.
      *
-     * Пока идёт скраб, смещение задаёт палец: scrollFraction отстаёт от
-     * dispatchRawDelta (он усредняет высоты элементов), и без этого ползунок
-     * дёргался бы назад на место посреди перетаскивания.
+     * Пока идёт скраб, смещение задаёт палец: список прыгает по элементам,
+     * и его позиция отстаёт от пальца на кадр, а без этого ползунок
+     * дёргался бы назад на место списка.
      */
     internal val thumb: State<ThumbGeometry> = derivedStateOf {
         val m = metrics.value
@@ -137,6 +133,37 @@ class ScrollbarController internal constructor(
         val offsetPx = dragOffsetPx
             ?: (m.scrollFraction * scrollableTrackPx).roundToInt().coerceIn(0, scrollableTrackPx)
         ThumbGeometry(thumbHeightPx, scrollableTrackPx, offsetPx)
+    }
+
+    /**
+     * Соответствие «смещение ползунка → позиция списка».
+     *
+     * Снимок, а не живые метрики: оценка высоты карточки и длины контента
+     * пересчитываются по мере прокрутки, и с живыми значениями цель
+     * прыгала бы под пальцем на сотни пикселей.
+     */
+    internal fun thumbMap(): ThumbMap {
+        val m = metrics.value
+        val g = thumb.value
+        return ThumbMap(
+            avgItemPx = m.avgItemPx.coerceAtLeast(1f),
+            contentRangePx = (m.totalScrollPx - m.viewportPx).coerceAtLeast(0f),
+            scrollableTrackPx = g.scrollableTrackPx.coerceAtLeast(1),
+            totalItemsCount = m.totalItemsCount,
+        )
+    }
+
+    /**
+     * Поставить список в позицию, соответствующую смещению ползунка [offsetPx].
+     *
+     * Прыжок по элементу ([LazyListState.requestScrollToItem]), а не
+     * прокрутка на дельту: список оказывается ровно там, где ползунок, и не
+     * откатывается назад при отпускании. Пропущенные элементы при этом не
+     * перемериваются — в отличие от scrollBy на десятки тысяч пикселей.
+     */
+    internal fun scrollToThumbOffset(offsetPx: Int, map: ThumbMap) {
+        val target = map.target(offsetPx)
+        listState.requestScrollToItem(target.index, target.offset)
     }
 }
 
@@ -163,6 +190,12 @@ fun rememberScrollbarController(listState: LazyListState): ScrollbarController {
  *
  * Тап в свободном поле у края ([marginWidth] справа, там, где контента нет)
  * прыгает по странице; тап по карточке остаётся карточке.
+ *
+ * Скраб — это не «прокрутка на дельту», а установка абсолютной позиции:
+ * ползунок задаёт, где должен быть список, и список прыгает туда
+ * ([ScrollbarController.scrollToThumbOffset]). Прокрутка на дельту отставала
+ * от пальца (за событие список едет на одну карточку, а палец требует
+ * десятки), и при отпускании ползунок откатывался назад на место списка.
  */
 fun Modifier.scrollbarGestures(
     controller: ScrollbarController,
@@ -177,169 +210,106 @@ fun Modifier.scrollbarGestures(
     // Насколько выше/ниже ползунка жест ещё считается «захватом ползунка».
     val tolerancePx = 8.dp.toPx()
 
-    coroutineScope {
-        // Воркер скролла. Он держит мьютекс списка на всё время скраба и
-        // применяет дельты по порядку.
-        //
-        // Почему воркер, а не scrollBy прямо из обработчика жеста:
-        // awaitPointerEventScope — restricted scope, там нельзя suspend-вызовы.
-        // А по одному dispatchRawDelta на дельту мьютекс брать нельзя: пока
-        // его держит флинг или другое перетаскивание, вызов виснет (замерено
-        // на устройстве: 14 → 472 мс на вызов) — список отставал от ползунка,
-        // скраб дёргался. Один scroll{} на жест держит мьютекс и сразу
-        // отменяет флинг (PreventUserInput).
-        // CONFLATED: в очереди остаётся только последняя цель. Команда
-        // несёт НАКОПЛЕННУЮ дельту с начала скраба, поэтому воркер докручивает
-        // до неё, отбрасывая промежуточные значения. Очередь не растёт, и
-        // главный поток не забивается работой, которую список всё равно не
-        // успевает: контент по полосе едет в ~79 раз быстрее пальца.
-        val commands = Channel<ScrubCommand>(Channel.CONFLATED)
-        launch {
-            while (true) {
-                val first = commands.receive()
-                controller.listState.scroll(MutatePriority.PreventUserInput) {
-                    var applied = 0f
-                    var cmd: ScrubCommand = first
-                    while (true) {
-                        when (cmd) {
-                            is ScrubCommand.Delta -> {
-                                // Шаг ограничен одним элементом: список
-                                // успевает составить примерно одну карточку
-                                // за кадр, а scrollBy на десятки тысяч
-                                // пикселей заставляет перемерить их все
-                                // (замерено 0.4 с на шаг).
-                                val maxStep = controller.metrics.value.avgItemPx
-                                    .coerceAtLeast(1f)
-                                val step = (cmd.px - applied).coerceIn(-maxStep, maxStep)
-                                if (step != 0f) {
-                                    scrollBy(step)
-                                    applied += step
-                                }
-                            }
-                            is ScrubCommand.Stop -> {
-                                // Финальная цель: докручиваем остаток, но не
-                                // больше одного элемента — большой остаток
-                                // перемерил бы полсотни карточек и держал
-                                // мьютекс (PreventUserInput) на секунды — новый
-                                // свайп пользователя ждал бы его и «догонял».
-                                val maxStep = controller.metrics.value.avgItemPx
-                                    .coerceAtLeast(1f)
-                                val rest = (cmd.px - applied).coerceIn(-maxStep, maxStep)
-                                if (rest != 0f) scrollBy(rest)
-                                return@scroll
-                            }
-                        }
-                        cmd = commands.receive()
-                    }
-                }
-            }
-        }
+    awaitPointerEventScope {
+        while (true) {
+            val event0 = awaitPointerEvent(PointerEventPass.Initial)
+            val down = event0.changes.firstOrNull { it.changedToDown() } ?: continue
+            val downX = down.position.x
+            val downY = down.position.y
+            val inMargin = downX >= listWidthPx - marginPx
+            // Зона захвата полосы — [grabWidth] справа. Скраб начинается
+            // только в ней: полоса живёт у самого края, и жест в этой
+            // полосе — осознанный захват полосы, а не обычный скролл.
+            // Раньше скраб начинался в любом месте, где палец по вертикали
+            // совпал с ползунком, — обычный свайп по списку превращался в
+            // скраб: контент ехал в противоположную сторону и жест
+            // «залипал» (проверено на устройстве).
+            val inGrab = downX >= listWidthPx - grabPx
+            val g0 = controller.thumb.value
+            val nearThumb = downY >= g0.offsetPx - tolerancePx &&
+                downY <= g0.offsetPx + g0.thumbHeightPx + tolerancePx
+            val mayScrub = inGrab && nearThumb
+            // Соответствие «ползунок → позиция списка» замораживаем на жест.
+            val map = controller.thumbMap()
+            var lastY = downY
+            var totalDeltaY = 0f
+            var scrubbed = false
 
-        awaitPointerEventScope {
-            while (true) {
-                val event0 = awaitPointerEvent(PointerEventPass.Initial)
-                val down = event0.changes.firstOrNull { it.changedToDown() } ?: continue
-                val downX = down.position.x
-                val downY = down.position.y
-                val inMargin = downX >= listWidthPx - marginPx
-                // Зона захвата полосы — [grabWidth] справа. Скраб начинается
-                // только в ней: полоса живёт у самого края, и жест в этой
-                // полосе — осознанный захват полосы, а не обычный скролл.
-                // Раньше скраб начинался в любом месте, где палец по вертикали
-                // совпал с ползунком, — обычный свайп по списку превращался в
-                // скраб: контент ехал в противоположную сторону и жест
-                // «залипал» (проверено на устройстве).
-                val inGrab = downX >= listWidthPx - grabPx
-                val g0 = controller.thumb.value
-                val nearThumb = downY >= g0.offsetPx - tolerancePx &&
-                    downY <= g0.offsetPx + g0.thumbHeightPx + tolerancePx
-                val mayScrub = inGrab && nearThumb
-                // Положение ползунка в момент касания; скраб идёт 1:1 от него,
-                // поэтому смещение пальца внутри ползунка не важно.
-                val grabOffsetPx = g0.offsetPx
-                var lastY = downY
-                var totalDeltaY = 0f
-                var scrubbed = false
-                var lastTargetPx = 0f
-
-                try {
-                    while (true) {
-                        val event = awaitPointerEvent(PointerEventPass.Initial)
-                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                        if (!change.pressed) break
-                        val delta = change.position.y - lastY
-                        if (delta == 0f) continue
+            try {
+                while (true) {
+                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                    val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                    val delta = change.position.y - lastY
+                    if (delta != 0f) {
                         lastY = change.position.y
                         totalDeltaY += delta
                         // До срабатывания touch slop жест не перехватываем:
                         // мелкая дрожь пальца должна читаться как тап.
-                        if (abs(totalDeltaY) <= viewConfiguration.touchSlop) continue
-                        // Не рядом с ползунком — жест остаётся списку.
-                        if (!mayScrub) continue
-                        // consume в Initial-проходе отменяет перетаскивание
-                        // списка: событие увидит и скролл, но уже «съеденным».
-                        change.consume()
-                        controller.isDragging = true
-                        // ponytail: ползунок упирается в дорожку, а список
-                        // прокручивается только на сырое смещение, поэтому за
-                        // край ползунок замирает, а список стоит — при отпускании
-                        // он догоняет список. Похоже на резинку; чтобы сделать
-                        // точно, нужен съеденный дельтой scrollBy.
-                        controller.dragOffsetPx = (grabOffsetPx + totalDeltaY)
-                            .roundToInt()
-                            .coerceIn(0, controller.thumb.value.scrollableTrackPx)
-                        val m = controller.metrics.value
-                        val totalScrollable = (m.totalScrollPx - m.viewportPx).coerceAtLeast(0f)
-                        val pxPerTrackPx = totalScrollable / controller.thumb.value.scrollableTrackPx
-                        if (pxPerTrackPx > 0f) {
-                            // Накопленная дельта с начала скраба — цель, к
-                            // которой воркер докручивает. Первая дельта сама
-                            // запускает скраб: воркер берёт мьютекс и сразу
-                            // отменяет флинг списка.
+                        if (abs(totalDeltaY) > viewConfiguration.touchSlop && mayScrub) {
+                            // consume в Initial-проходе отменяет перетаскивание
+                            // списка: событие увидит и скролл, но уже «съеденным».
+                            change.consume()
+                            controller.isDragging = true
+                            // Ползунок идёт за пальцем 1:1, список — туда, где
+                            // ползунок. Одно и то же смещение в одном и том же
+                            // координатном пространстве (дорожка полосы
+                            // начинается там же, где список).
+                            val offsetPx = (g0.offsetPx + totalDeltaY)
+                                .roundToInt()
+                                .coerceIn(0, g0.scrollableTrackPx)
+                            controller.dragOffsetPx = offsetPx
                             scrubbed = true
-                            lastTargetPx = totalDeltaY * pxPerTrackPx
-                            commands.trySend(ScrubCommand.Delta(lastTargetPx))
+                            controller.scrollToThumbOffset(offsetPx, map)
                         }
                     }
-                } finally {
-                    controller.isDragging = false
-                    if (scrubbed) {
-                        commands.trySend(ScrubCommand.Stop(lastTargetPx))
-                    }
-                    // Ползунок снова следует за списком — иначе он навсегда
-                    // остался бы там, где палец его отпустил.
-                    controller.dragOffsetPx = null
+                    // Подъём пальца — последнее событие: в нём уже есть
+                    // конечная позиция, поэтому дельту применяем ДО выхода.
+                    if (!change.pressed) break
                 }
+            } finally {
+                controller.isDragging = false
+                // Ползунок снова следует за списком — иначе он навсегда
+                // остался бы там, где палец его отпустил.
+                controller.dragOffsetPx = null
+            }
 
-                // Тап без перетаскивания: ставим ползунок под палец. Только в
-                // свободном поле у края — тап по карточке должен открыть
-                // карточку, а не прыгнуть по списку.
-                if (!scrubbed && abs(totalDeltaY) <= viewConfiguration.touchSlop && inMargin) {
-                    val g = controller.thumb.value
-                    val m = controller.metrics.value
-                    val ratio = ((downY - g.thumbHeightPx / 2f) / g.scrollableTrackPx)
-                        .coerceIn(0f, 1f)
-                    // Прыгаем к элементу, а не на пиксели: scrollBy на всю
-                    // высоту контента (десятки тысяч пикселей) заставляет
-                    // LazyColumn перемерить сотни элементов — замерено 3.8 с
-                    // на прыжок. requestScrollToItem прыгает сразу и ещё и
-                    // отменяет флинг списка.
-                    val total = m.totalItemsCount
-                    val targetIndex = (ratio * total).toInt().coerceIn(0, (total - 1).coerceAtLeast(0))
-                    controller.listState.requestScrollToItem(targetIndex)
-                }
+            // Тап без перетаскивания: ставим ползунок под палец. Только в
+            // свободном поле у края — тап по карточке должен открыть
+            // карточку, а не прыгнуть по списку.
+            if (!scrubbed && abs(totalDeltaY) <= viewConfiguration.touchSlop && inMargin) {
+                val offsetPx = (downY - g0.thumbHeightPx / 2f)
+                    .roundToInt()
+                    .coerceIn(0, g0.scrollableTrackPx)
+                controller.scrollToThumbOffset(offsetPx, map)
             }
         }
     }
 }
 
-/** Команды воркеру скролла. */
-private sealed interface ScrubCommand {
-    /** Сдвиг контента на [px] — цель от начала скраба. */
-    data class Delta(val px: Float) : ScrubCommand
-    /** Конец скраба: [px] — финальная цель, до неё воркер докручивает. */
-    data class Stop(val px: Float) : ScrubCommand
+/**
+ * Соответствие между смещением ползунка и позицией списка.
+ *
+ * Чистая математика: ползунок живёт в координатах дорожки, список — в
+ * координатах контента. Смещение ползунка переводится в долю прокрутки,
+ * доля — в пиксели контента, пиксели — в элемент и смещение внутри него.
+ */
+internal class ThumbMap(
+    val avgItemPx: Float,
+    val contentRangePx: Float,
+    val scrollableTrackPx: Int,
+    val totalItemsCount: Int,
+) {
+    /** Элемент и смещение внутри него для смещения ползунка [offsetPx]. */
+    fun target(offsetPx: Int): ScrollTarget {
+        val scrollPx = offsetPx / scrollableTrackPx.toFloat() * contentRangePx
+        val index = (scrollPx / avgItemPx).toInt()
+            .coerceIn(0, (totalItemsCount - 1).coerceAtLeast(0))
+        return ScrollTarget(index, (scrollPx - index * avgItemPx).roundToInt())
+    }
 }
+
+/** Позиция списка: элемент и смещение внутри него. */
+internal data class ScrollTarget(val index: Int, val offset: Int)
 
 /**
  * Material 3-стилизованная вертикальная полоса прокрутки.
