@@ -1,6 +1,8 @@
 package ru.antonkw.kwbooktrack.data.snapshot
 
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 import ru.antonkw.kwbooktrack.data.db.dao.NoteDao
 import ru.antonkw.kwbooktrack.data.db.dao.PhotoDao
 import ru.antonkw.kwbooktrack.data.db.dao.ReadingSessionDao
@@ -58,13 +60,24 @@ class SnapshotBuilder @Inject constructor(
 
     /**
      * Имя файла фото в архиве — MD5 от содержимого: устойчиво между экспортом
-     * и импортом (повторный импорт не плодит дубли). Файла нет — откатываемся
-     * на id, чтобы экспорт не ронялся.
+     * и импортом (повторный импорт не плодит дубли). Файла нет или он нечитаем —
+     * откатываемся на id, чтобы экспорт не ронялся.
      */
-    private fun PhotoEntity.archivePath(): String {
+    private suspend fun PhotoEntity.archivePath(): String {
         val file = File(path)
         val ext = file.extension.ifEmpty { "jpg" }
-        val name = if (file.isFile) md5(file.readBytes()) else id.toString()
+        val name = if (file.isFile) {
+            // Чтение файла — блокирующий I/O, поэтому уводим его с вызывающего
+            // потока (вызов может прийти из viewModelScope, то есть с Main).
+            // Файл мог исчезнуть или оказаться нечитаемым между проверкой и
+            // чтением — тогда откатываемся на id.
+            val digest = withContext(Dispatchers.IO) {
+                runCatching { md5(file.readBytes()) }.getOrNull()
+            }
+            digest ?: id.toString()
+        } else {
+            id.toString()
+        }
         return "photos/$name.$ext"
     }
 
