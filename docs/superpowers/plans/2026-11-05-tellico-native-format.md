@@ -1018,7 +1018,7 @@ Expected: FAIL — `importFromUri` не маршрутизирует по фор
 1. Временный файл: `File(cacheDir, "imports")/import-${System.currentTimeMillis()}.tmp` (имя больше не `tellico-…`, файл может быть не zip).
 2. Скопировать URI во временный файл.
 3. `ImportFormatDetector.detect(temp)`:
-   - `KWBOOKTRACK_ZIP` → `importKwBooktrackZipUseCase(temp)`;
+   - `KWBOOKTRACK_ZIP` → `importKwBooktrackZipUseCase(temp, context.filesDir)` (второй аргумент — каталог для обложек; сигнатура `invoke(zipFile: File, outputDir: File)`, см. задачу 7);
    - `TELLICO_XML` / `TELLICO_CSV` → `importTellicoZipUseCase(temp, format, context.filesDir)`.
 4. Ошибки → `UiText.Raw(e.message)`; в `finally` — удалить временный файл.
 
@@ -1026,6 +1026,8 @@ Expected: FAIL — `importFromUri` не маршрутизирует по фор
 
 - Кнопка «Выбрать файл» (строка `tellico_import_pick_file`), mime: `arrayOf("application/zip", "application/xml", "text/xml", "text/csv", "application/octet-stream", "*/*")`.
 - Описание (`tellico_import_description`) — про `.tc`/XML/CSV/свой бэкап.
+- **Показывать ошибки импорта:** сейчас экран рисует карточку «Импорт завершён» даже когда `result.errors` непуст (частично упавший импорт выглядит как успешный). Если `result != null && !result.isSuccess` — показывать `result.error` как ошибку, а не как успех.
+- **Поправить подписи счётчиков:** `notesImported` теперь = заметки + сессии + теги + фото, а строка `tellico_import_notes_format` говорит «Заметок добавлено: %1$d» — вводит в заблуждение. Либо переименовать строку в «Заметок, сессий, тегов и фото добавлено», либо считать и показывать раздельно (раздельно — значит расширить `ImportTellicoResult`, что выходит за рамки задачи; выбери переименование).
 
 - [ ] **Step 5: Написать падающий тест `AboutExportViewModelTest` (дополнение)**
 
