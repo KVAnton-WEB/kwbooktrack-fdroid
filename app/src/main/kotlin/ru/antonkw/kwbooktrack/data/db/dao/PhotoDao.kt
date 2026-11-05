@@ -10,6 +10,9 @@ import ru.antonkw.kwbooktrack.data.db.entity.PhotoEntity
 
 @Dao
 interface PhotoDao {
+    @Query("SELECT * FROM photos ORDER BY created_at DESC")
+    fun observeAll(): Flow<List<PhotoEntity>>
+
     @Query("SELECT * FROM photos WHERE book_id = :bookId ORDER BY created_at DESC")
     fun observeByBook(bookId: Long): Flow<List<PhotoEntity>>
 

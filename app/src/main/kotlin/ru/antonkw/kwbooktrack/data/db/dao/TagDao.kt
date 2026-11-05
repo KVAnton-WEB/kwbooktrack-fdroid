@@ -16,6 +16,13 @@ interface TagDao {
     @Query("SELECT * FROM tags WHERE name = :name LIMIT 1")
     suspend fun findByName(name: String): TagEntity?
 
+    /** Теги книги по алфавиту — так же, как их показывает список тегов. */
+    @Query(
+        "SELECT t.* FROM tags t JOIN book_tags bt ON bt.tag_id = t.id " +
+            "WHERE bt.book_id = :bookId ORDER BY t.name",
+    )
+    suspend fun tagsForBook(bookId: Long): List<TagEntity>
+
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insert(tag: TagEntity): Long
 
