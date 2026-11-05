@@ -111,7 +111,15 @@ class TellicoBookMapper @Inject constructor() {
             val trimmed = line.trim()
             if (trimmed.isEmpty() || trimmed.all { it.isDigit() }) return@mapNotNull null
             val match = QUOTE_PAGE.matchEntire(trimmed)
-            val body = unescape(if (match != null) match.groupValues[3] else trimmed).trim()
+            // Цитата без страницы: `::текст` — так пишет сам Tellico. Префикс надо
+            // снять, иначе каждое «экспорт → импорт» добавлял бы к тексту ещё `::`.
+            val body = unescape(
+                when {
+                    match != null -> match.groupValues[3]
+                    trimmed.startsWith("::") -> trimmed.removePrefix("::")
+                    else -> trimmed
+                },
+            ).trim()
             if (body.isEmpty()) return@mapNotNull null
             NoteSnapshot(
                 kind = NoteKind.QUOTE,

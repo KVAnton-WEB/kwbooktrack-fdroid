@@ -216,6 +216,18 @@ class TellicoBookMapperTest {
     }
 
     @Test
+    fun quoteWithEmptyPagePrefixLosesOnlyThePrefix() {
+        // `::текст` — так Tellico пишет цитату без страницы (в живой коллекции
+        // есть строка `::Абстракция…`). Без разбора префикса каждое
+        // «экспорт → импорт» добавляло бы к тексту ещё `::`.
+        val snapshot = mapper.map(record("title" to "X", "author" to "Y", "цитаты" to "::текст"))!!
+
+        val quote = snapshot.notes.single { it.kind == NoteKind.QUOTE }
+        assertThat(quote.body).isEqualTo("текст")
+        assertThat(quote.page).isNull()
+    }
+
+    @Test
     fun quoteInCsvFormatKeepsPage() {
         // Живая выгрузка Tellico пишет цитаты как «1:текст».
         val snapshot = mapper.map(record("title" to "X", "author" to "Y", "цитаты" to "1:текст"))!!

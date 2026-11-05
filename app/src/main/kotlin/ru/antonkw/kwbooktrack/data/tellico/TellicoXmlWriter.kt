@@ -66,6 +66,7 @@ object TellicoXmlWriter {
         val result = linkedMapOf<String, ExtraField>()
         for (entry in entries) {
             for ((name, extra) in entry.snapshot.extraFields) {
+                if (!isSafeName(name)) continue
                 result.putIfAbsent(name, extra)
             }
         }
@@ -109,7 +110,8 @@ object TellicoXmlWriter {
         book.binding?.let { element(xml, "binding", it) }
         book.purchasePrice?.let { element(xml, "pur_price", formatDecimal(it)) }
         book.purchaseDate?.let { date(xml, "pur_date", it) }
-        book.rating?.let { element(xml, "rating", it.toString()) }
+        // У Tellico рейтинг 1..5 — значение вне диапазона в файл не пишем.
+        book.rating?.takeIf { it in 1..5 }?.let { element(xml, "rating", it.toString()) }
         entry.coverArchiveName?.let { element(xml, "cover", it) }
         book.annotation?.let { element(xml, "comments", it) }
         date(xml, "cdate", book.createdAt)
@@ -146,8 +148,11 @@ object TellicoXmlWriter {
         // Рецензия — первая заметка REVIEW по createdAt.
         reviewText(snapshot.notes)?.let { element(xml, "рецензия", it) }
 
-        // Чужие поля.
-        snapshot.extraFields.forEach { (name, extra) -> element(xml, name, extra.value) }
+        // Чужие поля: имя элемента нельзя экранировать (экранирование даёт
+        // невалидное XML), поэтому поле с небезопасным именем пропускаем.
+        snapshot.extraFields.forEach { (name, extra) ->
+            if (isSafeName(name)) element(xml, name, extra.value)
+        }
 
         xml.append("  </entry>\n")
     }
@@ -164,9 +169,15 @@ object TellicoXmlWriter {
         xml.append("  </images>\n")
     }
 
+    /**
+     * Элемент со значением.
+     *
+     * Имя элемента **не экранируется** — экранирование даёт невалидный XML.
+     * Поэтому имя должно быть безопасным: свои поля — константы, чужие
+     * проверяются [isSafeName] перед вызовом.
+     */
     private fun element(xml: StringBuilder, name: String, value: String) {
-        val tag = escape(name)
-        xml.append("   <$tag>${escape(value)}</$tag>\n")
+        xml.append("   <$name>${escape(value)}</$name>\n")
     }
 
     /** Дата Tellico: `<поле calendar="gregorian">` с двузначными месяцем и днём. */
@@ -269,6 +280,16 @@ object TellicoXmlWriter {
         .replace("\"", "&quot;")
         .replace("'", "&apos;")
 
+    /**
+     * Имя, пригодное для имени элемента XML: буквы, цифры, точка, дефис,
+     * подчёркивание.
+     *
+     * Чужие поля приходят из пользовательских данных (импорт чужой коллекции),
+     * а одно «кривое» имя ломает разбор всего `tellico.xml` — поэтому такое
+     * поле пропускаем, а не экранируем.
+     */
+    private fun isSafeName(name: String): Boolean = SAFE_NAME.matches(name)
+
     /** Объявление поля в `<fields>`. */
     private data class FieldDef(
         val name: String,
@@ -280,6 +301,9 @@ object TellicoXmlWriter {
         val columns: Int? = null,
         val columnTitles: List<String> = emptyList(),
     )
+
+    /** Допустимое имя элемента XML. */
+    private val SAFE_NAME = Regex("[A-Za-zА-Яа-яЁё0-9._-]+")
 
     /** Свои поля — с теми же `name`/`title`, что в живой коллекции Tellico. */
     private val ownFields: List<FieldDef> = listOf(
@@ -302,8 +326,14 @@ object TellicoXmlWriter {
             columns = 3, columnTitles = listOf("страница", "Текст", "Дата"),
         ),
         ownField("теги", type = 1, flags = 1, category = "Классификация"),
-        ownField("сессии-чтения", type = 2, flags = 1, category = "Личное", columns = 6),
-        ownField("фото-заметок", type = 2, flags = 1, category = "Личное", columns = 3),
+        ownField(
+            "сессии-чтения", type = 2, flags = 1, category = "Личное", columns = 6,
+            columnTitles = listOf("начало", "конец", "страница начала", "страница конца", "длительность", "заметка"),
+        ),
+        ownField(
+            "фото-заметок", type = 2, flags = 1, category = "Личное", columns = 3,
+            columnTitles = listOf("файл", "индекс заметки", "дата"),
+        ),
     )
 
     /** Заголовок поля берём из словаря Tellico — чтобы имена не разъезжались. */

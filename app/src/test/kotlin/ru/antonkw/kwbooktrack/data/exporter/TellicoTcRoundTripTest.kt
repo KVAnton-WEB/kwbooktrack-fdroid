@@ -56,6 +56,7 @@ class TellicoTcRoundTripTest {
     private lateinit var sourceDb: KwBooktrackDatabase
     private lateinit var targetDb: KwBooktrackDatabase
     private lateinit var exportUseCase: ExportTellicoTcUseCase
+    private lateinit var targetExportUseCase: ExportTellicoTcUseCase
     private lateinit var importUseCase: ImportTellicoZipUseCase
     private lateinit var sourceBooks: BookRepository
     private lateinit var sourceNotes: NoteRepository
@@ -77,18 +78,15 @@ class TellicoTcRoundTripTest {
         sourceSessions = SessionRepository(sourceDb.readingSessionDao())
         sourceTags = TagRepository(sourceDb.tagDao())
 
-        exportUseCase = ExportTellicoTcUseCase(
-            snapshotBuilder = SnapshotBuilder(
-                bookRepository = sourceBooks,
-                noteDao = sourceDb.noteDao(),
-                sessionDao = sourceDb.readingSessionDao(),
-                photoDao = sourceDb.photoDao(),
-                tagDao = sourceDb.tagDao(),
+        exportUseCase = exporterFor(sourceDb, sourceBooks)
+        targetExportUseCase = exporterFor(
+            targetDb,
+            BookRepository(
+                targetDb.bookDao(),
+                targetDb.tagDao(),
+                NoOpCoverStorage,
+                PhotoRepository(targetDb.photoDao(), FilePhotoStorage(context)),
             ),
-            database = sourceDb,
-            versionProvider = object : AppVersionProvider {
-                override val appVersion: String = "0.1.0"
-            },
         )
 
         val targetPhotos = PhotoRepository(targetDb.photoDao(), FilePhotoStorage(context))
@@ -228,8 +226,83 @@ class TellicoTcRoundTripTest {
         assertThat(targetDb.photoDao().observeByBook(book.id).first()).hasSize(1)
     }
 
+    @Test
+    fun quoteWithoutPageDoesNotAccumulateColonsOnRepeatedRoundTrip() = runTest {
+        seedLibrary(withPageLessQuote = true)
+        val file = File(tempDir, "library.tc")
+        exportUseCase(file)
+
+        importUseCase(file, ImportFormat.TELLICO_XML, outputDir)
+
+        val quote = targetQuotes().single { it.page == null }
+        assertThat(quote.bodyMd).isEqualTo("текст без страницы")
+
+        // Второй круг: экспорт уже импортированной книги и импорт снова.
+        val second = File(tempDir, "library-2.tc")
+        targetExportUseCase(second)
+        importUseCase(second, ImportFormat.TELLICO_XML, outputDir)
+
+        val quoteAfter = targetQuotes().single { it.page == null }
+        assertThat(quoteAfter.bodyMd).isEqualTo("текст без страницы")
+    }
+
+    @Test
+    fun tableFieldsDeclareColumnTitles() = runTest {
+        seedLibrary()
+
+        val xml = exportedXml()
+
+        // У табличного поля Tellico подписи колонок обязательны (как `columns=N`).
+        assertThat(xml).contains("<prop name=\"columns\">6</prop>")
+        assertThat(xml).contains("<prop name=\"column1\">начало</prop>")
+        assertThat(xml).contains("<prop name=\"column3\">страница начала</prop>")
+        assertThat(xml).contains("<prop name=\"column6\">заметка</prop>")
+        assertThat(xml).contains("<prop name=\"column1\">файл</prop>")
+        assertThat(xml).contains("<prop name=\"column2\">индекс заметки</prop>")
+        assertThat(xml).contains("<prop name=\"column3\">дата</prop>")
+    }
+
+    @Test
+    fun foreignFieldWithUnsafeNameIsSkipped() = runTest {
+        sourceBooks.insert(
+            BookEntity(
+                title = "Кривое поле",
+                author = "Кто-то",
+                createdAt = 1L,
+                updatedAt = 1L,
+                extraFields = mapOf("плохое<имя" to ExtraField("Плохое", "значение")),
+            ),
+        )
+
+        val xml = exportedXml()
+
+        // Имя элемента экранировать нельзя — поле пропускаем, XML остаётся целым.
+        assertThat(xml).doesNotContain("плохое")
+        val records = TellicoXmlReader().read(xml.toByteArray())
+        assertThat(records).hasSize(1)
+        assertThat(records.single().extra.keys).doesNotContain("плохое<имя")
+    }
+
+    @Test
+    fun ratingOutOfRangeIsNotWritten() = runTest {
+        sourceBooks.insert(
+            BookEntity(
+                title = "Без рейтинга",
+                author = "Кто-то",
+                rating = 0,
+                createdAt = 1L,
+                updatedAt = 1L,
+            ),
+        )
+
+        val xml = exportedXml()
+
+        // У Tellico рейтинг 1..5.
+        assertThat(xml).doesNotContain("<rating>")
+    }
+
     /** Книга с заметками (цитата, рецензия, заметка), сессией, тегом, фото, обложкой и чужим полем. */
-    private suspend fun seedLibrary(withCover: Boolean = true) {
+    private suspend fun seedLibrary(withCover: Boolean = true, withPageLessQuote: Boolean = false) {
         val cover = File(tempDir, "cover.png").apply { writeBytes(pngBytes()) }
         val bookId = sourceBooks.insert(
             BookEntity(
@@ -283,6 +356,19 @@ class TellicoTcRoundTripTest {
                 updatedAt = day(2024, 1, 15),
             ),
         )
+        if (withPageLessQuote) {
+            // Цитата без страницы: экспорт пишет `::текст`, импорт должен вернуть
+            // текст без префикса — иначе каждый цикл добавлял бы ещё `::`.
+            sourceNotes.insert(
+                NoteEntity(
+                    bookId = bookId,
+                    bodyMd = "текст без страницы",
+                    kind = NoteKind.QUOTE,
+                    createdAt = day(2024, 1, 16),
+                    updatedAt = day(2024, 1, 16),
+                ),
+            )
+        }
         sourceNotes.insert(
             NoteEntity(
                 bookId = bookId,
@@ -320,6 +406,28 @@ class TellicoTcRoundTripTest {
         val file = File(tempDir, "library.tc")
         exportUseCase(file)
         return String(zipEntries(file).getValue("tellico.xml"), Charsets.UTF_8)
+    }
+
+    /** Экспортёр над указанной базой — нужен, чтобы переэкспортировать импортированное. */
+    private fun exporterFor(db: KwBooktrackDatabase, books: BookRepository): ExportTellicoTcUseCase =
+        ExportTellicoTcUseCase(
+            snapshotBuilder = SnapshotBuilder(
+                bookRepository = books,
+                noteDao = db.noteDao(),
+                sessionDao = db.readingSessionDao(),
+                photoDao = db.photoDao(),
+                tagDao = db.tagDao(),
+            ),
+            database = db,
+            versionProvider = object : AppVersionProvider {
+                override val appVersion: String = "0.1.0"
+            },
+        )
+
+    /** Цитаты импортированной книги. */
+    private suspend fun targetQuotes(): List<NoteEntity> {
+        val book = targetDb.bookDao().observeAll().first().single()
+        return targetDb.noteDao().observeByBook(book.id).first().filter { it.kind == NoteKind.QUOTE }
     }
 
     private fun zipEntries(file: File): Map<String, ByteArray> {
