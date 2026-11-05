@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - **Язык ответов и коммитов** — русский. Код, идентификаторы, имена файлов — без перевода.
-- **Версия в каждом коммите**: pre-commit hook (`hooks/pre-commit`) требует, чтобы в `app/build.gradle.kts` изменились **и** `versionCode`, **и** `versionName`. Текущие: `versionCode = 43`, `versionName = "0.5.35"`. Задача N бампит их до `43 + N` / `0.5.{35 + N}` — но с учётом fix-коммита Task 1 (версия 45/0.5.37) фактические значения: Task 2 = 46/0.5.38, Task 3 = 47/0.5.39, … Task 10 = 54/0.5.46. Сообщение коммита — в стиле репозитория: `v 0.5.36 — <что сделано>`.
+- **Версия в каждом коммите**: pre-commit hook (`hooks/pre-commit`) требует, чтобы в `app/build.gradle.kts` изменились **и** `versionCode`, **и** `versionName`. Текущие: `versionCode = 43`, `versionName = "0.5.35"`. Задача N бампит их до `43 + N` / `0.5.{35 + N}` — но с учётом fix-коммитов (Task 1 → 45/0.5.37, Task 6 → 51/0.5.43 и 52/0.5.44) фактические значения: Task 2 = 46/0.5.38, Task 3 = 47/0.5.39, … Task 7 = 53/0.5.45, Task 8 = 54/0.5.46, Task 9 = 55/0.5.47, Task 10 = 56/0.5.48. Сообщение коммита — в стиле репозитория: `v 0.5.36 — <что сделано>`.
 - **Тесты**: `./gradlew testDebugUnitTest`. Production-сборку (`--production`) не запускать никогда.
 - **Никаких новых зависимостей.** `kotlinx.serialization.json` и `commons-csv` уже подключены; XML — чистый `javax.xml.parsers`; MD5 — `java.security.MessageDigest`.
 - **Даты** хранятся как epoch-millis в локальной зоне (`data/time/Epoch.kt`: `LocalDate.toEpochMs()`, `Long.toLocalDate()`).
@@ -682,7 +682,7 @@ Expected: FAIL — «Unresolved reference: map(TellicoRecord)» / несовпа
 Точка входа: `fun map(record: TellicoRecord): BookSnapshot?`.
 
 - Аксессор: `private fun f(record: TellicoRecord, name: String): String? = record.fields[name]?.trim()?.takeUnless { it.isBlank() }`.
-- `title = f(record, "title") ?: ""`, `author = f(record, "author") ?: ""`; если обе пустые → `null`.
+- `title = f(record, "title")?.takeUnless { it.isEmpty() } ?: "(без названия)"`, `author = f(record, "author")?.takeUnless { it.isEmpty() } ?: "(автор неизвестен)"`; если обе пустые → `null` (заглушки — прежнее поведение маппера, пустой заголовок в списке библиотеки недопустим).
 - Поля `BookEntity` — те же, что сейчас, но читаются по внутренним именам:
   `subtitle`←`subtitle`, `isbn13`←`isbn` (нормализация: только цифры, 13 → иначе null), `pageCount`←`pages`, `language`←`language` (нормализация: `ru`/`русский`→`ru`, `en`/`английский`→`en`, иначе первые 2 буквы; пусто → `"ru"`), `genre`←`genre`, `publisher`←`publisher`, `year`←`pub_year`, `coverPath`←`cover`, `rating`←`rating` (1..5), `binding`←`binding`, `purchasePlace`←`место-покупки`, `series`←`series`, `seriesNumber`←`series_num`, `condition`←`condition`, `translator`←`translator`, `printYear`←`cr_year` (первое число из `; `-списка), `printPages`←`усл.-печ.-л.` (через `parseDecimal`), `originalLanguage`←`язык-оригинала`, `originalTitle`←`оригинальное-название`, `annotation`←`comments` (через `HtmlToMarkdown`), `isGift`←`gift`, `isLent`←`loaned`, `isSold`←`продано-new`, `purchasePrice`←`pur_price` (запятая → точка), `purchaseDate`←`pur_date`, `finishedAt`←`дата-прочтения`, `startedAt`←`дата-начала`, `createdAt`←`cdate`, `updatedAt`←`mdate`.
 - Даты: `parseDate(raw)`: пробует `yyyy-MM-dd`, `yyyy-MM`, `yyyy`, `dd.MM.yyyy`; результат — `LocalDate.toEpochMs()` (неполная дата дополняется 1-м числом/январём).
@@ -809,7 +809,7 @@ Expected: PASS.
 - [ ] **Step 5: Коммит**
 
 ```bash
-# versionCode = 51, versionName = "0.5.43"
+# versionCode = 53, versionName = "0.5.45"
 git commit -m "v 0.5.42 — импорт своего бэкапа: extra.json, фото, все поля книги"
 ```
 
@@ -916,7 +916,7 @@ Expected: PASS.
 - [ ] **Step 6: Коммит**
 
 ```bash
-# versionCode = 52, versionName = "0.5.44"
+# versionCode = 54, versionName = "0.5.46"
 git commit -m "v 0.5.43 — экспорт в Tellico .tc: tellico.xml, обложки, фото, контейнеры"
 ```
 
@@ -970,7 +970,7 @@ Expected: PASS.
 - [ ] **Step 5: Коммит**
 
 ```bash
-# versionCode = 53, versionName = "0.5.45"
+# versionCode = 55, versionName = "0.5.47"
 git commit -m "v 0.5.44 — экспорт books.csv без потерь: extra.json, фото, новые колонки"
 ```
 
@@ -1055,7 +1055,7 @@ Expected: PASS.
 - [ ] **Step 9: Коммит**
 
 ```bash
-# versionCode = 54, versionName = "0.5.46"
+# versionCode = 56, versionName = "0.5.48"
 git commit -m "v 0.5.45 — импорт любого формата и экспорт .tc в UI"
 ```
 
