@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - **Язык ответов и коммитов** — русский. Код, идентификаторы, имена файлов — без перевода.
-- **Версия в каждом коммите**: pre-commit hook (`hooks/pre-commit`) требует, чтобы в `app/build.gradle.kts` изменились **и** `versionCode`, **и** `versionName`. Текущие: `versionCode = 43`, `versionName = "0.5.35"`. Задача N бампит их до `43 + N` / `0.5.{35 + N}` — но с учётом fix-коммитов (Task 1 → 45/0.5.37, Task 6 → 51/0.5.43 и 52/0.5.44) фактические значения: Task 2 = 46/0.5.38, Task 3 = 47/0.5.39, … Task 7 = 53/0.5.45, Task 8 = 54/0.5.46, Task 9 = 55/0.5.47, Task 10 = 56/0.5.48. Сообщение коммита — в стиле репозитория: `v 0.5.36 — <что сделано>`.
+- **Версия в каждом коммите**: pre-commit hook (`hooks/pre-commit`) требует, чтобы в `app/build.gradle.kts` изменились **и** `versionCode`, **и** `versionName`. Текущие: `versionCode = 43`, `versionName = "0.5.35"`. Задача N бампит их до `43 + N` / `0.5.{35 + N}` — но с учётом fix-коммитов (Task 1 → 45/0.5.37, Task 6 → 51/0.5.43 и 52/0.5.44) фактические значения: Task 2 = 46/0.5.38, Task 3 = 47/0.5.39, … Task 7 = 53/0.5.45, Task 8 = 54/0.5.46 (+ fix-коммиты 55/0.5.47 и 56/0.5.48), Task 9 = 57/0.5.49, Task 10 = 58/0.5.50. Сообщение коммита — в стиле репозитория: `v 0.5.36 — <что сделано>`.
 - **Тесты**: `./gradlew testDebugUnitTest`. Production-сборку (`--production`) не запускать никогда.
 - **Никаких новых зависимостей.** `kotlinx.serialization.json` и `commons-csv` уже подключены; XML — чистый `javax.xml.parsers`; MD5 — `java.security.MessageDigest`.
 - **Даты** хранятся как epoch-millis в локальной зоне (`data/time/Epoch.kt`: `LocalDate.toEpochMs()`, `Long.toLocalDate()`).
@@ -970,7 +970,7 @@ Expected: PASS.
 - [ ] **Step 5: Коммит**
 
 ```bash
-# versionCode = 55, versionName = "0.5.47"
+# versionCode = 57, versionName = "0.5.49"
 git commit -m "v 0.5.44 — экспорт books.csv без потерь: extra.json, фото, новые колонки"
 ```
 
@@ -1057,7 +1057,7 @@ Expected: PASS.
 - [ ] **Step 9: Коммит**
 
 ```bash
-# versionCode = 56, versionName = "0.5.48"
+# versionCode = 58, versionName = "0.5.50"
 git commit -m "v 0.5.45 — импорт любого формата и экспорт .tc в UI"
 ```
 
