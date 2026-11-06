@@ -73,6 +73,15 @@ class AboutExportViewModel @Inject constructor(
 
     companion object {
         /**
+         * MIME-тип родного формата Tellico.
+         *
+         * Без расширения (`application/octet-stream`): SAF дописывает расширение
+         * mime-типа к имени файла, и у `application/zip` файл сохранился бы как
+         * `....tc.zip` — Tellico такой фильтр не видит.
+         */
+        const val TELLICO_MIME = "application/octet-stream"
+
+        /**
          * Default name proposed by the SAF picker, e.g.
          * `kwbooktrack-backup-2024-09-30_15-30-00.zip`. Local time, seconds
          * precision so a user can export twice in the same minute and not

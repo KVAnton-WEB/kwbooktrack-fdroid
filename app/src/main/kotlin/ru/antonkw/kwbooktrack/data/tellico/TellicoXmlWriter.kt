@@ -1,5 +1,6 @@
 package ru.antonkw.kwbooktrack.data.tellico
 
+import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
 import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
 import ru.antonkw.kwbooktrack.data.snapshot.BookSnapshot
@@ -67,6 +68,8 @@ object TellicoXmlWriter {
         for (entry in entries) {
             for ((name, extra) in entry.snapshot.extraFields) {
                 if (!isSafeName(name)) continue
+                // Поле, которое Tellico знает сам, объявлять нельзя — будет дубликат.
+                if (name in TellicoFields.KNOWN) continue
                 result.putIfAbsent(name, extra)
             }
         }
@@ -132,10 +135,10 @@ object TellicoXmlWriter {
         container(xml, "translator", splitValues(book.translator))
         container(xml, "cr_year", listOfNotNull(book.printYear?.toString()))
         container(xml, "теги", snapshot.tags)
-        container(xml, "цитаты", quoteRows(snapshot.notes))
-        container(xml, "заметки", noteRows(snapshot.notes))
-        container(xml, "сессии-чтения", sessionRows(snapshot.sessions))
-        container(xml, "фото-заметок", photoRows(snapshot.photos))
+        table(xml, "цитаты", quoteRows(snapshot.notes))
+        table(xml, "заметки", noteRows(snapshot.notes))
+        table(xml, "сессии-чтения", sessionRows(snapshot.sessions))
+        table(xml, "фото-заметок", photoRows(snapshot.photos))
 
         // Флаги — только `true`, отсутствие = false.
         if (book.status == BookStatus.FINISHED) element(xml, "read", "true")
@@ -151,10 +154,27 @@ object TellicoXmlWriter {
         // Чужие поля: имя элемента нельзя экранировать (экранирование даёт
         // невалидное XML), поэтому поле с небезопасным именем пропускаем.
         snapshot.extraFields.forEach { (name, extra) ->
-            if (isSafeName(name)) element(xml, name, extra.value)
+            writeExtra(xml, name, extra, book)
         }
 
         xml.append("  </entry>\n")
+    }
+
+    /**
+     * Чужее поле — элемент в записи.
+     *
+     * Поля, которые Tellico знает сам (`keyword`, `pur_price`), объявлять в
+     * `<fields>` нельзя — Tellico завёл бы дубликат. «Ключевые слова»
+     * многозначные, поэтому их пишут контейнером.
+     */
+    private fun writeExtra(xml: StringBuilder, name: String, extra: ExtraField, book: BookEntity) {
+        when {
+            !isSafeName(name) -> Unit
+            name == "keyword" -> container(xml, "keyword", extra.value.split("; ").filter { it.isNotEmpty() })
+            // Числовая цена важнее текстовой: два `<pur_price>` — последний победил бы.
+            name == "pur_price" && book.purchasePrice != null -> Unit
+            else -> element(xml, name, extra.value)
+        }
     }
 
     /** `<images>` — по одному `<image>` на обложку; без обложек блока нет вовсе. */
@@ -200,6 +220,18 @@ object TellicoXmlWriter {
         xml.append("   <${item}s>")
         values.forEach { xml.append("<$item>${escape(it)}</$item>") }
         xml.append("</${item}s>\n")
+    }
+
+    /**
+     * Табличное поле: **одна** таблица, строки — переводом строки.
+     *
+     * Так пишет сам Tellico: `<цитатыs><цитаты>1::первая\n2::вторая</цитаты></цитатыs>`.
+     * Отдельный элемент на строку Tellico прочитал бы как отдельную таблицу — в его
+     * интерфейсе появился бы переключатель таблиц вместо одной таблицы с цитатами.
+     */
+    private fun table(xml: StringBuilder, item: String, rows: List<String>) {
+        if (rows.isEmpty()) return
+        container(xml, item, listOf(rows.joinToString("\n")))
     }
 
     /** Многозначное значение режется по `"; "` — так его и читает импортёр. */

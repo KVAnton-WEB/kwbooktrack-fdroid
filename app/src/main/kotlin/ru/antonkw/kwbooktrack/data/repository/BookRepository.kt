@@ -19,6 +19,14 @@ class BookRepository @Inject constructor(
 ) {
     fun observeAll(): Flow<List<BookEntity>> = bookDao.observeAll()
 
+    /**
+     * Все книги разом — для снимка библиотеки.
+     *
+     * Suspend, а не Flow: Flow-запрос Room выполняет вне транзакции, и снимок
+     * собрался бы из разных состояний БД.
+     */
+    suspend fun getAll(): List<BookEntity> = bookDao.getAll()
+
     fun observeByStatus(status: BookStatus): Flow<List<BookEntity>> = bookDao.observeByStatus(status)
 
     fun search(query: String): Flow<List<BookEntity>> {

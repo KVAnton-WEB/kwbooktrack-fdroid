@@ -20,6 +20,15 @@ interface BookDao {
     fun observeAll(): Flow<List<BookEntity>>
 
     /**
+     * Все книги разом — для снимка библиотеки.
+     *
+     * Suspend, а не Flow: Flow-запрос Room выполняет вне транзакции, и снимок
+     * собрался бы из разных состояний БД.
+     */
+    @Query("SELECT * FROM books ORDER BY updated_at DESC")
+    suspend fun getAll(): List<BookEntity>
+
+    /**
      * Paging-friendly version of [observeAll] for libraries that exceed the
      * memory budget for a one-shot load (≥10k books). Current screens still
      * use [observeAll]; this is here so the call site is ready when the

@@ -40,9 +40,27 @@ class TellicoCsvReaderTest {
         )
 
         assertThat(record.extra["чтец"]).isEqualTo(ExtraField(title = "Чтец", value = "Иванова"))
-        assertThat(record.extra["livelib-fantlab"])
+        // «livelib/fantlab» — поле коллекции с внутренним именем «livelibfantlab»:
+        // с этим именем экспорт заполнит существующее поле, а не создаст дубликат.
+        assertThat(record.extra["livelibfantlab"])
             .isEqualTo(ExtraField(title = "livelib/fantlab", value = "https://livelib.ru"))
         assertThat(record.fields).doesNotContainKey("чтец")
+    }
+
+    @Test
+    fun foreignHeadersUseInternalNamesOfTheCollection() {
+        // Заголовок CSV — название поля по-человечески, внутреннее имя Tellico
+        // другое. Без таблицы имён экспорт объявил бы «редакция» и Tellico завёл бы
+        // второе поле рядом с «Редакция»/edition.
+        val record = record(
+            "Редакция" to "2-е изд.",
+            "Содержание" to "Глава 1",
+            "Редактор" to "Иванов",
+            "Подписано" to "да",
+        )
+
+        assertThat(record.extra.keys).containsExactly("edition", "plot", "editor", "signed")
+        assertThat(record.extra["edition"]?.title).isEqualTo("Редакция")
     }
 
     @Test

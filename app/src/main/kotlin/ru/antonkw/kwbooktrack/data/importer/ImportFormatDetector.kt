@@ -32,7 +32,9 @@ object ImportFormatDetector {
         }
         if (!isZip(head)) {
             val text = String(head, Charsets.UTF_8)
-            val isXml = text.contains("<tellico") || text.contains("<collection")
+            // Корневой элемент может быть с префиксом пространства имён
+            // («<t:tellico>») — иначе такой файл молча ушёл бы в CSV.
+            val isXml = XML_ROOT.containsMatchIn(text) || text.trimStart().startsWith("<?xml")
             return if (isXml) ImportFormat.TELLICO_XML else ImportFormat.TELLICO_CSV
         }
         val names = runCatching {
@@ -56,4 +58,7 @@ object ImportFormatDetector {
     /** ZIP начинается с сигнатуры `PK`. */
     private fun isZip(head: ByteArray): Boolean =
         head.size >= 2 && head[0] == 'P'.code.toByte() && head[1] == 'K'.code.toByte()
+
+    /** Корневой элемент XML Tellico — с префиксом или без. */
+    private val XML_ROOT = Regex("<([\\w.-]+:)?(tellico|collection)\\b")
 }

@@ -17,6 +17,7 @@ import ru.antonkw.kwbooktrack.data.NoOpCoverStorage
 import ru.antonkw.kwbooktrack.data.NoOpPhotoStorage
 import ru.antonkw.kwbooktrack.data.CancellingBookDao
 import ru.antonkw.kwbooktrack.data.TestDb
+import ru.antonkw.kwbooktrack.data.tagsOf
 import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
@@ -112,7 +113,7 @@ class SnapshotApplierTest {
         applier.apply(snapshot(), assets)
 
         assertThat(tagRepository.observeAll().first()).hasSize(1)
-        assertThat(db.tagDao().tagsForBook(bookId())).hasSize(1)
+        assertThat(db.tagDao().tagsOf(bookId())).hasSize(1)
     }
 
     @Test

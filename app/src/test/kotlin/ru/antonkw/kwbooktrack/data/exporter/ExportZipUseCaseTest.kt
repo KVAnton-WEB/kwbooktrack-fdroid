@@ -125,6 +125,24 @@ class ExportZipUseCaseTest {
     }
 
     @Test
+    fun csvStoresOnlyCoverFileName() {
+        runBlocking {
+            val coverFile = File(tempDir, "cover.jpg").apply { writeBytes(byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte())) }
+            repo.insert(sampleBook("Book With Cover", "Author", coverPath = coverFile.absolutePath))
+
+            val outFile = File(tempDir, "export.zip")
+            useCase(outFile)
+
+            // Внутренний путь приложения в бэкапе бессмысленен: импорт ищет
+            // обложку по имени файла.
+            val csv = readZipEntries(outFile)["books.csv"]!!
+            val header = csv.lineSequence().first().split(";")
+            val row = csv.lineSequence().drop(1).first().split(";")
+            assertThat(row[header.indexOf("cover_path")]).isEqualTo("cover.jpg")
+        }
+    }
+
+    @Test
     fun emptyLibraryExportsHeaderOnly() {
         runBlocking {
             val outFile = File(tempDir, "export.zip")

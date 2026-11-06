@@ -14,6 +14,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import ru.antonkw.kwbooktrack.data.NoOpCoverStorage
 import ru.antonkw.kwbooktrack.data.TestDb
+import ru.antonkw.kwbooktrack.data.tagsOf
 import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
 import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
@@ -98,7 +99,7 @@ class TellicoTcImportTest {
         assertThat(db.readingSessionDao().observeByBook(book.id).first().single().startedAt)
             .isEqualTo(1730000000000L)
 
-        assertThat(db.tagDao().tagsForBook(book.id).map { it.name }).containsExactly("фэнтези")
+        assertThat(db.tagDao().tagsOf(book.id).map { it.name }).containsExactly("фэнтези")
 
         val photo = db.photoDao().observeByBook(book.id).first().single()
         assertThat(photo.noteId).isEqualTo(quote.id)

@@ -17,6 +17,10 @@ interface NoteDao {
     @Query("SELECT * FROM notes ORDER BY created_at DESC")
     fun observeAll(): Flow<List<NoteEntity>>
 
+    /** Все заметки разом — для снимка библиотеки (внутри транзакции). */
+    @Query("SELECT * FROM notes ORDER BY created_at DESC")
+    suspend fun getAll(): List<NoteEntity>
+
     @Query("SELECT * FROM notes WHERE book_id = :bookId ORDER BY created_at DESC")
     fun observeByBook(bookId: Long): Flow<List<NoteEntity>>
 

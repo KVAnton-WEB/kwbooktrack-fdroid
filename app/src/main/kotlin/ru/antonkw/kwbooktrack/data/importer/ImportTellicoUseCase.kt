@@ -113,10 +113,11 @@ class ImportTellicoUseCase @Inject constructor(
      * Обложки, на которые ссылаются записи, но которых нет в архиве: Tellico
      * хранит картинки **рядом** с файлом коллекции (в папке `<имя>_files/`),
      * а не внутри архива `.tc` — молчать об этом нельзя, пользователь ждёт
-     * переноса обложек.
+     * переноса обложек. Предупреждение и про часть обложек: одна найденная из
+     * двух — тоже потеря.
      */
     private fun warnings(coversReferenced: Int, coversCopied: Int, dryRun: Boolean): List<String> {
-        if (dryRun || coversReferenced == 0 || coversCopied > 0) return emptyList()
+        if (dryRun || coversReferenced == 0 || coversCopied >= coversReferenced) return emptyList()
         return listOf(NO_COVERS_WARNING)
     }
 

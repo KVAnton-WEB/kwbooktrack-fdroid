@@ -1,7 +1,6 @@
 package ru.antonkw.kwbooktrack.data.snapshot
 
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import ru.antonkw.kwbooktrack.data.db.dao.NoteDao
 import ru.antonkw.kwbooktrack.data.db.dao.PhotoDao
@@ -30,10 +29,14 @@ class SnapshotBuilder @Inject constructor(
     private val tagDao: TagDao,
 ) {
     suspend fun buildAll(): List<BookSnapshot> {
-        val books = bookRepository.observeAll().first()
-        val notesByBook = noteDao.observeAll().first().groupBy { it.bookId }
-        val sessionsByBook = sessionDao.observeAll().first().groupBy { it.bookId }
-        val photosByBook = photoDao.observeAll().first().groupBy { it.bookId }
+        // Suspend-запросы, а не Flow: Flow Room выполняет вне транзакции, и снимок
+        // собрался бы из разных состояний БД. Вызывающий оборачивает сборку в
+        // `withTransaction` — тогда все данные из одного состояния.
+        val books = bookRepository.getAll()
+        val notesByBook = noteDao.getAll().groupBy { it.bookId }
+        val sessionsByBook = sessionDao.getAll().groupBy { it.bookId }
+        val photosByBook = photoDao.getAll().groupBy { it.bookId }
+        val tagsByBook = tagDao.tagsForAllBooks().groupBy { it.bookId }
         return books.map { book ->
             val notes = notesByBook[book.id].orEmpty().sortedWith(NOTE_ORDER)
             // 1-based индекс заметки в итоговом списке — на него ссылаются фото.
@@ -42,7 +45,7 @@ class SnapshotBuilder @Inject constructor(
                 book = book,
                 notes = notes.map { it.toSnapshot() },
                 sessions = sessionsByBook[book.id].orEmpty().map { it.toSnapshot() },
-                tags = tagDao.tagsForBook(book.id).map { it.name },
+                tags = tagsByBook[book.id].orEmpty().map { it.name },
                 photos = photosByBook[book.id].orEmpty().map { photo ->
                     PhotoSnapshot(
                         archivePath = photo.archivePath(),

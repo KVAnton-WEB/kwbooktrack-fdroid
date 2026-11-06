@@ -23,6 +23,7 @@ import org.robolectric.RobolectricTestRunner
 import ru.antonkw.kwbooktrack.data.NoOpCoverStorage
 import ru.antonkw.kwbooktrack.data.NoOpPhotoStorage
 import ru.antonkw.kwbooktrack.data.TestDb
+import ru.antonkw.kwbooktrack.data.tagsOf
 import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
@@ -213,7 +214,7 @@ class KwBooktrackZipRoundTripTest {
         assertThat(sessions).hasSize(1)
         assertThat(sessions.single().durationSec).isEqualTo(600)
 
-        assertThat(targetDb.tagDao().tagsForBook(book.id).map { it.name }).containsExactly("фэнтези")
+        assertThat(targetDb.tagDao().tagsOf(book.id).map { it.name }).containsExactly("фэнтези")
 
         val photos = targetDb.photoDao().observeByBook(book.id).first()
         assertThat(photos).hasSize(1)
@@ -238,7 +239,7 @@ class KwBooktrackZipRoundTripTest {
         assertThat(targetDb.bookDao().observeAll().first()).hasSize(1)
         assertThat(targetDb.noteDao().observeByBook(book.id).first()).hasSize(2)
         assertThat(targetDb.readingSessionDao().observeByBook(book.id).first()).hasSize(1)
-        assertThat(targetDb.tagDao().tagsForBook(book.id)).hasSize(1)
+        assertThat(targetDb.tagDao().tagsOf(book.id)).hasSize(1)
         assertThat(targetDb.photoDao().observeByBook(book.id).first()).hasSize(1)
     }
 

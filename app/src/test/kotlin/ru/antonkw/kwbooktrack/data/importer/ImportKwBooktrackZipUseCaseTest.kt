@@ -14,6 +14,7 @@ import ru.antonkw.kwbooktrack.data.CancellingBookDao
 import ru.antonkw.kwbooktrack.data.NoOpCoverStorage
 import ru.antonkw.kwbooktrack.data.NoOpPhotoStorage
 import ru.antonkw.kwbooktrack.data.TestDb
+import ru.antonkw.kwbooktrack.data.tagsOf
 import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
@@ -322,7 +323,7 @@ class ImportKwBooktrackZipUseCaseTest {
             assertThat(targetNoteRepo.observeByBook(book.id).first()).hasSize(2)
             assertThat(targetSessionRepo.observeByBook(book.id).first()).hasSize(1)
             assertThat(targetPhotoRepo.observeByBook(book.id).first()).hasSize(1)
-            assertThat(targetDb.tagDao().tagsForBook(book.id)).hasSize(1)
+            assertThat(targetDb.tagDao().tagsOf(book.id)).hasSize(1)
         }
     }
 

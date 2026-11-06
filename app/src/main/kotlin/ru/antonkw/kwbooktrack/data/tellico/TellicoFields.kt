@@ -58,6 +58,21 @@ object TellicoFields {
     /** Русский заголовок → внутреннее имя. */
     val NAME_BY_TITLE: Map<String, String> = TITLE.entries.associate { (name, title) -> title to name }
 
+    /**
+     * Заголовок чужого поля → внутреннее имя Tellico.
+     *
+     * У части полей коллекции имя не выводится из заголовка: «Редакция» — это
+     * `edition`, «Содержание» — `plot`. Без этой таблицы экспорт объявил бы поле
+     * «редакция», и Tellico завёл бы **дубликат** рядом с существующим.
+     */
+    val EXTRA_NAME_BY_TITLE: Map<String, String> = mapOf(
+        "Редактор" to "editor",
+        "Редакция" to "edition",
+        "Подписано" to "signed",
+        "Содержание" to "plot",
+        "livelib/fantlab" to "livelibfantlab",
+    )
+
     /** Известные внутренние имена: всё, что попадает в `fields`, а не в `extra`. */
     val KNOWN: Set<String> = TITLE.keys
 

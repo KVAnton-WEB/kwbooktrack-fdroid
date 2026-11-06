@@ -30,7 +30,9 @@ class TellicoCsvReader @Inject constructor() {
             // вместо null, а одна кривая строка не должна ронять весь импорт.
             val value = if (index < size()) get(index).trim() else ""
             if (value.isEmpty()) return@forEachIndexed
-            val name = TellicoFields.NAME_BY_TITLE[header] ?: TellicoFields.nameFromTitle(header)
+            val name = TellicoFields.NAME_BY_TITLE[header]
+                ?: TellicoFields.EXTRA_NAME_BY_TITLE[header]
+                ?: TellicoFields.nameFromTitle(header)
             // Заголовок из одних знаков препинания имени не даёт — колонку пропускаем.
             if (name.isEmpty()) return@forEachIndexed
             if (name in TellicoFields.KNOWN) {

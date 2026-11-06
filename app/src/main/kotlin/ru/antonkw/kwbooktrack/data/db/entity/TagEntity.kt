@@ -45,3 +45,15 @@ data class BookTagCrossRef(
     @ColumnInfo(name = "tag_id")
     val tagId: Long,
 )
+
+/**
+ * Имя тега книги — результат одного запроса по всем связям.
+ *
+ * Отдельный запрос на книгу стоил бы запроса на каждую книгу библиотеки.
+ */
+data class BookTagName(
+    @ColumnInfo(name = "book_id")
+    val bookId: Long,
+    @ColumnInfo(name = "name")
+    val name: String,
+)

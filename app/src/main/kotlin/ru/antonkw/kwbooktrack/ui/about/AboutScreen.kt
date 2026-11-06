@@ -97,9 +97,10 @@ fun AboutScreen(
         if (uri != null) exportViewModel.exportToUri(uri)
     }
 
-    // Родной формат Tellico: `.tc` — это zip, поэтому mime-тип тот же.
+    // Родной формат Tellico: `.tc` — это zip, но mime-тип без расширения,
+    // иначе SAF допишет к имени `.zip` (см. AboutExportViewModel.TELLICO_MIME).
     val exportTellicoLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("application/zip"),
+        contract = ActivityResultContracts.CreateDocument(AboutExportViewModel.TELLICO_MIME),
     ) { uri ->
         if (uri != null) exportViewModel.exportTellicoToUri(uri)
     }

@@ -121,6 +121,13 @@ class AboutExportViewModelTest {
     }
 
     @Test
+    fun tellicoMimeTypeHasNoExtensionSoSafKeepsTheTcName() {
+        // SAF дописывает расширение mime-типа: у `application/zip` это `.zip`, и
+        // файл сохранился бы как `....tc.zip` — Tellico такой фильтр не видит.
+        assertThat(AboutExportViewModel.TELLICO_MIME).isEqualTo("application/octet-stream")
+    }
+
+    @Test
     fun acknowledgeClearsState() {
         // acknowledge() resets the StateFlow to its default; it doesn't require
         // a prior error to be observable.

@@ -97,6 +97,17 @@ class ImportFormatDetectorTest {
         assertThat(ImportFormatDetector.detect(file)).isEqualTo(ImportFormat.TELLICO_CSV)
     }
 
+    @Test
+    fun xmlFileWithNamespacePrefixIsTellicoXml() {
+        // Корневой элемент с префиксом пространства имён: «<t:tellico», а не «<tellico».
+        val file = file(
+            "books.xml",
+            "<?xml version=\"1.0\"?><t:tellico xmlns:t=\"http://periapsis.org/tellico/\"><t:collection type=\"2\"/></t:tellico>",
+        )
+
+        assertThat(ImportFormatDetector.detect(file)).isEqualTo(ImportFormat.TELLICO_XML)
+    }
+
     private fun file(name: String, content: String): File =
         File(dir, name).apply { writeText(content) }
 

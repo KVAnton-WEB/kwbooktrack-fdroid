@@ -16,6 +16,7 @@ import org.robolectric.RobolectricTestRunner
 import ru.antonkw.kwbooktrack.data.NoOpCoverStorage
 import ru.antonkw.kwbooktrack.data.NoOpPhotoStorage
 import ru.antonkw.kwbooktrack.data.TestDb
+import ru.antonkw.kwbooktrack.data.tagsOf
 import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
@@ -160,6 +161,20 @@ class TellicoTcRoundTripTest {
     }
 
     @Test
+    fun quoteRowsAreWrittenAsOneTable() = runTest {
+        seedLibrary(withPageLessQuote = true)
+
+        val xml = exportedXml()
+
+        // Tellico пишет таблицу одним элементом, строки — переводом строки.
+        // Иначе каждая цитата стала бы отдельной таблицей, а в Tellico
+        // появился бы переключатель таблиц вместо одной таблицы с цитатами.
+        assertThat(xml).contains(
+            "<цитатыs><цитаты>12::Цитата про хаос\n::текст без страницы</цитаты></цитатыs>",
+        )
+    }
+
+    @Test
     fun imageElementHasOnlyIdAndFormat() = runTest {
         seedLibrary()
 
@@ -209,7 +224,7 @@ class TellicoTcRoundTripTest {
         assertThat(note.createdAt).isEqualTo(day(2024, 1, 12))
 
         assertThat(targetDb.readingSessionDao().observeByBook(book.id).first()).hasSize(1)
-        assertThat(targetDb.tagDao().tagsForBook(book.id).map { it.name }).containsExactly("фэнтези")
+        assertThat(targetDb.tagDao().tagsOf(book.id).map { it.name }).containsExactly("фэнтези")
         val photo = targetDb.photoDao().observeByBook(book.id).first().single()
         assertThat(File(photo.path).exists()).isTrue()
     }
@@ -319,7 +334,7 @@ class TellicoTcRoundTripTest {
         assertThat(targetDb.bookDao().observeAll().first()).hasSize(1)
         assertThat(targetDb.noteDao().observeByBook(book.id).first()).hasSize(3)
         assertThat(targetDb.readingSessionDao().observeByBook(book.id).first()).hasSize(1)
-        assertThat(targetDb.tagDao().tagsForBook(book.id)).hasSize(1)
+        assertThat(targetDb.tagDao().tagsOf(book.id)).hasSize(1)
         assertThat(targetDb.photoDao().observeByBook(book.id).first()).hasSize(1)
     }
 

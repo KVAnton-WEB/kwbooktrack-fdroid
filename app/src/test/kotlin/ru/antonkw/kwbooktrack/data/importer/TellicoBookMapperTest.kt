@@ -48,7 +48,21 @@ class TellicoBookMapperTest {
     }
 
     @Test
-    fun isbnShorterThan13IsDropped() {
+    fun isbnWithTenDigitsIsKept() {
+        val book = mapper.map(record("title" to "Foo", "author" to "Bar", "isbn" to "5-04168446-4"))!!.book
+
+        assertThat(book.isbn13).isEqualTo("5041684464")
+    }
+
+    @Test
+    fun isbnWithXCheckDigitIsKept() {
+        val book = mapper.map(record("title" to "Foo", "author" to "Bar", "isbn" to "5-04089273-X"))!!.book
+
+        assertThat(book.isbn13).isEqualTo("504089273X")
+    }
+
+    @Test
+    fun isbnOfOtherLengthIsDropped() {
         val book = mapper.map(record("title" to "Foo", "author" to "Bar", "isbn" to "12345"))!!.book
 
         assertThat(book.isbn13).isNull()
@@ -417,6 +431,26 @@ class TellicoBookMapperTest {
         )!!
 
         assertThat(snapshot.extraFields).containsExactly("чтец", ExtraField("Чтец", "Иванова"))
+    }
+
+    @Test
+    fun keywordsAreKeptAsExtraField() {
+        // «Ключевые слова» — встроенное поле Tellico, в приложении для него нет
+        // колонки. Без extra_fields они бы просто потерялись.
+        val snapshot = mapper.map(record("title" to "X", "author" to "Y", "keyword" to "классика; эпик"))!!
+
+        assertThat(snapshot.extraFields)
+            .containsExactly("keyword", ExtraField("Ключевые слова", "классика; эпик"))
+    }
+
+    @Test
+    fun nonNumericPriceIsKeptAsExtraField() {
+        // Цена «по подписке» в число не переводится — но и не должна исчезать.
+        val snapshot = mapper.map(record("title" to "X", "author" to "Y", "pur_price" to "по подписке"))!!
+
+        assertThat(snapshot.book.purchasePrice).isNull()
+        assertThat(snapshot.extraFields)
+            .containsExactly("pur_price", ExtraField("Цена покупки", "по подписке"))
     }
 
     @Test

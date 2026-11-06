@@ -5,9 +5,11 @@ import ru.antonkw.kwbooktrack.data.db.entity.BookSource
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
 import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
 import ru.antonkw.kwbooktrack.data.snapshot.BookSnapshot
+import ru.antonkw.kwbooktrack.data.snapshot.ExtraField
 import ru.antonkw.kwbooktrack.data.snapshot.NoteSnapshot
 import ru.antonkw.kwbooktrack.data.snapshot.PhotoSnapshot
 import ru.antonkw.kwbooktrack.data.snapshot.SessionSnapshot
+import ru.antonkw.kwbooktrack.data.tellico.TellicoFields
 import ru.antonkw.kwbooktrack.data.tellico.TellicoRecord
 import ru.antonkw.kwbooktrack.data.text.HtmlToMarkdown
 import ru.antonkw.kwbooktrack.data.text.parseDecimal
@@ -79,8 +81,29 @@ class TellicoBookMapper @Inject constructor() {
             sessions = sessions(record),
             tags = tags(record),
             photos = photos(record),
-            extraFields = record.extra,
+            // Чужие поля Tellico плюс то, для чего в приложении нет колонки:
+            // «Ключевые слова» и нечисловая цена.
+            extraFields = record.extra + keywordExtra(record) + priceExtra(record, book.purchasePrice),
         )
+    }
+
+    /**
+     * «Ключевые слова» — встроенное поле Tellico, в приложении для него нет
+     * колонки. Без `extra_fields` они бы просто потерялись.
+     */
+    private fun keywordExtra(record: TellicoRecord): Map<String, ExtraField> {
+        val value = f(record, "keyword") ?: return emptyMap()
+        return mapOf("keyword" to ExtraField(TellicoFields.TITLE.getValue("keyword"), value))
+    }
+
+    /**
+     * Цена, которая не число («по подписке»), — в `extra_fields`: иначе
+     * пользовательская пометка пропала бы.
+     */
+    private fun priceExtra(record: TellicoRecord, price: Double?): Map<String, ExtraField> {
+        if (price != null) return emptyMap()
+        val raw = f(record, "pur_price") ?: return emptyMap()
+        return mapOf("pur_price" to ExtraField(TellicoFields.TITLE.getValue("pur_price"), raw))
     }
 
     private fun f(record: TellicoRecord, name: String): String? =
@@ -223,10 +246,22 @@ class TellicoBookMapper @Inject constructor() {
         }
     }
 
+    /**
+     * ISBN: 13 цифр (ISBN-13) или 10 знаков (ISBN-10, последний может быть «X»).
+     *
+     * Десятизначный ISBN — половина реальных книг: отбрасывать его нельзя.
+     */
     private fun normalizeIsbn(raw: String?): String? {
         if (raw.isNullOrBlank()) return null
-        val digits = raw.filter { it.isDigit() }
-        return digits.takeIf { it.length == 13 }
+        val text = raw.trim().uppercase()
+        val digits = text.filter { it.isDigit() }
+        val hasX = 'X' in text
+        return when {
+            digits.length == 13 && !hasX -> digits
+            digits.length == 10 && !hasX -> digits
+            digits.length == 9 && hasX -> digits + "X"
+            else -> null
+        }
     }
 
     private fun normalizeLanguage(raw: String?): String {

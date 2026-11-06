@@ -89,6 +89,20 @@ class ImportTellicoUseCaseTest {
     }
 
     @Test
+    fun partiallyCopiedCoversAreReportedAsWarning() = runTest {
+        // Обложка одной книги нашлась, другой — нет: молчать о потере нельзя.
+        File(staging, "abc.webp").writeBytes(byteArrayOf(1, 2, 3))
+
+        val result = useCase(
+            listOf(recordWithCover("abc.webp"), recordWithCover("missing.webp", "Дюна 2")),
+            ImportTellicoOptions(assetRoot = staging, coverOutputDir = outputDir),
+        )
+
+        assertThat(result.coversCopied).isEqualTo(1)
+        assertThat(result.warnings).hasSize(1)
+    }
+
+    @Test
     fun importedCoversProduceNoWarning() = runTest {
         File(staging, "abc.webp").writeBytes(byteArrayOf(1, 2, 3))
 
@@ -116,13 +130,14 @@ class ImportTellicoUseCaseTest {
         assertThat(error).isInstanceOf(CancellationException::class.java)
     }
 
-    private fun recordWithCover(): TellicoRecord = TellicoRecord(
-        fields = mapOf(
-            "title" to "Дюна",
-            "author" to "Фрэнк Герберт",
-            "cover" to "abc.webp",
-        ),
-    )
+    private fun recordWithCover(cover: String = "abc.webp", title: String = "Дюна"): TellicoRecord =
+        TellicoRecord(
+            fields = mapOf(
+                "title" to title,
+                "author" to "Фрэнк Герберт",
+                "cover" to cover,
+            ),
+        )
 
     private fun applierFor(
         bookRepository: BookRepository,

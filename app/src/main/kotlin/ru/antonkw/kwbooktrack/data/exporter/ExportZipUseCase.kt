@@ -140,7 +140,7 @@ class ExportZipUseCase @Inject constructor(
                 csvField(book.genre.orEmpty()),
                 csvField(book.publisher.orEmpty()),
                 csvField(book.year?.toString().orEmpty()),
-                csvField(book.coverPath.orEmpty()),
+                csvField(book.coverPath?.substringAfterLast('/').orEmpty()),
                 csvField(book.rating?.toString().orEmpty()),
                 csvField(book.status.name),
                 csvField(epochToDate(book.startedAt)),
