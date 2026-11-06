@@ -56,7 +56,7 @@ class ScrollbarController internal constructor(
     val listState: LazyListState,
     private val density: Density,
 ) {
-    private val estimate = AvgItemHeight()
+    private val heights = ItemHeights()
 
     /**
      * Метрики скролла. Производное состояние: пересчитывается, только
@@ -82,7 +82,7 @@ class ScrollbarController internal constructor(
         computeScrollMetrics(
             firstVisibleItemIndex = listState.firstVisibleItemIndex,
             firstVisibleItemScrollOffset = listState.firstVisibleItemScrollOffset,
-            avgItemPx = estimate.update(info, viewportPx),
+            avgItemPx = heights.update(info, viewportPx),
             totalItemsCount = info.totalItemsCount,
             viewportPx = viewportPx,
             // Сумма полных высот видимых элементов: один элемент может быть
@@ -146,7 +146,8 @@ class ScrollbarController internal constructor(
      * прыгала бы под пальцем на сотни пикселей.
      *
      * Средняя высота карточки — оценка, а не измерение: см. `shortcut:`
-     * в [AvgItemHeight].
+     * в [ItemHeights]. А вот измеренная высота элемента берётся живая:
+     * она только уточняет сдвиг внутри элемента и на цель прыжка не влияет.
      */
     internal fun thumbMap(): ThumbMap {
         val m = metrics.value
@@ -159,6 +160,9 @@ class ScrollbarController internal constructor(
             contentRangePx = (m.totalScrollPx - m.viewportPx).coerceAtLeast(0f),
             scrollableTrackPx = g.scrollableTrackPx.coerceAtLeast(1),
             totalItemsCount = m.totalItemsCount,
+            // Измеренная высота элемента нужна, чтобы сдвиг внутри элемента
+            // не оказался больше самого элемента.
+            itemHeight = { heights.heightOf(it) },
         )
     }
 
@@ -310,6 +314,8 @@ internal class ThumbMap(
     val contentRangePx: Float,
     val scrollableTrackPx: Int,
     val totalItemsCount: Int,
+    /** Измеренная высота элемента; 0 — элемент ещё не измеряли. */
+    private val itemHeight: (Int) -> Int = { 0 },
 ) {
     /** Элемент и смещение внутри него для смещения ползунка [offsetPx]. */
     fun target(offsetPx: Int): ScrollTarget {
@@ -319,7 +325,11 @@ internal class ThumbMap(
         // Сдвиг внутри элемента — не меньше нуля: отрицательный сдвиг в
         // Compose двигает элемент вниз, и на экране остаётся пустое место.
         val offset = (scrollPx - index * avgItemPx).roundToInt().coerceAtLeast(0)
-        return ScrollTarget(index, offset)
+        // И не больше высоты элемента: сдвиг больше элемента Compose
+        // прокручивает мимо запрошенного, и ползунок при отпускании
+        // прыгает не туда, куда показал палец.
+        val limit = itemHeight(index)
+        return ScrollTarget(index, if (limit > 0) offset.coerceAtMost(limit) else offset)
     }
 }
 
@@ -341,7 +351,7 @@ internal data class ScrollTarget(val index: Int, val offset: Int)
  *   он жёстко равен `-beforeContentPadding`. Нужны `firstVisibleItemIndex` /
  *   `firstVisibleItemScrollOffset`.
  * - Общей высоты контента у LazyListState нет, её приходится оценивать;
- *   см. `shortcut:` в [AvgItemHeight].
+ *   см. `shortcut:` в [ItemHeights].
  *
  * Производительность: покадровые величины живут в производном состоянии,
  * которое читается **только из draw-фазы** (ползунок рисуется через
@@ -501,23 +511,50 @@ internal data class ThumbGeometry(
 )
 
 /**
- * Mean height of the visible items, frozen between shape changes.
+ * Измеренные высоты элементов и средняя по ним.
  *
- * The key is (item count, viewport height, tallest visible item) — the same
- * triple the previous `remember` call used. The value is re-derived only when
- * that key changes, so the thumb doesn't breathe while the visible mix
- * shifts under a fling.
+ * LazyList отдаёт размеры только видимых элементов, поэтому высота
+ * накапливается: ушедший с экрана элемент всё равно измерен, и его размер
+ * пригождается — для средней и для сдвига внутри элемента.
  *
- * shortcut: высота карточки — средняя по видимым, а не измерение каждой.
- * Позиция списка при скрабе считается по этой средней, поэтому на списках
- * с разной высотой карточек ползунок и список расходятся; когда понадобится
- * точность, брать высоту из измеренных элементов.
+ * Средняя берётся по всем измеренным элементам, а не по текущим видимым.
+ * По видимым средняя скачет вместе с их составом (одна длинная карточка —
+ * и оценка ползунка поехала), а по накопленным она близка к настоящей и
+ * почти не дышит под флингом.
+ *
+ * shortcut: позиция списка при скрабе считается по средней, а не по
+ * измерению каждого элемента: LazyList не отдаёт ни абсолютную позицию
+ * контента, ни его высоту. Поэтому на списках с разной высотой карточек
+ * ползунок и список расходятся — ошибка копится как случайное блуждание.
+ * Точно посчитать можно, только измерив каждый элемент.
  */
-private class AvgItemHeight {
+internal class ItemHeights {
     private var key: Triple<Int, Int, Int?>? = null
     private var value = 0f
+    private var sum = 0f
+    private var lastCount = -1
+    private val heights = HashMap<Int, Int>()
 
+    /**
+     * Средняя высота элемента.
+     *
+     * Ключ (количество элементов, высота экрана, самый высокий видимый
+     * элемент) — тот же тройной, что и раньше: значение пересчитывается
+     * только когда список изменился, поэтому ползунок не дышит, пока под
+     * флингом меняется состав видимых.
+     */
     fun update(info: LazyListLayoutInfo, viewportPx: Float): Float {
+        // Стало элементов больше или меньше — индексы сдвинулись, прежние
+        // измерения больше не про те элементы.
+        if (info.totalItemsCount != lastCount) {
+            lastCount = info.totalItemsCount
+            heights.clear()
+            sum = 0f
+            key = null
+        }
+        for (item in info.visibleItemsInfo) {
+            sum += item.size - (heights.put(item.index, item.size) ?: 0)
+        }
         val newKey = Triple(
             info.totalItemsCount,
             viewportPx.roundToInt(),
@@ -525,17 +562,17 @@ private class AvgItemHeight {
         )
         if (newKey != key) {
             key = newKey
-            val visible = info.visibleItemsInfo
-            val measured = if (visible.isEmpty()) {
-                0f
-            } else {
-                visible.sumOf { it.size }.toFloat() / visible.size
+            // Пустой видимый список — это кадр между перестановками, а не
+            // «элементы нулевой высоты»: обнуление оценки растягивало
+            // ползунок на всю дорожку.
+            if (heights.isNotEmpty()) {
+                val measured = sum / heights.size
+                if (measured > 0f || value == 0f) value = measured
             }
-            // Пустой список виденмых элементов — это кадр между
-            // перестановками, а не «элементы нулевой высоты»: обнуление
-            // оценки растягивало ползунок на всю дорожку.
-            if (measured > 0f || value == 0f) value = measured
         }
         return value
     }
+
+    /** Измеренная высота элемента; 0 — элемент ещё не измеряли. */
+    fun heightOf(index: Int): Int = heights[index] ?: 0
 }

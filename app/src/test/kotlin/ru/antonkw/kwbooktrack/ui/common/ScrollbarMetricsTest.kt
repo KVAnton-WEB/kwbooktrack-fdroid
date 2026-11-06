@@ -1,5 +1,7 @@
 package ru.antonkw.kwbooktrack.ui.common
 
+import androidx.compose.foundation.lazy.LazyListItemInfo
+import androidx.compose.foundation.lazy.LazyListLayoutInfo
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
@@ -224,6 +226,7 @@ class ScrollbarMetricsTest {
         count: Int = itemCount,
         viewport: Float = viewportPx,
         track: Int = 1000,
+        itemHeight: (Int) -> Int = { 0 },
     ): ThumbMap {
         val m = metrics(avg = avg, count = count, viewport = viewport)
         return ThumbMap(
@@ -231,6 +234,7 @@ class ScrollbarMetricsTest {
             contentRangePx = m.totalScrollPx - m.viewportPx,
             scrollableTrackPx = track,
             totalItemsCount = m.totalItemsCount,
+            itemHeight = itemHeight,
         )
     }
 
@@ -287,5 +291,77 @@ class ScrollbarMetricsTest {
         assertThat(map.target(-500).offset).isAtLeast(0)
         assertThat(map.target(9999).index).isAtMost(itemCount - 1)
         assertThat(map.target(9999).offset).isAtLeast(0)
+    }
+
+    @Test
+    fun `the shift inside an item never exceeds the measured height of the item`() {
+        // Сдвиг больше элемента Compose прокручивает мимо запрошенного: ползунок
+        // при отпускании прыгает не туда, куда показал палец. Знаем высоту — режем.
+        val map = thumbMap(itemHeight = { 20 })
+        val target = map.target(505)
+        assertThat(target.index).isEqualTo(45)
+        assertThat(target.offset).isEqualTo(20)
+    }
+
+    @Test
+    fun `an unmeasured item keeps the estimated shift`() {
+        // Высоты элемента нет — резать нечем, сдвиг остаётся как есть.
+        val map = thumbMap(itemHeight = { 0 })
+        assertThat(map.target(505).offset).isEqualTo(36)
+    }
+
+    /** Размеры видимых элементов: пары индекс → высота. */
+    private fun layoutInfo(
+        vararg visible: Pair<Int, Int>,
+        totalItemsCount: Int = visible.size,
+        viewport: Int = viewportPx.toInt(),
+    ): LazyListLayoutInfo = object : LazyListLayoutInfo {
+        override val visibleItemsInfo: List<LazyListItemInfo> = visible.map { (index, size) ->
+            object : LazyListItemInfo {
+                override val index: Int = index
+                override val key: Any = index
+                override val offset: Int = 0
+                override val size: Int = size
+            }
+        }
+
+        override val viewportStartOffset: Int = 0
+        override val viewportEndOffset: Int = viewport
+        override val totalItemsCount: Int = totalItemsCount
+    }
+
+    @Test
+    fun `the average is taken over every measured item, not only the visible ones`() {
+        // Средняя по видимым скачет вместе с составом экрана: одна длинная
+        // карточка — и оценка позиции поехала. По накопленным измерениям
+        // средняя близка к настоящей и не дышит под флингом.
+        val heights = ItemHeights()
+        heights.update(layoutInfo(0 to 100, 1 to 100, 2 to 100, totalItemsCount = 20), viewportPx)
+        val avg = heights.update(
+            layoutInfo(3 to 200, 4 to 200, 5 to 200, totalItemsCount = 20),
+            viewportPx,
+        )
+        assertThat(avg).isWithin(1e-3f).of(150f)
+    }
+
+    @Test
+    fun `the measured height of an item is remembered after it leaves the screen`() {
+        val heights = ItemHeights()
+        heights.update(layoutInfo(0 to 140, 1 to 160, totalItemsCount = 20), viewportPx)
+        heights.update(layoutInfo(2 to 180, totalItemsCount = 20), viewportPx)
+        assertThat(heights.heightOf(0)).isEqualTo(140)
+        assertThat(heights.heightOf(2)).isEqualTo(180)
+        assertThat(heights.heightOf(9)).isEqualTo(0)
+    }
+
+    @Test
+    fun `the measurements are dropped when the item count changes`() {
+        // Данных стало больше — индексы сдвинулись, прежние измерения больше
+        // не про те элементы.
+        val heights = ItemHeights()
+        heights.update(layoutInfo(0 to 140, 1 to 140, totalItemsCount = 5), viewportPx)
+        assertThat(heights.heightOf(1)).isEqualTo(140)
+        heights.update(layoutInfo(0 to 90, totalItemsCount = 6), viewportPx)
+        assertThat(heights.heightOf(1)).isEqualTo(0)
     }
 }
