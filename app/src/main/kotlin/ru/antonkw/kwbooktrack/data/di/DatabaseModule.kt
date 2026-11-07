@@ -40,6 +40,8 @@ object DatabaseModule {
                 ru.antonkw.kwbooktrack.data.db.migration.Migrate4To5,
                 ru.antonkw.kwbooktrack.data.db.migration.Migrate5To6,
                 ru.antonkw.kwbooktrack.data.db.migration.Migrate6To7,
+                ru.antonkw.kwbooktrack.data.db.migration.Migrate7To8,
+                ru.antonkw.kwbooktrack.data.db.migration.Migrate8To9,
             )
             .build()
 

@@ -64,6 +64,7 @@ import coil.compose.AsyncImage
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import ru.antonkw.kwbooktrack.R
+import ru.antonkw.kwbooktrack.ui.common.DatePickerField
 import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -310,11 +311,10 @@ fun AddBookScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                OutlinedTextField(
+                DatePickerField(
                     value = state.purchaseDate,
                     onValueChange = viewModel::setPurchaseDate,
-                    label = { Text(stringResource(R.string.label_purchase_date)) },
-                    singleLine = true,
+                    label = stringResource(R.string.label_purchase_date),
                     modifier = Modifier.weight(1f),
                 )
                 OutlinedTextField(
@@ -354,11 +354,10 @@ fun AddBookScreen(
                 label = stringResource(R.string.field_is_read),
             )
             if (state.isRead) {
-                OutlinedTextField(
+                DatePickerField(
                     value = state.finishedDate,
                     onValueChange = viewModel::setFinishedDate,
-                    label = { Text(stringResource(R.string.label_finished_date)) },
-                    singleLine = true,
+                    label = stringResource(R.string.label_finished_date),
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -462,7 +461,7 @@ fun AddBookScreen(
                             onValueChange = viewModel::setPrintPages,
                             label = { Text(stringResource(R.string.field_print_pages)) },
                             singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             modifier = Modifier.weight(1f),
                         )
                     }

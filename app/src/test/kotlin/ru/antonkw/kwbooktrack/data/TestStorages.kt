@@ -14,6 +14,14 @@ object NoOpCoverStorage : CoverStorage {
 /** Stub PhotoStorage для unit-тестов. */
 object NoOpPhotoStorage : PhotoStorage {
     override fun saveForNote(noteId: Long, source: InputStream, extension: String): String = ""
+
+    /**
+     * Путь детерминированный — иначе дедупликация фото при импорте не работает:
+     * каждый импорт создавал бы новый путь, и фото дублировались бы.
+     */
+    override fun saveNamed(name: String, source: InputStream, extension: String): String =
+        "/photos/$name.${extension.ifEmpty { "jpg" }}"
+
     override fun deleteForNote(noteId: Long) = Unit
     override fun deleteForBook(bookId: Long) = Unit
     override fun deletePaths(paths: Collection<String>) = Unit

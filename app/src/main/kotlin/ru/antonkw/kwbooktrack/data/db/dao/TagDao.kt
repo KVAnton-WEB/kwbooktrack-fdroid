@@ -6,6 +6,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import ru.antonkw.kwbooktrack.data.db.entity.BookTagCrossRef
+import ru.antonkw.kwbooktrack.data.db.entity.BookTagName
 import ru.antonkw.kwbooktrack.data.db.entity.TagEntity
 
 @Dao
@@ -15,6 +16,17 @@ interface TagDao {
 
     @Query("SELECT * FROM tags WHERE name = :name LIMIT 1")
     suspend fun findByName(name: String): TagEntity?
+
+    /**
+     * Теги всех книг по одному запросу — по алфавиту, как их показывает список тегов.
+     *
+     * Запрос на книгу стоил бы запроса на каждую книгу библиотеки.
+     */
+    @Query(
+        "SELECT bt.book_id AS book_id, t.name AS name FROM tags t " +
+            "JOIN book_tags bt ON bt.tag_id = t.id ORDER BY t.name",
+    )
+    suspend fun tagsForAllBooks(): List<BookTagName>
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insert(tag: TagEntity): Long

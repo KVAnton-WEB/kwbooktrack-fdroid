@@ -1,28 +1,38 @@
 package ru.antonkw.kwbooktrack.data.importer
 
-import ru.antonkw.kwbooktrack.data.repository.BookRepository
-import ru.antonkw.kwbooktrack.data.repository.NoteRepository
-import ru.antonkw.kwbooktrack.data.storage.CoverTranscoder
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import ru.antonkw.kwbooktrack.data.tellico.TellicoCsvReader
+import ru.antonkw.kwbooktrack.data.tellico.TellicoRecord
+import ru.antonkw.kwbooktrack.data.tellico.TellicoXmlReader
 import java.io.File
-import java.io.StringReader
-import java.util.zip.ZipEntry
-import java.util.zip.ZipInputStream
+import java.util.zip.ZipFile
 import javax.inject.Inject
-import kotlin.Unit
 
+/**
+ * Импорт архива Tellico: `.tc` (zip с `tellico.xml`), zip с CSV или «голый»
+ * CSV/XML-файл.
+ *
+ * Архив распаковывается во временный каталог рядом с выходным — оттуда
+ * апплиер берёт обложки и фото. Каталог удаляется в `finally`.
+ *
+ * Записи → снимки → БД сливает [ImportTellicoUseCase]: этот класс отвечает
+ * только за файл (архив, распаковка, формат).
+ */
 class ImportTellicoZipUseCase @Inject constructor(
+    private val importUseCase: ImportTellicoUseCase,
     private val csvReader: TellicoCsvReader,
-    private val mapper: TellicoBookMapper,
-    private val bookRepository: BookRepository,
-    private val noteRepository: NoteRepository,
-    private val transcoder: CoverTranscoder,
+    private val xmlReader: TellicoXmlReader,
 ) {
+
     suspend operator fun invoke(
-        zipFile: File,
-        coverOutputDir: File,
+        file: File,
+        format: ImportFormat,
+        outputDir: File,
         dryRun: Boolean = false,
     ): ImportTellicoResult {
-        if (!zipFile.exists()) {
+        if (!file.exists()) {
+            // Не «успешный» импорт в пустоту: UI должен показать ошибку.
             return ImportTellicoResult(
                 total = 0,
                 imported = 0,
@@ -30,73 +40,97 @@ class ImportTellicoZipUseCase @Inject constructor(
                 coversCopied = 0,
                 notesImported = 0,
                 dryRun = dryRun,
+                errors = listOf(IllegalStateException("файл не найден: ${file.absolutePath}")),
             )
         }
+        val staging = File(outputDir, ".import-staging")
+        try {
+            val prepared = withContext(Dispatchers.IO) { prepare(file, format, staging) }
+            // Корень ассетов: распакованный архив; обложки кладутся в outputDir.
+            return importUseCase(
+                prepared.records,
+                ImportTellicoOptions(
+                    assetRoot = prepared.root,
+                    coverOutputDir = outputDir,
+                    dryRun = dryRun,
+                ),
+            )
+        } finally {
+            staging.deleteRecursively()
+        }
+    }
 
-        val csvContent = StringBuilder()
-        val extractedCovers = File(coverOutputDir, "covers").apply { mkdirs() }
-        var coversExtracted = 0
-        // The cover files in a Tellico ZIP live under <prefix>/Books_files/, e.g. "tellico/Books_files/abc.jpeg".
-        // We auto-detect the prefix from the first matching entry so users don't need to know it.
-        var coverDirPrefix: String? = null
-        val imageExt = setOf("jpg", "jpeg", "png", "webp")
+    /**
+     * Готовит архив к чтению: распаковывает zip (или берёт родительский каталог
+     * «голого» файла) и читает записи.
+     *
+     * [Prepared.root] — корень ассетов: обложки и фото лежат внутри него.
+     */
+    private fun prepare(file: File, format: ImportFormat, staging: File): Prepared {
+        val zipped = isZip(file)
+        // Для «голого» файла корень — его родительский каталог: рядом лежат обложки и фото.
+        val root = if (zipped) {
+            staging.deleteRecursively()
+            staging.mkdirs()
+            unzip(file, staging)
+            staging
+        } else {
+            file.parentFile ?: File(".")
+        }
+        val records = when (format) {
+            ImportFormat.TELLICO_XML -> {
+                val xml = source(root, file, zipped) { it.name == "tellico.xml" }
+                    ?: throw IllegalStateException("в архиве нет tellico.xml")
+                xmlReader.read(xml.readBytes())
+            }
+            ImportFormat.TELLICO_CSV -> {
+                val csv = source(root, file, zipped) { it.name.endsWith(".csv", ignoreCase = true) }
+                    ?: throw IllegalStateException("в архиве нет CSV")
+                csv.inputStream().bufferedReader().use { reader -> csvReader.read(reader) }
+            }
+            ImportFormat.KWBOOKTRACK_ZIP ->
+                throw IllegalStateException("свой бэкап импортируется отдельным импортёром")
+        }
+        return Prepared(root, records)
+    }
 
-        ZipInputStream(zipFile.inputStream().buffered()).use { zin ->
-            var entry: ZipEntry? = zin.nextEntry
-            while (entry != null) {
-                if (!entry.isDirectory) {
-                    val name = entry.name
-                    val ext = name.substringAfterLast('.', "").lowercase()
-                    when {
-                        name.endsWith(".csv", ignoreCase = true) && csvContent.isEmpty() -> {
-                            csvContent.append(zin.readBytes().toString(Charsets.UTF_8))
-                        }
-                        ext in imageExt -> {
-                            if (coverDirPrefix == null && "/" in name) {
-                                val idx = name.lastIndexOf("/Books_files/")
-                                if (idx >= 0) {
-                                    coverDirPrefix = name.substring(0, idx + "/Books_files/".length)
-                                }
-                            }
-                            if (!dryRun) {
-                                val basename = File(name).name
-                                val target = File(extractedCovers, basename)
-                                target.outputStream().use { out -> zin.copyTo(out) }
-                                coversExtracted++
-                            }
-                        }
-                    }
+    /** Корень ассетов и прочитанные записи. */
+    private class Prepared(val root: File, val records: List<TellicoRecord>)
+
+    /**
+     * Файл-источник: в zip ищем по имени, «голый» файл берём как есть —
+     * его формап уже определён по содержимому, а имя может быть любым.
+     */
+    private fun source(root: File, file: File, zipped: Boolean, predicate: (File) -> Boolean): File? =
+        if (zipped) {
+            root.walkTopDown().firstOrNull { it.isFile && predicate(it) }
+        } else {
+            file.takeIf { it.isFile }
+        }
+
+    /** Распаковка архива с сохранением путей. */
+    private fun unzip(zip: File, target: File) {
+        val root = target.canonicalPath
+        ZipFile(zip).use { archive ->
+            for (entry in archive.entries()) {
+                val out = File(target, entry.name)
+                // Путь из архива не должен уводить за пределы распаковки.
+                if (!out.canonicalPath.startsWith(root + File.separator)) continue
+                if (entry.isDirectory) {
+                    out.mkdirs()
+                    continue
                 }
-                entry = zin.nextEntry
+                out.parentFile?.mkdirs()
+                archive.getInputStream(entry).use { input ->
+                    out.outputStream().use { output -> input.copyTo(output) }
+                }
             }
         }
-
-        if (csvContent.isEmpty()) {
-            return ImportTellicoResult(
-                total = 0,
-                imported = 0,
-                skipped = 0,
-                coversCopied = 0,
-                notesImported = 0,
-                dryRun = dryRun,
-            )
-        }
-
-        val useCase = ImportTellicoUseCase(
-            csvReader = csvReader,
-            mapper = mapper,
-            bookRepository = bookRepository,
-            noteRepository = noteRepository,
-            transcoder = transcoder,
-        )
-        val result = useCase(
-            input = StringReader(csvContent.toString()),
-            options = ImportTellicoOptions(
-                coverSourceDir = if (dryRun) null else extractedCovers,
-                coverOutputDir = coverOutputDir,
-                dryRun = dryRun,
-            ),
-        )
-        return result.copy(coversCopied = if (dryRun) 0 else coversExtracted)
     }
+
+    private fun isZip(file: File): Boolean =
+        file.inputStream().use { input ->
+            val head = ByteArray(2)
+            input.read(head) == 2 && head[0] == 'P'.code.toByte() && head[1] == 'K'.code.toByte()
+        }
 }

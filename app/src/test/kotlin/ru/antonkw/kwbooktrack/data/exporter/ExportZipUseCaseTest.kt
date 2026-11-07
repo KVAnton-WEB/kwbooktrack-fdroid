@@ -19,6 +19,7 @@ import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
+import ru.antonkw.kwbooktrack.data.snapshot.SnapshotBuilder
 import java.io.File
 import java.io.StringReader
 import java.nio.file.Files
@@ -46,11 +47,13 @@ class ExportZipUseCaseTest {
             PhotoRepository(db.photoDao(), NoOpPhotoStorage),
         )
         useCase = ExportZipUseCase(
-            bookRepository = repo,
-            noteDao = db.noteDao(),
-            sessionDao = db.readingSessionDao(),
-            photoDao = db.photoDao(),
-            tagDao = db.tagDao(),
+            snapshotBuilder = SnapshotBuilder(
+                bookRepository = repo,
+                noteDao = db.noteDao(),
+                sessionDao = db.readingSessionDao(),
+                photoDao = db.photoDao(),
+                tagDao = db.tagDao(),
+            ),
             versionProvider = versionProvider,
             database = db,
         )
@@ -122,6 +125,24 @@ class ExportZipUseCaseTest {
     }
 
     @Test
+    fun csvStoresOnlyCoverFileName() {
+        runBlocking {
+            val coverFile = File(tempDir, "cover.jpg").apply { writeBytes(byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte())) }
+            repo.insert(sampleBook("Book With Cover", "Author", coverPath = coverFile.absolutePath))
+
+            val outFile = File(tempDir, "export.zip")
+            useCase(outFile)
+
+            // Внутренний путь приложения в бэкапе бессмысленен: импорт ищет
+            // обложку по имени файла.
+            val csv = readZipEntries(outFile)["books.csv"]!!
+            val header = csv.lineSequence().first().split(";")
+            val row = csv.lineSequence().drop(1).first().split(";")
+            assertThat(row[header.indexOf("cover_path")]).isEqualTo("cover.jpg")
+        }
+    }
+
+    @Test
     fun emptyLibraryExportsHeaderOnly() {
         runBlocking {
             val outFile = File(tempDir, "export.zip")
@@ -130,6 +151,43 @@ class ExportZipUseCaseTest {
             assertThat(manifest.counts.books).isEqualTo(0)
             val csv = readZipEntries(outFile)["books.csv"]!!
             assertThat(csv).startsWith("title;")
+        }
+    }
+
+    @Test
+    fun fileVanishedBeforeWriteIsSkippedWithoutBreakingExport() {
+        runBlocking {
+            val cover = File(tempDir, "cover.jpg").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+            repo.insert(sampleBook("Book With Cover", "Author", coverPath = cover.absolutePath))
+            // Версия провайдера читается между подготовкой архива и его записью —
+            // «исчезаем» с файлом обложки именно тут.
+            val deleting = ExportZipUseCase(
+                snapshotBuilder = SnapshotBuilder(
+                    bookRepository = repo,
+                    noteDao = db.noteDao(),
+                    sessionDao = db.readingSessionDao(),
+                    photoDao = db.photoDao(),
+                    tagDao = db.tagDao(),
+                ),
+                versionProvider = object : AppVersionProvider {
+                    override val appVersion: String
+                        get() {
+                            cover.delete()
+                            return "0.1.0"
+                        }
+                },
+                database = db,
+            )
+
+            val outFile = File(tempDir, "export.zip")
+            val manifest = deleting(outFile)
+
+            // Файл исчез — экспорт не роняется, обложки в архиве нет.
+            assertThat(manifest.counts.books).isEqualTo(1)
+            assertThat(outFile.exists()).isTrue()
+            val entries = readZipEntries(outFile)
+            assertThat(entries.keys).contains("books.csv")
+            assertThat(entries.keys.none { it.startsWith("covers/") }).isTrue()
         }
     }
 

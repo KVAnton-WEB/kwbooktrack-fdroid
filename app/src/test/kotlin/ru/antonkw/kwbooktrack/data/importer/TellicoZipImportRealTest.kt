@@ -1,7 +1,5 @@
 package ru.antonkw.kwbooktrack.data.importer
 
-import ru.antonkw.kwbooktrack.data.storage.CoverTranscoder
-
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.first
@@ -12,11 +10,20 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import ru.antonkw.kwbooktrack.data.NoOpCoverStorage
+import ru.antonkw.kwbooktrack.data.NoOpPhotoStorage
 import ru.antonkw.kwbooktrack.data.TestDb
 import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
+import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.NoteRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
+import ru.antonkw.kwbooktrack.data.repository.SessionRepository
+import ru.antonkw.kwbooktrack.data.repository.TagRepository
+import ru.antonkw.kwbooktrack.data.snapshot.SnapshotApplier
+import ru.antonkw.kwbooktrack.data.storage.CoverTranscoder
+import ru.antonkw.kwbooktrack.data.tellico.TellicoCsvReader
+import ru.antonkw.kwbooktrack.data.tellico.TellicoXmlReader
 import java.io.File
 import java.nio.file.Files
 
@@ -25,7 +32,6 @@ class TellicoZipImportRealTest {
 
     private lateinit var db: KwBooktrackDatabase
     private lateinit var repo: BookRepository
-    private lateinit var noteRepo: NoteRepository
     private lateinit var useCase: ImportTellicoZipUseCase
     private lateinit var tempOut: File
     private lateinit var zipFile: File
@@ -38,14 +44,30 @@ class TellicoZipImportRealTest {
         assumeTrue("tellico.zip present", zipFile.exists() && zipFile.length() > 0)
 
         db = TestDb.createInMemory(ApplicationProvider.getApplicationContext())
+        val photoRepository = PhotoRepository(db.photoDao(), NoOpPhotoStorage)
         repo = BookRepository(
             db.bookDao(),
             db.tagDao(),
-            ru.antonkw.kwbooktrack.data.NoOpCoverStorage,
-            PhotoRepository(db.photoDao(), ru.antonkw.kwbooktrack.data.NoOpPhotoStorage),
+            NoOpCoverStorage,
+            photoRepository,
         )
-        noteRepo = NoteRepository(db.noteDao(), ru.antonkw.kwbooktrack.data.NoOpPhotoStorage)
-        useCase = ImportTellicoZipUseCase(TellicoCsvReader(), TellicoBookMapper(), repo, noteRepo, CoverTranscoder())
+        useCase = ImportTellicoZipUseCase(
+            importUseCase = ImportTellicoUseCase(
+                csvReader = TellicoCsvReader(),
+                mapper = TellicoBookMapper(),
+                applier = SnapshotApplier(
+                    bookRepository = repo,
+                    noteRepository = NoteRepository(db.noteDao(), NoOpPhotoStorage),
+                    sessionRepository = SessionRepository(db.readingSessionDao()),
+                    tagRepository = TagRepository(db.tagDao()),
+                    photoRepository = photoRepository,
+                    photoStorage = NoOpPhotoStorage,
+                    transcoder = CoverTranscoder(),
+                ),
+            ),
+            csvReader = TellicoCsvReader(),
+            xmlReader = TellicoXmlReader(),
+        )
         tempOut = Files.createTempDirectory("kwbooktrack-zip-").toFile()
     }
 
@@ -57,7 +79,8 @@ class TellicoZipImportRealTest {
 
     @Test
     fun importsBooksWithCoversFromRealZip() = runBlocking {
-        val result = useCase(zipFile, tempOut)
+        // В тестовом архиве лежит tellico/tellico.csv, а не tellico.xml.
+        val result = useCase(zipFile, ImportFormat.TELLICO_CSV, tempOut)
         assertThat(result.total).isGreaterThan(500)
         assertThat(result.imported).isGreaterThan(500)
         assertThat(result.coversCopied).isGreaterThan(0)
@@ -69,7 +92,7 @@ class TellicoZipImportRealTest {
         // Sample several books that claim to have a cover and verify the file actually exists on disk.
         val sample = books.filter { !it.coverPath.isNullOrBlank() }.take(20)
         val missing = sample.count { book ->
-            val f = java.io.File(book.coverPath!!)
+            val f = File(book.coverPath!!)
             !f.exists() || f.length() == 0L
         }
         assertThat(missing).isEqualTo(0)
@@ -77,17 +100,17 @@ class TellicoZipImportRealTest {
 
     @Test
     fun importsQuotesAndReviewsFromRealZip() = runBlocking {
-        val result = useCase(zipFile, tempOut)
+        val result = useCase(zipFile, ImportFormat.TELLICO_CSV, tempOut)
         assertThat(result.notesImported).isGreaterThan(0)
 
-        val notes = db.noteDao().observeByKind(ru.antonkw.kwbooktrack.data.db.entity.NoteKind.QUOTE)
+        val notes = db.noteDao().observeByKind(NoteKind.QUOTE)
             .first() + db.noteDao()
-            .observeByKind(ru.antonkw.kwbooktrack.data.db.entity.NoteKind.REVIEW)
+            .observeByKind(NoteKind.REVIEW)
             .first()
         assertThat(notes).isNotEmpty()
 
-        val quotes = notes.filter { it.kind == ru.antonkw.kwbooktrack.data.db.entity.NoteKind.QUOTE }
-        val reviews = notes.filter { it.kind == ru.antonkw.kwbooktrack.data.db.entity.NoteKind.REVIEW }
+        val quotes = notes.filter { it.kind == NoteKind.QUOTE }
+        val reviews = notes.filter { it.kind == NoteKind.REVIEW }
         assertThat(quotes).isNotEmpty()
         assertThat(reviews).isNotEmpty()
         // Связь с книгой должна быть установлена

@@ -4,6 +4,7 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import ru.antonkw.kwbooktrack.data.snapshot.ExtraField
 
 @Entity(
     tableName = "books",
@@ -85,8 +86,9 @@ data class BookEntity(
     val translator: String? = null,
     @ColumnInfo(name = "print_year")
     val printYear: Int? = null,
+    // Усл. печ. л. — дробное число («32,5»), колонка REAL (миграция v7→v8).
     @ColumnInfo(name = "print_pages")
-    val printPages: Int? = null,
+    val printPages: Double? = null,
     @ColumnInfo(name = "original_language")
     val originalLanguage: String? = null,
     @ColumnInfo(name = "original_title")
@@ -99,4 +101,9 @@ data class BookEntity(
     val isLent: Boolean = false,
     @ColumnInfo(name = "is_sold")
     val isSold: Boolean = false,
+    // --- v9: чужие поля Tellico ---
+    // Пользовательские поля, которых нет в приложении (миграция v8→v9).
+    // Хранятся в JSON, чтобы пережить экспорт/импорт без потерь.
+    @ColumnInfo(name = "extra_fields")
+    val extraFields: Map<String, ExtraField> = emptyMap(),
 )

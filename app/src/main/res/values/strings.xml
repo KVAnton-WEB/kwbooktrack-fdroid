@@ -8,8 +8,9 @@
     <string name="about_version">Версия</string>
     <string name="about_library">Библиотека</string>
     <string name="about_backup_title">Резервные копии</string>
-    <string name="about_backup_description">Экспорт библиотеки в ZIP-архив с CSV и обложками, либо импорт ранее сохранённого архива.</string>
+    <string name="about_backup_description">Экспорт библиотеки в ZIP-архив с CSV и обложками, экспорт в родной формат Tellico (.tc) либо импорт ранее сохранённого архива.</string>
     <string name="action_export">Экспорт</string>
+    <string name="action_export_tellico">Экспорт в Tellico (.tc)</string>
     <string name="export_success_format">Экспорт готов: %1$d книг, %2$d фото</string>
     <string name="export_failed_format">Не удалось экспортировать: %1$s</string>
     <string name="export_failed_unknown">Не удалось экспортировать: неизвестная ошибка</string>
@@ -65,6 +66,7 @@
     <string name="cd_about">О приложении</string>
     <string name="cd_clear_query">Очистить поиск</string>
     <string name="cd_choose_period">Выбрать период</string>
+    <string name="cd_choose_date">Выбрать дату</string>
     <string name="cd_back">Назад</string>
 
     <!-- Book list -->
@@ -74,7 +76,7 @@
     <string name="action_list">Список</string>
     <string name="notes_search_hint">Поиск по заметкам…</string>
     <string name="notes_no_results">Ничего не найдено по «%1$s»</string>
-    <string name="action_import_tellico">Импорт Tellico</string>
+    <string name="action_import_tellico">Импорт каталога</string>
     <string name="search_hint">Поиск по названию, автору, ISBN…</string>
     <string name="empty_library">Библиотека пуста — добавьте первую книгу</string>
     <string name="empty_search">Ничего не найдено по «%1$s»</string>
@@ -195,6 +197,7 @@
     <string name="action_pick_cover">Выбрать обложку</string>
     <string name="action_take_photo">Сделать фото</string>
     <string name="action_clear_cover">Убрать обложку</string>
+    <string name="action_clear_date">Очистить</string>
     <string name="action_write_review">Написать рецензию</string>
     <string name="action_save_review">Сохранить рецензию</string>
     <string name="note_editor_preview">Предпросмотр</string>
@@ -217,15 +220,18 @@
     <string name="dialog_delete_book_message">Книга и все связанные данные будут удалены без возможности восстановления.</string>
 
     <!-- Tellico -->
-    <string name="tellico_import_description">Импортируйте ZIP-архив с экспортом из Tellico (CSV + Books_files/*.jpg). Обложки будут автоматически скопированы в библиотеку обложек.</string>
+    <string name="tellico_import_description">Импортируйте родной архив Tellico (.tc), файл tellico.xml, CSV-выгрузку Tellico или свой zip-бэкап приложения. Формат определяется по содержимому файла. Обложки и фото переносятся из архива; у архивов, писанных самим Tellico, картинки лежат рядом с файлом коллекции (в папке «&lt;имя&gt;_files») — такой архив импортируйте вместе с этой папкой.</string>
     <string name="tellico_import_done">Импорт завершён</string>
-    <string name="tellico_import_total_format">Записей в CSV: %1$d</string>
+    <string name="tellico_import_done_with_errors">Импорт завершён с ошибками</string>
+    <string name="tellico_import_total_format">Записей в файле: %1$d</string>
     <string name="tellico_import_imported_format">Импортировано книг: %1$d</string>
     <string name="tellico_import_skipped_format">Пропущено: %1$d</string>
     <string name="tellico_import_label_covers">Обложек скопировано: %1$d</string>
     <string name="tellico_import_label_notes">Заметок/цитат/рецензий: %1$d</string>
     <string name="tellico_import_error_read">Не удалось прочитать файл</string>
+    <string name="tellico_import_error_empty">В файле не найдено ни одной записи</string>
     <string name="tellico_import_error_unknown">Неизвестная ошибка</string>
+    <string name="tellico_import_warning_format">Предупреждение: %1$s</string>
 
     <!-- Picker -->
     <string name="dialog_choose_month">Выбрать месяц</string>
@@ -320,14 +326,14 @@
     <string name="stats_monthly_entry">%1$d-%2$02d    %3$d кн.</string>
 
     <!-- Tellico importer -->
-    <string name="tellico_import_title">Импорт Tellico</string>
+    <string name="tellico_import_title">Импорт каталога</string>
     <string name="tellico_import_pick_csv">Выбрать CSV-файл</string>
-    <string name="tellico_import_pick_zip">Выбрать ZIP-файл</string>
+    <string name="tellico_import_pick_file">Выбрать файл</string>
     <string name="tellico_import_run">Запустить импорт</string>
     <string name="tellico_import_running">Идёт импорт…</string>
     <string name="tellico_import_result_format">Импортировано: %1$d, пропущено: %2$d</string>
     <string name="tellico_import_covers_format">Обложек скопировано: %1$d</string>
-    <string name="tellico_import_notes_format">Заметок добавлено: %1$d</string>
+    <string name="tellico_import_notes_format">Заметок, сессий, тегов и фото добавлено: %1$d</string>
     <string name="tellico_import_dry_run">Пробный прогон (без записи)</string>
     <string name="tellico_import_error">Ошибка импорта</string>
 

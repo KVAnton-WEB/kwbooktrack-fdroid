@@ -97,6 +97,14 @@ fun AboutScreen(
         if (uri != null) exportViewModel.exportToUri(uri)
     }
 
+    // Родной формат Tellico: `.tc` — это zip, но mime-тип без расширения,
+    // иначе SAF допишет к имени `.zip` (см. AboutExportViewModel.TELLICO_MIME).
+    val exportTellicoLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument(AboutExportViewModel.TELLICO_MIME),
+    ) { uri ->
+        if (uri != null) exportViewModel.exportTellicoToUri(uri)
+    }
+
     val exportSuccessFormat = stringResource(R.string.export_success_format)
     LaunchedEffect(exportState.lastManifest) {
         val m = exportState.lastManifest ?: return@LaunchedEffect
@@ -184,6 +192,16 @@ fun AboutScreen(
                             Icon(Icons.Filled.FileUpload, contentDescription = null)
                         }
                         Text(text = stringResource(R.string.action_export))
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            exportTellicoLauncher.launch(AboutExportViewModel.suggestedTellicoFilename())
+                        },
+                        enabled = !exportState.inProgress,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.Filled.FileUpload, contentDescription = null)
+                        Text(text = stringResource(R.string.action_export_tellico))
                     }
                     OutlinedButton(
                         onClick = onImportClick,

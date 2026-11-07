@@ -25,6 +25,8 @@ import ru.antonkw.kwbooktrack.data.db.entity.BookSource
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.storage.CoverStorage
+import ru.antonkw.kwbooktrack.data.text.formatDecimal
+import ru.antonkw.kwbooktrack.data.text.parseDecimal
 import ru.antonkw.kwbooktrack.data.time.toEpochMs
 import ru.antonkw.kwbooktrack.data.time.toLocalDate
 import java.io.File
@@ -171,7 +173,7 @@ class AddBookViewModel @Inject constructor(
                         condition = book.condition.orEmpty(),
                         translator = book.translator.orEmpty(),
                         printYear = book.printYear?.toString().orEmpty(),
-                        printPages = book.printPages?.toString().orEmpty(),
+                        printPages = book.printPages?.let { formatDecimal(it) }.orEmpty(),
                         originalLanguage = book.originalLanguage.orEmpty(),
                         originalTitle = book.originalTitle.orEmpty(),
                         annotation = book.annotation.orEmpty(),
@@ -218,7 +220,13 @@ class AddBookViewModel @Inject constructor(
     fun setCondition(value: String) { _state.value = _state.value.copy(condition = value) }
     fun setTranslator(value: String) { _state.value = _state.value.copy(translator = value) }
     fun setPrintYear(value: String) { _state.value = _state.value.copy(printYear = value.filter { it.isDigit() }) }
-    fun setPrintPages(value: String) { _state.value = _state.value.copy(printPages = value.filter { it.isDigit() }) }
+    fun setPrintPages(value: String) {
+        // Дробное число: цифры и один разделитель (запятая).
+        val parts = value.replace('.', ',').split(',')
+        val cleaned = parts[0].filter { it.isDigit() } +
+            if (parts.size > 1) "," + parts[1].filter { it.isDigit() } else ""
+        _state.value = _state.value.copy(printPages = cleaned)
+    }
     fun setOriginalLanguage(value: String) { _state.value = _state.value.copy(originalLanguage = value) }
     fun setOriginalTitle(value: String) { _state.value = _state.value.copy(originalTitle = value) }
     fun setAnnotation(value: String) { _state.value = _state.value.copy(annotation = value) }
@@ -304,7 +312,7 @@ class AddBookViewModel @Inject constructor(
             val purchasePrice = parsePriceInput(s.purchasePrice)
             val finishedDate = parseDateInput(s.finishedDate)
             val printYear = s.printYear.toIntOrNull()
-            val printPages = s.printPages.toIntOrNull()
+            val printPages = parseDecimal(s.printPages)
             if (isEditing) {
                 val existing = bookRepository.findById(editingBookId) ?: return@launch
                 // "Прочитано" is a checkbox, so the finished date travels with
