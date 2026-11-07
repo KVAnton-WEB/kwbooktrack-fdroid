@@ -26,6 +26,9 @@ data class TcEntry(
  * Сборщик `tellico.xml` — родного формата Tellico (DTD v12).
  *
  * Правила, которые Tellico не прощает (потому и написаны руками):
+ *  - `<fields>` должен объявлять **все** поля записи, стандартные Tellico
+ *    включительно: при импорте Tellico берёт поля только из `<fields>`, а
+ *    значения необъявленных полей молча выбрасывает;
  *  - многозначное поле — контейнер `<имя+s>` с вложенными `<имя>`; плоская запись
  *    читается как одно значение;
  *  - дата — `<поле calendar="gregorian">` с `year`/`month`/`day`;
@@ -54,11 +57,18 @@ object TellicoXmlWriter {
     }
 
     /**
-     * `<fields>`: объявляем только свои и чужие поля — встроенные Tellico знает сам
-     * (со своими типами), а объявление встроенного поля с другим типом его портит.
+     * `<fields>`: объявляем **все** поля, которые пишем в записи, — и свои, и
+     * стандартные Tellico.
+     *
+     * Стандартные поля объявлять обязательно: при импорте Tellico собирает
+     * коллекцию только из объявленных полей (`addFields = defaultFields ||
+     * fields.isEmpty()`) и **молча выбрасывает** значения тех полей, которых в
+     * коллекции нет. Без объявления терялись заголовок, автор, издательство,
+     * обложка, аннотация и прочее — записи выглядели пустыми.
      */
     private fun writeFields(xml: StringBuilder, entries: List<TcEntry>) {
         xml.append("  <fields>\n")
+        standardFields.forEach { writeField(xml, it) }
         ownFields.forEach { writeField(xml, it) }
         // Текстовая цена — отдельное поле: `pur_price` у Tellico числовой.
         if (entries.any { it.textPrice() != null }) {
@@ -371,6 +381,74 @@ object TellicoXmlWriter {
         val format: Int = 4,
         val columns: Int? = null,
         val columnTitles: List<String> = emptyList(),
+    )
+
+    /**
+     * Стандартные поля Tellico для коллекции «книги».
+     *
+     * Типы, форматы и флаги — как в живой коллекции Tellico
+     * (`src/collections/bookcollection.cpp`):
+     * `type` — вид поля (1 текст, 2 многострочный, 4 флаг, 6 число, 10 картинка,
+     * 12 дата, 14 рейтинг), `format` — оформление (0 как есть, 1 заголовок,
+     * 2 имя, 3 дата), `flags` — биты (1 несколько значений, 2 группировка,
+     * 4 подсказка, 16 не править).
+     *
+     * Бит 1 (несколько значений) обязателен у многозначных полей: без него
+     * Tellico склеит значения контейнера в одно.
+     *
+     * «Переплёт» и «Состояние» у Tellico — списки выбора, и значение не из
+     * списка он **молча выбрасывает**. В приложении это свободный текст, поэтому
+     * объявляем их текстом: потерять значение хуже, чем показать его без
+     * выпадающего списка.
+     */
+    private val standardFields: List<FieldDef> = listOf(
+        std("title", type = 1, format = 1, category = "Общее"),
+        std("subtitle", type = 1, format = 1, category = "Общее"),
+        std("author", type = 1, format = 2, flags = 7, category = "Общее"),
+        std("editor", type = 1, format = 2, flags = 5, category = "Общее"),
+        std("publisher", type = 1, format = 0, flags = 6, category = "Издательство"),
+        std("edition", type = 1, format = 0, flags = 4, category = "Издательство"),
+        std("cr_year", type = 6, flags = 1, category = "Издательство"),
+        std("pub_year", type = 6, flags = 2, category = "Издательство"),
+        std("isbn", type = 1, category = "Издательство"),
+        std("lccn", type = 1, category = "Издательство"),
+        std("pages", type = 6, category = "Издательство"),
+        std("language", type = 1, flags = 5, category = "Издательство"),
+        std("genre", type = 1, flags = 7, category = "Классификация"),
+        std("keyword", type = 1, flags = 7, category = "Классификация"),
+        std("series", type = 1, flags = 6, category = "Классификация"),
+        std("series_num", type = 6, category = "Классификация"),
+        std("condition", type = 1, category = "Классификация"),
+        std("translator", type = 1, format = 2, flags = 7, category = "Издательство"),
+        std("binding", type = 1, flags = 2, category = "Общее"),
+        std("pur_price", type = 6, category = "Покупка"),
+        std("pur_date", type = 12, format = 3, category = "Покупка"),
+        std("read", type = 4, flags = 2, category = "Личное"),
+        std("gift", type = 4, flags = 2, category = "Личное"),
+        std("loaned", type = 4, flags = 2, category = "Личное"),
+        std("signed", type = 4, category = "Личное"),
+        std("rating", type = 14, flags = 2, category = "Личное"),
+        std("cover", type = 10, category = "Лицевая сторона обложки"),
+        std("plot", type = 2, category = "Содержание"),
+        std("comments", type = 2, category = "Аннотация"),
+        std("cdate", type = 12, format = 3, flags = 16, category = "Личное"),
+        std("mdate", type = 12, format = 3, flags = 16, category = "Личное"),
+    )
+
+    /** Стандартное поле Tellico: заголовок — из словаря полей. */
+    private fun std(
+        name: String,
+        type: Int,
+        format: Int = 4,
+        flags: Int = 0,
+        category: String,
+    ) = FieldDef(
+        name = name,
+        title = TellicoFields.TITLE[name] ?: TellicoFields.STANDARD_TITLES.getValue(name),
+        type = type,
+        category = category,
+        flags = flags,
+        format = format,
     )
 
     /** Свои поля — с теми же `name`/`title`, что в живой коллекции Tellico. */

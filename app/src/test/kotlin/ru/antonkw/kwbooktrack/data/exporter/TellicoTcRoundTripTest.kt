@@ -13,6 +13,8 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.w3c.dom.Element
+import org.xml.sax.InputSource
 import ru.antonkw.kwbooktrack.data.NoOpCoverStorage
 import ru.antonkw.kwbooktrack.data.NoOpPhotoStorage
 import ru.antonkw.kwbooktrack.data.TestDb
@@ -44,10 +46,12 @@ import ru.antonkw.kwbooktrack.data.time.toEpochMs
 import ru.antonkw.kwbooktrack.data.time.toLocalDate
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.StringReader
 import java.nio.file.Files
 import java.time.LocalDate
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
+import javax.xml.parsers.DocumentBuilderFactory
 
 /**
  * Экспорт библиотеки в `.tc` (zip с `tellico.xml`, обложками и фото) и обратный
@@ -218,9 +222,11 @@ class TellicoTcRoundTripTest {
     }
 
     @Test
-    fun builtinTellicoFieldsAreNotDeclaredTwice() = runTest {
-        // «Содержание», «Редакция», «Подписано» Tellico знает сам: объявлять их
-        // в `<fields>` — значит завести у пользователя второе такое же поле.
+    fun builtinTellicoFieldsAreDeclaredOnce() = runTest {
+        // «Содержание», «Редакция», «Подписано» — стандартные поля Tellico, но
+        // объявлять их надо: при импорте Tellico берёт поля только из `<fields>`,
+        // иначе значение молча выбрасывается. Дубликата не будет — объявление
+        // и есть поле.
         sourceBooks.insert(
             BookEntity(
                 title = "Дюна",
@@ -238,9 +244,13 @@ class TellicoTcRoundTripTest {
 
         val xml = exportedXml()
 
-        assertThat(xml).doesNotContain("name=\"plot\"")
-        assertThat(xml).doesNotContain("name=\"edition\"")
-        assertThat(xml).doesNotContain("name=\"signed\"")
+        assertThat(xml).contains(fieldTag("Содержание", 0, 4, "plot", "Содержание", 2))
+        assertThat(xml).contains(fieldTag("Издательство", 4, 0, "edition", "Редакция", 1))
+        assertThat(xml).contains(fieldTag("Личное", 0, 4, "signed", "Подписано", 4))
+        // Объявлено ровно один раз — дубликата у пользователя не появится.
+        assertThat(Regex("name=\"plot\"").findAll(xml).count()).isEqualTo(1)
+        assertThat(Regex("name=\"edition\"").findAll(xml).count()).isEqualTo(1)
+        assertThat(Regex("name=\"signed\"").findAll(xml).count()).isEqualTo(1)
         // Значение встроенного поля всё равно пишется — в его элемент.
         assertThat(xml).contains("<plot>Глава 1</plot>")
         assertThat(xml).contains("<edition>2-е изд.</edition>")
@@ -379,6 +389,28 @@ class TellicoTcRoundTripTest {
 
         // Чужие поля объявляем текстом (1) — встроенные поля Tellico знает сам.
         assertThat(xml).contains(fieldTag("Общее", 0, 4, "чтец", "Чтец", 1))
+    }
+
+    @Test
+    fun everyFieldUsedInEntryIsDeclaredInFieldsBlock() = runTest {
+        seedLibrary()
+
+        val xml = exportedXml()
+        val (declared, used) = parseFieldUsage(xml)
+
+        // Tellico при импорте берёт поля только из `<fields>`, а значения
+        // необъявленных полей молча выбрасывает — записи выходят пустыми.
+        // Контейнер многозначного поля — имя поля с `s` на конце.
+        val undeclared = used.filter { name ->
+            name !in declared && name.removeSuffix("s") !in declared
+        }
+        assertThat(undeclared).isEmpty()
+
+        // Стандартные поля Tellico без объявления терялись все до единого.
+        assertThat(declared).containsAtLeast(
+            "title", "author", "publisher", "isbn", "pages", "comments",
+            "cover", "cdate", "mdate", "rating", "genre", "language",
+        )
     }
 
     @Test
@@ -675,4 +707,30 @@ class TellicoTcRoundTripTest {
     ): String =
         "<field category=\"$category\" description=\"\" flags=\"$flags\" format=\"$format\" " +
             "name=\"$name\" title=\"$title\" type=\"$type\""
+
+    /** Объявленные в `<fields>` имена полей и имена элементов, которыми заполнены записи. */
+    private fun parseFieldUsage(xml: String): Pair<Set<String>, Set<String>> {
+        val factory = DocumentBuilderFactory.newInstance().apply {
+            isNamespaceAware = true
+            runCatching {
+                setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
+            }
+        }
+        val document = factory.newDocumentBuilder()
+            .parse(InputSource(StringReader(xml)))
+        val collection = document.getElementsByTagName("collection").item(0) as Element
+        val fields = collection.getElementsByTagName("field")
+        val declared = (0 until fields.length)
+            .map { (fields.item(it) as Element).getAttribute("name") }
+            .toSet()
+        val entries = collection.getElementsByTagName("entry")
+        val used = mutableSetOf<String>()
+        for (index in 0 until entries.length) {
+            val children = (entries.item(index) as Element).childNodes
+            for (child in 0 until children.length) {
+                (children.item(child) as? Element)?.let { used += it.tagName }
+            }
+        }
+        return declared to used
+    }
 }

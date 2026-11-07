@@ -83,6 +83,20 @@ object TellicoFields {
         "livelib/fantlab" to "livelibfantlab",
     )
 
+    /**
+     * Заголовки стандартных полей Tellico, которых нет в [TITLE].
+     *
+     * Отдельная карта, а не [TITLE]: [KNOWN] — это «известные имена», и поле,
+     * попавшее в него, перестаёт быть чужим (уезжает в `extra_fields`).
+     */
+    val STANDARD_TITLES: Map<String, String> = mapOf(
+        "editor" to "Редактор",
+        "edition" to "Редакция",
+        "lccn" to "LCCN#",
+        "plot" to "Содержание",
+        "signed" to "Подписано",
+    )
+
     /** Известные внутренние имена: всё, что попадает в `fields`, а не в `extra`. */
     val KNOWN: Set<String> = TITLE.keys
 
