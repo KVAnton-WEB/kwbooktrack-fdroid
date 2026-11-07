@@ -21,6 +21,7 @@ import ru.antonkw.kwbooktrack.data.TestDb
 import ru.antonkw.kwbooktrack.data.TestViewModels
 import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
+import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
 import ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
@@ -86,6 +87,30 @@ class CalendarViewModelTest {
         val state = vm.uiState.first { s -> s.days.any { it?.books?.isNotEmpty() == true } }
         val day1 = state.days.firstOrNull { it?.date == firstOfMonth }
         assertThat(day1?.books?.map { it.title }).containsExactly("Hyperion")
+    }
+
+    @Test
+    fun finishedBookWithoutSessionsShowsOnItsFinishedDate() = runTest(dispatcher) {
+        // Прочитанная книга попадает в календарь по дате прочтения,
+        // даже если по ней нет ни одной сессии чтения.
+        val vm = CalendarViewModel(bookRepository, sessionRepository)
+        TestViewModels.track(vm)
+        val firstOfMonth = vm.month.value.atDay(1)
+        bookRepository.insert(
+            BookEntity(
+                title = "Dune",
+                author = "Herbert",
+                status = BookStatus.FINISHED,
+                finishedAt = firstOfMonth.toEpochMs(),
+                createdAt = 0L,
+                updatedAt = 0L,
+            ),
+        )
+
+        advanceUntilIdle()
+        val state = vm.uiState.first { s -> s.days.any { it?.books?.isNotEmpty() == true } }
+        val day1 = state.days.firstOrNull { it?.date == firstOfMonth }
+        assertThat(day1?.books?.map { it.title }).containsExactly("Dune")
     }
 
     @Test

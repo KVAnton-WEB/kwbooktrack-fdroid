@@ -17,6 +17,7 @@ import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.SessionRepository
 import ru.antonkw.kwbooktrack.data.stats.StatsCalculator
 import ru.antonkw.kwbooktrack.data.time.toEpochMs
+import ru.antonkw.kwbooktrack.data.time.toLocalDate
 import java.time.LocalDate
 import java.time.YearMonth
 import javax.inject.Inject
@@ -89,6 +90,11 @@ class CalendarViewModel @Inject constructor(
         sessionRepository.observeAll(),
     ) { books, sessions ->
         val booksById = books.associateBy { it.id }
+        // Прочитанные книги попадают в календарь по дате прочтения, даже если
+        // по ним нет ни одной сессии чтения.
+        val finishedByDate = books
+            .mapNotNull { book -> book.finishedAt?.let { book to it.toLocalDate() } }
+            .groupBy({ it.second }, { it.first })
         val pagesByDate = StatsCalculator.aggregateDailyPages(sessions).associate { it.date to it.pages }
         val firstOfMonth = ym.atDay(1)
         val daysInMonth = ym.lengthOfMonth()
@@ -100,7 +106,10 @@ class CalendarViewModel @Inject constructor(
         repeat(firstDow) { cells.add(null) }
         for (day in 1..daysInMonth) {
             val date = ym.atDay(day)
-            val booksForDay = sessionsForDate(date, sessions, booksById)
+            val booksForDay = (
+                sessionsForDate(date, sessions, booksById) +
+                    finishedByDate[date].orEmpty().map { it.toCalendarBook() }
+                ).distinctBy { it.title }
             cells.add(CalendarDay(date, booksForDay, pagesByDate[date] ?: 0))
         }
         while (cells.size < weeks * 7) cells.add(null)
@@ -122,14 +131,16 @@ class CalendarViewModel @Inject constructor(
             .filter { it.startedAt in startMs until endMs }
             .mapNotNull { session ->
                 val book = booksById[session.bookId] ?: return@mapNotNull null
-                CalendarBook(
-                    title = book.title,
-                    coverPath = book.coverPath,
-                    rating = book.rating,
-                )
+                book.toCalendarBook()
             }
             .distinctBy { it.title }
     }
+
+    private fun BookEntity.toCalendarBook() = CalendarBook(
+        title = title,
+        coverPath = coverPath,
+        rating = rating,
+    )
 
     private fun emptyState(ym: YearMonth): CalendarUiState {
         val firstOfMonth = ym.atDay(1)
