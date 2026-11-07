@@ -22,6 +22,7 @@ import ru.antonkw.kwbooktrack.R
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
 import ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity
+import ru.antonkw.kwbooktrack.data.progress.ReadingProgress
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.SessionRepository
 import ru.antonkw.kwbooktrack.data.time.toEpochMs
@@ -172,10 +173,9 @@ class BookListViewModel @Inject constructor(
         books: List<BookEntity>,
         sessions: List<ReadingSessionEntity>,
     ): List<BookWithProgress> {
-        val pagesByBook = sessions.groupBy { it.bookId }
-            .mapValues { (_, list) -> list.mapNotNull { it.endPage }.maxOrNull() ?: 0 }
+        val sessionsByBook = sessions.groupBy { it.bookId }
         return books.map { book ->
-            val pages = pagesByBook[book.id] ?: 0
+            val pages = ReadingProgress.pagesRead(book, sessionsByBook[book.id].orEmpty())
             val pct = if (book.pageCount != null && book.pageCount > 0) {
                 (pages.coerceAtMost(book.pageCount) * 100 / book.pageCount)
             } else 0

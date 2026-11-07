@@ -256,6 +256,29 @@ class ImportKwBooktrackZipUseCaseTest {
     }
 
     @Test
+    fun import_oldBackupWithoutExtraJsonWarnsAboutLostProgress() = runBlocking {
+        // Старый формат экспорта (до `extra.json`): в архиве нет ни сессий,
+        // ни заметок, хотя манифест их считает. Импорт проходит, но человек
+        // должен узнать, что прогресс не перенесён.
+        val zip = File(tempDir, "no-extra.zip")
+        ZipOutputStream(zip.outputStream()).use { out ->
+            out.putNextEntry(ZipEntry("manifest.json"))
+            out.write(MANIFEST.toByteArray())
+            out.closeEntry()
+            out.putNextEntry(ZipEntry("books.csv"))
+            out.write("title;author;page_count;status\nСтарый бэкап;Автор;480;FINISHED\n".toByteArray())
+            out.closeEntry()
+        }
+
+        val result = importer(zip, outputDir)
+
+        assertThat(result.isSuccess).isTrue()
+        assertThat(result.imported).isEqualTo(1)
+        assertThat(result.warnings).isNotEmpty()
+        assertThat(result.warnings.joinToString()).contains("прогресс")
+    }
+
+    @Test
     fun import_oldBackupWithoutIdColumnSkipsExtraJson() {
         runBlocking {
             // Старый бэкап: колонки `id` нет — `extra.json` привязать не к чему,

@@ -19,6 +19,7 @@ import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
 import ru.antonkw.kwbooktrack.data.db.entity.NoteEntity
 import ru.antonkw.kwbooktrack.data.db.entity.PhotoEntity
 import ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity
+import ru.antonkw.kwbooktrack.data.progress.ReadingProgress
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.NoteRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
@@ -137,7 +138,7 @@ class BookDetailViewModel @Inject constructor(
 
     private fun computeProgress(book: BookEntity?, sessions: List<ReadingSessionEntity>): BookProgress {
         if (book == null) return BookProgress(0, null, 0, null)
-        val pagesRead = sessions.mapNotNull { it.endPage }.maxOrNull() ?: 0
+        val pagesRead = ReadingProgress.pagesRead(book, sessions)
         val total = book.pageCount
         val percent = if (total != null && total > 0) (pagesRead.coerceAtMost(total) * 100 / total) else 0
         val remaining = total?.let { (it - pagesRead).coerceAtLeast(0) }

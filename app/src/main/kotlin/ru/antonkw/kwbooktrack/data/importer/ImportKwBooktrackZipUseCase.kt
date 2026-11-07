@@ -92,6 +92,7 @@ class ImportKwBooktrackZipUseCase @Inject constructor(
                 notesImported = notesImported,
                 dryRun = false,
                 errors = errors,
+                warnings = prepared.warnings,
             )
         } catch (e: CancellationException) {
             // Отмена импорта — не «ошибка архива».
@@ -129,17 +130,51 @@ class ImportKwBooktrackZipUseCase @Inject constructor(
             ?: throw IllegalStateException("books.csv не найден в архиве")
         val rows = readRows(csvFile)
         // `extra.json` может отсутствовать (старый бэкап) — тогда импортируются только книги.
-        val extras = readExtras(findFile(staging, "extra.json"))
-        return Prepared(rows, extras)
+        val extrasFile = findFile(staging, "extra.json")
+        val extras = readExtras(extrasFile)
+        return Prepared(rows, extras, warnings(manifest, extrasFile, extras, rows))
+    }
+
+    /**
+     * Предупреждения импорта.
+     *
+     * Старый формат экспорта (до `extra.json`) не выгружал ни сессий чтения,
+     * ни заметок, ни цитат — хотя манифест честно считал их. Молчать об этом
+     * нельзя: человек видит «импорт прошёл», а прогресса нет.
+     *
+     * Второй случай — `extra.json` есть, но привязать его не к чему: в
+     * `books.csv` нет колонки `id`. Данные в архиве есть, но достать их
+     * нельзя — это тоже потеря, о ней тоже надо сказать.
+     */
+    private fun warnings(
+        manifest: ExportManifest,
+        extrasFile: File?,
+        extras: Map<Long, BookExtras>,
+        rows: List<BookRow>,
+    ): List<String> {
+        val result = mutableListOf<String>()
+        val counts = manifest.counts
+        val lost = counts.sessions + counts.notes + counts.quotes + counts.photos + counts.tags
+        if (extrasFile == null && lost > 0) {
+            result += MISSING_EXTRA_WARNING.format(
+                counts.sessions,
+                counts.notes + counts.quotes,
+            )
+        }
+        if (extrasFile != null && extras.isNotEmpty() && rows.none { it.id != null }) {
+            result += UNBOUND_EXTRA_WARNING
+        }
+        return result
     }
 
     /** Строки `books.csv`: id книги в архиве и сама книга (null — без названия). */
     private class BookRow(val id: Long?, val book: BookEntity?)
 
-    /** Прочитанный архив: книги и `extra.json` по id книги. */
+    /** Прочитанный архив: книги, `extra.json` по id книги и предупреждения. */
     private class Prepared(
         val rows: List<BookRow>,
         val extras: Map<Long, BookExtras>,
+        val warnings: List<String>,
     )
 
     /** Строка `books.csv` — значения колонок по имени. */
@@ -309,6 +344,24 @@ class ImportKwBooktrackZipUseCase @Inject constructor(
     private companion object {
         const val TAG = "ImportKwBooktrackZip"
         val TRUE_VALUES = setOf("1", "true", "да", "yes")
+
+        /**
+         * В архиве нет прогресса чтения, заметок и цитат: их не выгрузила
+         * старая версия приложения (до `extra.json`), хотя манифест считал их.
+         */
+        const val MISSING_EXTRA_WARNING =
+            "В бэкапе нет прогресса чтения, заметок и цитат: старая версия приложения " +
+                "не записывала их в архив (по манифесту их было — сессий %1\$d, " +
+                "заметок и цитат %2\$d). Импортированы только книги — прогресс придётся " +
+                "восстановить вручную или перенести из .tc-экспорта."
+
+        /**
+         * `extra.json` в архиве есть, но привязать его не к чему: в `books.csv`
+         * нет колонки `id`.
+         */
+        const val UNBOUND_EXTRA_WARNING =
+            "Заметки и сессии в архиве не привязались к книгам: в books.csv нет " +
+                "колонки id (старый формат бэкапа). Прогресс и заметки не перенесены."
 
         val JSON = Json { ignoreUnknownKeys = true }
 
