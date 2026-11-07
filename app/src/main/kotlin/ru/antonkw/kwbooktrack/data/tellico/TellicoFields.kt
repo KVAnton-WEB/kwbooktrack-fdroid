@@ -8,6 +8,15 @@ package ru.antonkw.kwbooktrack.data.tellico
  */
 object TellicoFields {
 
+    /**
+     * Поле Tellico для цены, которая **не число** («по подписке»).
+     *
+     * `pur_price` у Tellico числовой (`type="6"`), текст в нём он не покажет.
+     * Поэтому текстовая цена живёт в отдельном поле, а в приложении — в
+     * `extra_fields` под ключом `pur_price`.
+     */
+    const val TEXT_PRICE = "цена-покупки-текст"
+
     /** Внутреннее имя поля → русский заголовок. */
     val TITLE: Map<String, String> = linkedMapOf(
         // Встроенные поля Tellico.
@@ -47,6 +56,7 @@ object TellicoFields {
         "усл.-печ.-л." to "Усл. печ. л.",
         "язык-оригинала" to "Язык оригинала",
         "оригинальное-название" to "Оригинальное название",
+        TEXT_PRICE to "Цена покупки (текст)",
         "цитаты" to "Цитаты",
         "рецензия" to "Рецензия",
         "заметки" to "Заметки",
@@ -75,6 +85,20 @@ object TellicoFields {
 
     /** Известные внутренние имена: всё, что попадает в `fields`, а не в `extra`. */
     val KNOWN: Set<String> = TITLE.keys
+
+    /**
+     * Встроенные поля Tellico, которых нет в [KNOWN].
+     *
+     * Их значения приходят из чужой коллекции как «чужие поля», но объявлять
+     * их в `<fields>` нельзя: Tellico знает их сам и завёл бы дубликат (или
+     * переопределил бы тип — «Содержание» у него многострочный текст).
+     */
+    val TELLICO_BUILTIN: Set<String> = setOf(
+        "editor", "edition", "lccn", "plot", "signed",
+    )
+
+    /** Значения, которые и Tellico, и приложение считают «да». */
+    val TRUE_VALUES: Set<String> = setOf("true", "yes", "да", "1", "y")
 
     /** Служебные столбцы Tellico: id записи — в данные не превращается. */
     val SKIP_TITLES: Set<String> = setOf("Номер")

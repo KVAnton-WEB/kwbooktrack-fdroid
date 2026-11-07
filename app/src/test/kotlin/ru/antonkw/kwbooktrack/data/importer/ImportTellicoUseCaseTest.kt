@@ -100,6 +100,10 @@ class ImportTellicoUseCaseTest {
 
         assertThat(result.coversCopied).isEqualTo(1)
         assertThat(result.warnings).hasSize(1)
+        // Частичная потеря — своё сообщение: «обложки не найдены» при половине
+        // перенесённых обложек вводит в заблуждение.
+        assertThat(result.warnings.single()).contains("1 из 2")
+        assertThat(result.warnings.single()).doesNotContain("не найдены")
     }
 
     @Test

@@ -1,9 +1,12 @@
 package ru.antonkw.kwbooktrack.data.tellico
 
 import com.google.common.truth.Truth.assertThat
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 import ru.antonkw.kwbooktrack.data.snapshot.ExtraField
 import java.io.File
+import java.util.zip.ZipEntry
+import java.util.zip.ZipInputStream
 
 class TellicoXmlReaderTest {
 
@@ -148,6 +151,49 @@ class TellicoXmlReaderTest {
             assertThat(record.fields["title"]).isEqualTo("Дюна")
         } finally {
             file.delete()
+        }
+    }
+
+    @Test
+    fun readsRealTellicoCollection() {
+        // Настоящая коллекция лежит в локальном архиве `tellico.zip` (в git его
+        // нет — данные пользователя): тест проходит там, где архив есть, и
+        // пропускается там, где его нет.
+        val resource = javaClass.classLoader!!.getResource("tellico.zip")
+        assumeTrue("tellico.zip present", resource != null)
+        val xml = realTellicoXml(resource!!)
+        assumeTrue("tellico.xml present", xml != null)
+
+        val records = reader.read(xml!!)
+
+        assertThat(records.size).isGreaterThan(500)
+        val first = records.first()
+        assertThat(first.fields["title"]).isNotEmpty()
+        assertThat(first.fields["cover"]).isNotEmpty()
+        // Дата Tellico — ISO, а не «20230214»: склейка года, месяца и дня.
+        assertThat(first.fields["дата-прочтения"]).matches("\\d{4}-\\d{2}-\\d{2}")
+        assertThat(first.fields["cdate"]).matches("\\d{4}-\\d{2}-\\d{2}")
+        // Контейнер «Ключевых слов» — значения склеены "; ".
+        assertThat(records.count { it.fields.containsKey("keyword") }).isGreaterThan(100)
+    }
+
+    /** `tellico.xml` из локального архива с настоящей коллекцией. */
+    private fun realTellicoXml(archive: java.net.URL): ByteArray? {
+        val tc = ZipInputStream(archive.openStream()).use { zip ->
+            var entry = zip.nextEntry
+            while (entry != null) {
+                if (entry.name.endsWith("Books.tc")) return@use zip.readBytes()
+                entry = zip.nextEntry
+            }
+            null
+        } ?: return null
+        return ZipInputStream(tc.inputStream()).use { zip ->
+            var entry = zip.nextEntry
+            while (entry != null) {
+                if (entry.name == "tellico.xml") return@use zip.readBytes()
+                entry = zip.nextEntry
+            }
+            null
         }
     }
 

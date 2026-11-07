@@ -454,6 +454,41 @@ class TellicoBookMapperTest {
     }
 
     @Test
+    fun priceWithWordsIsNotANumber() {
+        // «4 книга бесплатно» — не цена 4.00: цифра в начале слова не делает
+        // его числом. Пометка должна уцелеть как текст.
+        val snapshot = mapper.map(
+            record("title" to "X", "author" to "Y", "pur_price" to "4 книга бесплатно"),
+        )!!
+
+        assertThat(snapshot.book.purchasePrice).isNull()
+        assertThat(snapshot.extraFields)
+            .containsExactly("pur_price", ExtraField("Цена покупки", "4 книга бесплатно"))
+    }
+
+    @Test
+    fun priceWithCurrencyMarkIsANumber() {
+        val book = mapper.map(
+            record("title" to "X", "author" to "Y", "pur_price" to "275 ₽"),
+        )!!.book
+
+        assertThat(book.purchasePrice).isEqualTo(275.0)
+    }
+
+    @Test
+    fun textPriceFieldIsKeptAsExtraField() {
+        // Наш же экспорт пишет текстовую цену в отдельное поле — на импорте
+        // она должна вернуться в `extra_fields`.
+        val snapshot = mapper.map(
+            record("title" to "X", "author" to "Y", "цена-покупки-текст" to "по подписке"),
+        )!!
+
+        assertThat(snapshot.book.purchasePrice).isNull()
+        assertThat(snapshot.extraFields)
+            .containsExactly("pur_price", ExtraField("Цена покупки", "по подписке"))
+    }
+
+    @Test
     fun createdAndUpdatedDatesComeFromTellico() {
         val book = mapper.map(
             record("title" to "X", "author" to "Y", "cdate" to "2023-02-14", "mdate" to "2024-10-28"),

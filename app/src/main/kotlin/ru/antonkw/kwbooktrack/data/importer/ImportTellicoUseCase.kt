@@ -114,11 +114,16 @@ class ImportTellicoUseCase @Inject constructor(
      * хранит картинки **рядом** с файлом коллекции (в папке `<имя>_files/`),
      * а не внутри архива `.tc` — молчать об этом нельзя, пользователь ждёт
      * переноса обложек. Предупреждение и про часть обложек: одна найденная из
-     * двух — тоже потеря.
+     * двух — тоже потеря, и про это своё сообщение: «обложки не найдены» при
+     * половине перенесённых обложек вводит в заблуждение.
      */
     private fun warnings(coversReferenced: Int, coversCopied: Int, dryRun: Boolean): List<String> {
         if (dryRun || coversReferenced == 0 || coversCopied >= coversReferenced) return emptyList()
-        return listOf(NO_COVERS_WARNING)
+        return if (coversCopied == 0) {
+            listOf(NO_COVERS_WARNING)
+        } else {
+            listOf(PARTIAL_COVERS_WARNING.format(coversCopied, coversReferenced))
+        }
     }
 
     suspend operator fun invoke(
@@ -135,5 +140,11 @@ class ImportTellicoUseCase @Inject constructor(
             "Обложки не найдены: Tellico хранит картинки рядом с файлом коллекции " +
                 "(в папке «<имя>_files»), а не внутри архива. Скопируйте архив вместе " +
                 "с папкой картинок и повторите импорт."
+
+        /** Часть обложек перенеслась, часть — нет. */
+        const val PARTIAL_COVERS_WARNING =
+            "Обложек перенесено %1\$d из %2\$d: часть картинок потеряна. Tellico " +
+                "хранит их рядом с файлом коллекции (в папке «<имя>_files») — проверьте, " +
+                "что папка скопирована целиком."
     }
 }

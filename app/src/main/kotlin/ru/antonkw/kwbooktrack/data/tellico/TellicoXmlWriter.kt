@@ -16,7 +16,11 @@ data class TcEntry(
     val snapshot: BookSnapshot,
     /** Имя файла обложки в архиве (`{md5}.{ext}`) — без пути `images/`. */
     val coverArchiveName: String? = null,
-)
+) {
+    /** Текстовая цена («по подписке») — если числовой у книги нет. */
+    fun textPrice(): String? =
+        snapshot.extraFields["pur_price"]?.value?.takeIf { snapshot.book.purchasePrice == null }
+}
 
 /**
  * Сборщик `tellico.xml` — родного формата Tellico (DTD v12).
@@ -56,6 +60,18 @@ object TellicoXmlWriter {
     private fun writeFields(xml: StringBuilder, entries: List<TcEntry>) {
         xml.append("  <fields>\n")
         ownFields.forEach { writeField(xml, it) }
+        // Текстовая цена — отдельное поле: `pur_price` у Tellico числовой.
+        if (entries.any { it.textPrice() != null }) {
+            writeField(
+                xml,
+                FieldDef(
+                    name = TellicoFields.TEXT_PRICE,
+                    title = TellicoFields.TITLE.getValue(TellicoFields.TEXT_PRICE),
+                    type = 1,
+                    category = "Покупка",
+                ),
+            )
+        }
         foreignFields(entries).forEach { (name, extra) ->
             writeField(xml, FieldDef(name = name, title = extra.title, type = 1, category = "Общее"))
         }
@@ -70,6 +86,7 @@ object TellicoXmlWriter {
                 if (!isSafeName(name)) continue
                 // Поле, которое Tellico знает сам, объявлять нельзя — будет дубликат.
                 if (name in TellicoFields.KNOWN) continue
+                if (name in TellicoFields.TELLICO_BUILTIN) continue
                 result.putIfAbsent(name, extra)
             }
         }
@@ -164,18 +181,30 @@ object TellicoXmlWriter {
      * Чужее поле — элемент в записи.
      *
      * Поля, которые Tellico знает сам (`keyword`, `pur_price`), объявлять в
-     * `<fields>` нельзя — Tellico завёл бы дубликат. «Ключевые слова»
-     * многозначные, поэтому их пишут контейнером.
+     * `<fields>` нельзя — Tellico завёл бы дубликат. «Ключевые слова» и
+     * «Редактор» многозначные, поэтому их пишут контейнером; текстовая цена
+     * идёт в отдельное поле ([TellicoFields.TEXT_PRICE]), а флаг — как
+     * `true`/`false`.
      */
     private fun writeExtra(xml: StringBuilder, name: String, extra: ExtraField, book: BookEntity) {
         when {
             !isSafeName(name) -> Unit
             name == "keyword" -> container(xml, "keyword", extra.value.split("; ").filter { it.isNotEmpty() })
+            // «Редактор» у Tellico многозначный: `<editors><editor>…</editor></editors>`.
+            name == "editor" -> container(xml, "editor", extra.value.split("; ").filter { it.isNotEmpty() })
             // Числовая цена важнее текстовой: два `<pur_price>` — последний победил бы.
             name == "pur_price" && book.purchasePrice != null -> Unit
+            // `pur_price` у Tellico число (`type="6"`) — текст в нём он не покажет.
+            name == "pur_price" -> element(xml, TellicoFields.TEXT_PRICE, extra.value)
+            // Флаг Tellico: `true`/`false` — так пишет сам Tellico.
+            name == "signed" -> element(xml, name, boolText(extra.value))
             else -> element(xml, name, extra.value)
         }
     }
+
+    /** Флаг Tellico: `true`/`false`. */
+    private fun boolText(value: String): String =
+        if (value.trim().lowercase() in TellicoFields.TRUE_VALUES) "true" else "false"
 
     /** `<images>` — по одному `<image>` на обложку; без обложек блока нет вовсе. */
     private fun writeImages(xml: StringBuilder, entries: List<TcEntry>) {
@@ -366,6 +395,9 @@ object TellicoXmlWriter {
             "заметки", type = 2, flags = 1, category = "Личное",
             columns = 3, columnTitles = listOf("страница", "Текст", "Дата"),
         ),
+        // Флаг 1 в `flags` — «много значений»: значение пишется контейнером
+        // (`<тегиs><теги>…</теги></тегиs>`). Так объявлены и поля живой
+        // коллекции Tellico: `keyword` (`flags="7"`), `language` (`flags="5"`).
         ownField("теги", type = 1, flags = 1, category = "Классификация"),
         ownField(
             "сессии-чтения", type = 2, flags = 1, category = "Личное", columns = 6,

@@ -99,10 +99,13 @@ class TellicoBookMapper @Inject constructor() {
     /**
      * Цена, которая не число («по подписке»), — в `extra_fields`: иначе
      * пользовательская пометка пропала бы.
+     *
+     * Текстовая цена приходит и из поля Tellico [TellicoFields.TEXT_PRICE] —
+     * туда её пишет наш же экспорт (в `pur_price` Tellico текст не покажет).
      */
     private fun priceExtra(record: TellicoRecord, price: Double?): Map<String, ExtraField> {
         if (price != null) return emptyMap()
-        val raw = f(record, "pur_price") ?: return emptyMap()
+        val raw = f(record, "pur_price") ?: f(record, TellicoFields.TEXT_PRICE) ?: return emptyMap()
         return mapOf("pur_price" to ExtraField(TellicoFields.TITLE.getValue("pur_price"), raw))
     }
 
@@ -312,10 +315,20 @@ class TellicoBookMapper @Inject constructor() {
     private fun firstYear(raw: String?): Int? =
         raw?.let { FIRST_NUMBER.find(it)?.value?.toIntOrNull() }
 
+    /**
+     * Цена Tellico: число с разделителями («275», «195,44», «275 ₽»).
+     *
+     * Цена с буквами — не цена: «4 книга бесплатно» не число, и превращать
+     * его в 4.0 нельзя — пометка потерялась бы. Такие значения остаются
+     * текстом (см. [priceExtra]).
+     */
     private fun parsePrice(raw: String?): Double? {
         if (raw.isNullOrBlank()) return null
-        val normalized = raw.replace(',', '.').replace(Regex("[^0-9.\\-]"), "")
-        if (normalized.isBlank()) return null
+        // Валюта и пробелы — не часть числа; остальные буквы — значит, это не цена.
+        val cleaned = raw.trim().replace(PRICE_NOISE, "")
+        if (cleaned.any { !it.isDigit() && it != '.' && it != ',' && it != '-' && it != '+' }) return null
+        val normalized = cleaned.replace(',', '.')
+        if (normalized.isBlank() || normalized == "-" || normalized == ".") return null
         return normalized.toDoubleOrNull()
     }
 
@@ -341,10 +354,12 @@ class TellicoBookMapper @Inject constructor() {
     }
 
     private companion object {
-        val TRUE_VALUES = setOf("true", "yes", "да", "1", "y")
+        val TRUE_VALUES = TellicoFields.TRUE_VALUES
         val DATE_PATTERNS = listOf("yyyy-MM-dd", "yyyy-MM", "yyyy", "dd.MM.yyyy")
         val FIRST_NUMBER = Regex("\\d+")
         /** Страница цитаты: `1:текст` или `1::текст`. */
         val QUOTE_PAGE = Regex("(\\d+)(::?)(.*)")
+        /** Валюта в цене: «275 ₽», «275 руб.», «275р» — число без них. */
+        val PRICE_NOISE = Regex("[\\s₽\\$]|руб\\.?|RUB|USD|EUR|р\\b")
     }
 }

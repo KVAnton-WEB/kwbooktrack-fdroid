@@ -197,6 +197,81 @@ class TellicoTcRoundTripTest {
     }
 
     @Test
+    fun textPriceIsWrittenToItsOwnField() = runTest {
+        // «По подписке» в `pur_price` Tellico не покажет: у него это число.
+        sourceBooks.insert(
+            BookEntity(
+                title = "Подписка",
+                author = "Кто-то",
+                createdAt = 1L,
+                updatedAt = 1L,
+                extraFields = mapOf("pur_price" to ExtraField("Цена покупки", "по подписке")),
+            ),
+        )
+
+        val xml = exportedXml()
+
+        assertThat(xml).doesNotContain("<pur_price>")
+        assertThat(xml).contains("<цена-покупки-текст>по подписке</цена-покупки-текст>")
+        // Поле объявлено — иначе Tellico не покажет значение.
+        assertThat(xml).contains(fieldTag("Покупка", 0, 4, "цена-покупки-текст", "Цена покупки (текст)", 1))
+    }
+
+    @Test
+    fun builtinTellicoFieldsAreNotDeclaredTwice() = runTest {
+        // «Содержание», «Редакция», «Подписано» Tellico знает сам: объявлять их
+        // в `<fields>` — значит завести у пользователя второе такое же поле.
+        sourceBooks.insert(
+            BookEntity(
+                title = "Дюна",
+                author = "Фрэнк Герберт",
+                createdAt = 1L,
+                updatedAt = 1L,
+                extraFields = mapOf(
+                    "plot" to ExtraField("Содержание", "Глава 1"),
+                    "edition" to ExtraField("Редакция", "2-е изд."),
+                    "editor" to ExtraField("Редактор", "Иванов"),
+                    "signed" to ExtraField("Подписано", "да"),
+                ),
+            ),
+        )
+
+        val xml = exportedXml()
+
+        assertThat(xml).doesNotContain("name=\"plot\"")
+        assertThat(xml).doesNotContain("name=\"edition\"")
+        assertThat(xml).doesNotContain("name=\"signed\"")
+        // Значение встроенного поля всё равно пишется — в его элемент.
+        assertThat(xml).contains("<plot>Глава 1</plot>")
+        assertThat(xml).contains("<edition>2-е изд.</edition>")
+        // «Редактор» у Tellico многозначный — контейнером.
+        assertThat(xml).contains("<editors><editor>Иванов</editor></editors>")
+        // Флаг Tellico ждёт `true`/`false`, а не слово.
+        assertThat(xml).contains("<signed>true</signed>")
+    }
+
+    @Test
+    fun textPriceSurvivesExportAndImport() = runTest {
+        sourceBooks.insert(
+            BookEntity(
+                title = "Подписка",
+                author = "Кто-то",
+                createdAt = 1L,
+                updatedAt = 1L,
+                extraFields = mapOf("pur_price" to ExtraField("Цена покупки", "по подписке")),
+            ),
+        )
+        val file = File(tempDir, "library.tc")
+        exportUseCase(file)
+
+        importUseCase(file, ImportFormat.TELLICO_XML, outputDir)
+
+        val book = targetDb.bookDao().observeAll().first().single()
+        assertThat(book.purchasePrice).isNull()
+        assertThat(book.extraFields["pur_price"]?.value).isEqualTo("по подписке")
+    }
+
+    @Test
     fun importOfExportedFileKeepsEverything() = runTest {
         seedLibrary()
         val file = File(tempDir, "library.tc")
