@@ -2,6 +2,14 @@
 
 Android book tracker. Kotlin, Jetpack Compose, Hilt, Room.
 
+## License
+
+GNU General Public License v3 — see [LICENSE](LICENSE).
+
+## Publishing
+
+F-Droid: подготовленные метаданные и пошаговая инструкция — [docs/fdroid.md](docs/fdroid.md).
+
 ## Build
 
     ./gradlew assembleDebug
