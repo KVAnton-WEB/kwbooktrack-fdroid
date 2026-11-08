@@ -12,9 +12,9 @@
 
 - `LICENSE` — полный текст GNU GPL v3.
 - `fastlane/metadata/android/en-US` и `fastlane/metadata/android/ru` — название, короткое и полное
-  описание, changelog для 69 (версия 0.6.4), иконка 512×512 и скриншоты
-  (6 для en-US, 5 для ru).
-- Тег `v0.6.4` на коммите с этими файлами: F-Droid соберёт APK именно из него.
+  описание, changelog для 70 (версия 0.6.5), иконка 512×512 и скриншоты
+  (7 для en-US, 5 для ru).
+- Тег `v0.6.5` на коммите с этими файлами: F-Droid соберёт APK именно из него.
 - Проверено локально: `./gradlew assembleRelease` собирается (unsigned APK — его подпишет сам F-Droid).
 
 ## Что нужно сделать (по порядку)
@@ -25,7 +25,7 @@
 2. **Залить ветку и тег.**
 
        git push origin main
-       git push origin v0.6.4
+       git push origin v0.6.5
 
 3. **Скриншоты уже сняты** — `fastlane/metadata/android/{en-US,ru}/images/phoneScreenshots/`.
    Заменить их на свои можно так (интерфейс приложения русский; для английских кадров
@@ -43,7 +43,7 @@
        # создай metadata/ru.antonkw.kwbooktrack.yml и вставь содержимое
        # из раздела «Метаданные для fdroiddata» в конце этого документа
 
-   В файле должен стоять реальный SHA тега: `git rev-parse v0.6.4` в клоне kwbooktrack.
+   В файле должен стоять реальный SHA тега: `git rev-parse v0.6.5` в клоне kwbooktrack.
 
 5. **Проверить метаданные и сборку** (нужен [fdroidserver](https://gitlab.com/fdroid/fdroidserver)):
 
@@ -73,7 +73,7 @@ F-Droid подхватит новую версию сам (`AutoUpdateMode: Vers
 
 - **Описание и картинки лежат в fastlane/, а не в fdroiddata.** Поле `Description` в yml
   перекрывает fastlane-описание — поэтому в yml его нет намеренно.
-- **`commit:` в yml** обязан совпадать с SHA коммита, который помечен тегом `v0.6.4`.
+- **`commit:` в yml** обязан совпадать с SHA коммита, который помечен тегом `v0.6.5`.
 - **Правило «3 месяца активной разработки»** (Inclusion Policy). Проект стартовал 2026-09-29,
   то есть формально не хватает до 2026-12-29. Обходится, если у приложения уже есть
   пользователи (ссылка на обсуждение) — в MR это стоит упомянуть.
@@ -102,17 +102,17 @@ RepoType: git
 Repo: https://github.com/KVAnton-WEB/kwbooktrack.git
 
 Builds:
-  - versionName: 0.6.4
-    versionCode: 69
-    commit: <SHA коммита тега v0.6.4>
+  - versionName: 0.6.5
+    versionCode: 70
+    commit: <SHA коммита тега v0.6.5>
     subdir: app
     gradle:
       - yes
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
-CurrentVersion: 0.6.4
-CurrentVersionCode: 69
+CurrentVersion: 0.6.5
+CurrentVersionCode: 70
 
 MaintainerNotes: |-
   Descriptions, changelogs and images live in the app repository

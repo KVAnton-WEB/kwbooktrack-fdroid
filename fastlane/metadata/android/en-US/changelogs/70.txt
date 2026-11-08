@@ -1,0 +1,3 @@
+Publication release: the app is now licensed under the GNU GPL v3 and ships with F-Droid metadata (descriptions, icon, screenshots).
+
+Reading calendar: the month name now follows the app language instead of the device language - an English UI no longer shows a Russian month.

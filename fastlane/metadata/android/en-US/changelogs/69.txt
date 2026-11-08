@@ -1,3 +1,0 @@
-Publication release: the app is now licensed under the GNU GPL v3 and ships with F-Droid metadata. No functional changes - this release adds the license file, the store descriptions and the screenshots only.
-
-Previous release: the native Tellico (.tc) export now declares the fields element and the standard Tellico fields.

@@ -38,6 +38,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.text.font.FontWeight
@@ -51,7 +52,6 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
-import java.util.Locale
 import ru.antonkw.kwbooktrack.R
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -64,6 +64,9 @@ fun CalendarScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val month by viewModel.month.collectAsStateWithLifecycle()
     val mode by viewModel.mode.collectAsStateWithLifecycle()
+    // Locale of the app (may be overridden per-app), not of the device:
+    // a hardcoded locale here printed "ноября" in an English UI.
+    val locale = LocalContext.current.resources.configuration.locales.get(0)
     val today = remember { LocalDate.now() }
     val maxYm = remember(today) { YearMonth.of(today.year, today.month) }
 
@@ -108,7 +111,7 @@ fun CalendarScreen(
                 ) {
                     Text(
                         text = month.format(
-                            remember { DateTimeFormatter.ofPattern("MMMM yyyy", Locale("ru")) }
+                            remember(locale) { DateTimeFormatter.ofPattern("MMMM yyyy", locale) }
                         ),
                         style = MaterialTheme.typography.titleLarge,
                     )
