@@ -15,7 +15,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.NoteAdd
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.RateReview
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
@@ -24,6 +26,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -104,6 +108,16 @@ fun MovieDetailScreen(
                     }
                 },
             )
+        },
+        floatingActionButton = {
+            state.movie?.let { m ->
+                FloatingActionButton(onClick = { onAddNote(m.id) }) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.NoteAdd,
+                        contentDescription = stringResource(R.string.action_add_note),
+                    )
+                }
+            }
         },
     ) { padding ->
         val movie = state.movie
@@ -187,6 +201,24 @@ fun MovieDetailScreen(
             if (review != null) {
                 Text(stringResource(R.string.movie_field_review), style = MaterialTheme.typography.titleMedium)
                 MarkdownText(markdown = review.bodyMd)
+            } else {
+                // Рецензии ещё нет — показываем входную точку, чтобы не искать
+                // её в кнопке добавления заметки.
+                OutlinedButton(
+                    onClick = { onAddReview(movie.id) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(Icons.Filled.RateReview, contentDescription = null)
+                    Text(
+                        text = "  " + stringResource(R.string.action_write_review),
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                }
+            }
+
+            if (!movie.comments.isNullOrBlank()) {
+                Text(stringResource(R.string.movie_field_comments), style = MaterialTheme.typography.titleMedium)
+                MarkdownText(markdown = movie.comments)
             }
 
             if (state.tags.isNotEmpty()) {

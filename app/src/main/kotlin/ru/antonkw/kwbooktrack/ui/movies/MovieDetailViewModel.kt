@@ -61,12 +61,13 @@ class MovieDetailViewModel @Inject constructor(
         movieRepository.observeById(movieId),
         noteRepository.observeByMedia(movieId, MediaType.MOVIES),
         photoRepository.observeByMedia(movieId, MediaType.MOVIES),
-    ) { movie, notes, photos ->
+        tagRepository.observeTagsOfMedia(movieId, MediaType.MOVIES),
+    ) { movie, notes, photos, tags ->
         MovieDetailUiState(
             movie = movie,
             notes = notes,
             photos = photos,
-            tags = tagRepository.tagsOfMedia(movieId, MediaType.MOVIES),
+            tags = tags,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MovieDetailUiState(null))
 

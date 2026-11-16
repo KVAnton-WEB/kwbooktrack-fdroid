@@ -3,6 +3,7 @@ package ru.antonkw.kwbooktrack.data.db.dao
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Before
@@ -60,7 +61,7 @@ class TagDaoTest {
     fun attachBookTagInsertsCrossRef() = runTest {
         val tagId = tagDao.insert(TagEntity(name = "drama"))
         tagDao.insertCrossRef(MediaTagCrossRef(mediaId = bookId, mediaType = MediaType.BOOKS, tagId = tagId))
-        val cleared = tagDao.clearCrossRefsForMedia(bookId, MediaType.BOOKS)
-        assertThat(cleared).isEqualTo(1)
+        val attached = tagDao.observeTagsOfMedia(bookId, MediaType.BOOKS).first()
+        assertThat(attached).containsExactly("drama")
     }
 }

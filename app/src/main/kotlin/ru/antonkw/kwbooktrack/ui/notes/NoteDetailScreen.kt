@@ -122,7 +122,15 @@ class NoteDetailViewModel @Inject constructor(
                 _state.value = NoteDetailUiState.NotFound
                 return@launch
             }
-            val deletedFallback = context.getString(R.string.about_book_deleted_fallback)
+            // Подстановка «владелец удалён» — по типу носителя: у фильма
+            // это не «книга удалена».
+            val deletedFallback = context.getString(
+                if (note.mediaType == ru.antonkw.kwbooktrack.data.db.entity.MediaType.MOVIES) {
+                    R.string.about_movie_deleted_fallback
+                } else {
+                    R.string.about_book_deleted_fallback
+                },
+            )
             combine(
                 bookRepository.observeAll(),
                 movieRepository.observeAll(),

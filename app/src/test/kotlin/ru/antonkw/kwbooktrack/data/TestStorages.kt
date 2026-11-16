@@ -23,6 +23,5 @@ object NoOpPhotoStorage : PhotoStorage {
         "/photos/$name.${extension.ifEmpty { "jpg" }}"
 
     override fun deleteForNote(noteId: Long) = Unit
-    override fun deleteForBook(bookId: Long) = Unit
     override fun deletePaths(paths: Collection<String>) = Unit
 }

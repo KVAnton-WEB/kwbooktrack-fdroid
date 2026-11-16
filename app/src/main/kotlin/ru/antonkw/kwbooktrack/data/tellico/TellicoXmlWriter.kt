@@ -571,13 +571,13 @@ object TellicoXmlWriter {
      */
     private val movieFields: List<FieldDef> = listOf(
         movieStd("title", type = 1, format = 1, flags = 8, category = "Общее"),
-        movieStd("medium", type = 3, flags = 2, category = "Общее"),
+        movieStd("medium", type = 1, flags = 2, category = "Общее"),
         movieStd("year", type = 6, flags = 2, category = "Общее"),
-        movieStd("certification", type = 3, flags = 2, category = "Общее"),
+        movieStd("certification", type = 1, flags = 2, category = "Общее"),
         movieStd("genre", type = 1, flags = 7, format = 0, category = "Общее"),
-        movieStd("region", type = 3, flags = 2, category = "Общее"),
+        movieStd("region", type = 1, flags = 2, category = "Общее"),
         movieStd("nationality", type = 1, flags = 7, format = 0, category = "Общее"),
-        movieStd("format", type = 3, flags = 2, category = "Общее"),
+        movieStd("format", type = 1, flags = 2, category = "Общее"),
         movieStd(
             "cast", type = 8, flags = 3, format = 2, category = "В ролях",
             columns = 2, columnTitles = listOf("Актёр/актриса", "Роль"),
@@ -593,7 +593,7 @@ object TellicoXmlWriter {
         movieStd("running-time", type = 6, category = "Features"),
         movieStd("aspect-ratio", type = 1, flags = 7, category = "Features"),
         movieStd("widescreen", type = 4, category = "Features"),
-        movieStd("color", type = 3, flags = 2, category = "Features"),
+        movieStd("color", type = 1, flags = 2, category = "Features"),
         movieStd("directors-cut", type = 4, category = "Features"),
         movieStd("plot", type = 2, category = "Сюжет"),
         movieStd("rating", type = 14, flags = 2, category = "Личное"),

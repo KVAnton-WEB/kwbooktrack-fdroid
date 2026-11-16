@@ -25,10 +25,11 @@ class TagRepository @Inject constructor(
         tagDao.insertCrossRef(MediaTagCrossRef(mediaId = mediaId, mediaType = mediaType, tagId = tagId))
     }
 
-    suspend fun clearForMedia(mediaId: Long, mediaType: MediaType): Int =
-        tagDao.clearCrossRefsForMedia(mediaId, mediaType)
-
     /** Теги владельца — книга или фильм. */
     suspend fun tagsOfMedia(mediaId: Long, mediaType: MediaType): List<String> =
         tagDao.tagsOfMedia(mediaId, mediaType)
+
+    /** Теги владельца — потоком, чтобы список обновлялся при их изменении. */
+    fun observeTagsOfMedia(mediaId: Long, mediaType: MediaType): Flow<List<String>> =
+        tagDao.observeTagsOfMedia(mediaId, mediaType)
 }

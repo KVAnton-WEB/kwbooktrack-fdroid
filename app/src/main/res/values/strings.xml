@@ -11,12 +11,16 @@
     <string name="about_backup_description">Экспорт библиотеки в ZIP-архив с CSV и обложками, экспорт в родной формат Tellico (.tc) либо импорт ранее сохранённого архива.</string>
     <string name="action_export">Экспорт</string>
     <string name="action_export_tellico">Экспорт в Tellico (.tc)</string>
+    <string name="export_success_zip_format">Экспорт готов: %1$d книг, %2$d фильмов, %3$d фото</string>
+    <string name="export_success_books_format">Экспорт готов: %1$d книг</string>
+    <string name="export_success_movies_format">Экспорт готов: %1$d фильмов</string>
     <string name="export_success_format">Экспорт готов: %1$d книг, %2$d фото</string>
     <string name="export_failed_format">Не удалось экспортировать: %1$s</string>
     <string name="export_failed_unknown">Не удалось экспортировать: неизвестная ошибка</string>
     <string name="about_total_books">Всего книг: %1$d</string>
     <string name="about_finished_books">Прочитано: %1$d из %2$d (%3$d%%)</string>
     <string name="about_book_deleted_fallback">(книга удалена)</string>
+    <string name="about_movie_deleted_fallback">(фильм удалён)</string>
 
     <!-- Book fields (v5) -->
     <string name="field_subtitle">Подзаголовок</string>
@@ -331,6 +335,7 @@
     <string name="tellico_import_pick_file">Выбрать файл</string>
     <string name="tellico_import_run">Запустить импорт</string>
     <string name="tellico_import_running">Идёт импорт…</string>
+    <string name="tellico_import_movies_format">Фильмов: %1$d</string>
     <string name="tellico_import_result_format">Импортировано: %1$d, пропущено: %2$d</string>
     <string name="tellico_import_covers_format">Обложек скопировано: %1$d</string>
     <string name="tellico_import_notes_format">Заметок, сессий, тегов и фото добавлено: %1$d</string>
@@ -362,6 +367,7 @@
     <string name="movie_field_watched_at">Дата просмотра</string>
     <string name="movie_field_url">Ссылка</string>
     <string name="movie_field_plot">Сюжет</string>
+    <string name="movie_field_comments">Комментарии</string>
     <string name="movie_field_review">Рецензия</string>
     <string name="movie_field_downloaded">Скачан</string>
     <string name="movie_delete_title">Удалить фильм?</string>

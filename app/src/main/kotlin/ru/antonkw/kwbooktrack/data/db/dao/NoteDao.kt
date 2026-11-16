@@ -65,8 +65,6 @@ interface NoteDao {
     @Delete
     suspend fun delete(note: NoteEntity): Int
 
-    @Query("DELETE FROM notes WHERE media_id = :mediaId AND media_type = :mediaType")
-    suspend fun deleteForMedia(mediaId: Long, mediaType: MediaType): Int
 
     @Query("SELECT COUNT(*) FROM notes")
     suspend fun count(): Int

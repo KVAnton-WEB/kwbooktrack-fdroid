@@ -82,11 +82,21 @@ data class LibraryFilterState(
     val period: PeriodOption = PeriodOption.allTime(),
     val bookType: BookFilterType = BookFilterType.ALL,
     val movieType: MovieFilterType = MovieFilterType.ALL,
+    /** Тип носителя, к которому относится содержимое списка. */
+    val mediaType: MediaType = MediaType.BOOKS,
 ) {
+    /**
+     * Активен ли фильтр **для текущего типа носителя**.
+     *
+     * Фильтры книг и фильмов живут рядом, но не мешают друг другу: книжный
+     * фильтр не должен показывать «Сбросить» в режиме фильмов — там сбрасывать
+     * нечего, и кнопка только вводила бы в заблуждение.
+     */
     val isActive: Boolean
-        get() = !period.isAllTime ||
-            bookType != BookFilterType.ALL ||
-            movieType != MovieFilterType.ALL
+        get() = !period.isAllTime || when (mediaType) {
+            MediaType.BOOKS -> bookType != BookFilterType.ALL
+            MediaType.MOVIES -> movieType != MovieFilterType.ALL
+        }
 }
 
 sealed interface LibraryUiState {
@@ -195,8 +205,11 @@ class LibraryViewModel @Inject constructor(
     private fun applyMovieFilters(movies: List<MovieEntity>, filters: Filters): List<MovieEntity> =
         movies.filter { movie ->
             when (filters.movieFilter) {
-                // Фильм без даты просмотра в ограниченный период не попадает.
-                MovieFilterType.ALL -> filters.period.matches(movie.watchedAt)
+                // Фильм без даты просмотра — это фильм, который добавили
+                // вручную и ещё не смотрели: под фильтром «Все» он виден, а в
+                // ограниченный период не попадает (даты нет — не сказать, что
+                // он туда относится).
+                MovieFilterType.ALL -> filters.period.matchesAny(movie.watchedAt)
                 MovieFilterType.WATCHED ->
                     movie.watchedAt != null && filters.period.matches(movie.watchedAt)
                 MovieFilterType.UNWATCHED ->
@@ -278,8 +291,8 @@ class LibraryViewModel @Inject constructor(
 
     /** Фильтры для показа: тип-специфичный фильтр берётся по текущему носителю. */
     val currentFilter: StateFlow<LibraryFilterState> =
-        combine(period, bookFilter, movieFilter) { p, bf, mf ->
-            LibraryFilterState(p, bf, mf)
+        combine(period, bookFilter, movieFilter, currentMediaType) { p, bf, mf, mt ->
+            LibraryFilterState(p, bf, mf, mt)
         }.stateIn(viewModelScope, SharingStarted.Eagerly, LibraryFilterState())
 
     fun setQuery(value: String) {
@@ -322,7 +335,12 @@ class LibraryViewModel @Inject constructor(
     }
 
     private fun filterState(filters: Filters = currentFilters()): LibraryFilterState =
-        LibraryFilterState(filters.period, filters.bookFilter, filters.movieFilter)
+        LibraryFilterState(
+            filters.period,
+            filters.bookFilter,
+            filters.movieFilter,
+            currentMediaType.value,
+        )
 
     private fun currentFilters() = Filters(
         query.value,

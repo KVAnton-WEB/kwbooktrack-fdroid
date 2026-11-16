@@ -179,6 +179,37 @@ class LibraryViewModelTest {
     }
 
     @Test
+    fun movieWithoutWatchedDateIsVisibleInAllFilter() = runTest(dispatcher) {
+        // Фильм без даты просмотра — это фильм, который добавили вручную и не
+        // смотрели. Под фильтром «Все» он должен быть виден: иначе приложение
+        // говорит «в библиотеке нет фильмов», хотя фильм в базе есть.
+        movies.insert(watched("Не посмотрен", null))
+        val viewModel = viewModel()
+        viewModel.setMediaType(MediaType.MOVIES)
+
+        val loaded = viewModel.uiState.first {
+            it is LibraryUiState.Loaded && it.mediaType == MediaType.MOVIES
+        } as LibraryUiState.Loaded
+        assertThat(loaded.titles()).containsExactly("Не посмотрен")
+    }
+
+    @Test
+    fun filterIsActiveOnlyForCurrentMediaType() = runTest(dispatcher) {
+        // Книжный фильтр не должен показывать «Сбросить» в режиме фильмов:
+        // фильтры живут рядом, но не мешают друг другу.
+        val viewModel = viewModel()
+        viewModel.setBookFilter(BookFilterType.PURCHASED)
+
+        viewModel.setMediaType(MediaType.MOVIES)
+        val movies = viewModel.currentFilter.first { it.mediaType == MediaType.MOVIES }
+        assertThat(movies.isActive).isFalse()
+
+        viewModel.setMediaType(MediaType.BOOKS)
+        val books = viewModel.currentFilter.first { it.mediaType == MediaType.BOOKS }
+        assertThat(books.isActive).isTrue()
+    }
+
+    @Test
     fun movieFilterKeepsWatchedAndUnwatchedApart() = runTest(dispatcher) {
         movies.insert(watched("Посмотрен", LocalDate.of(2026, 1, 2)))
         movies.insert(watched("Не посмотрен", null))

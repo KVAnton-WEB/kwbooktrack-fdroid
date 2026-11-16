@@ -154,7 +154,13 @@ private fun NoteListRow(item: NoteListItem, onClick: () -> Unit) {
                     .padding(start = 12.dp),
             ) {
                 Text(
-                    text = item.mediaTitle,
+                    text = item.mediaTitle ?: stringResource(
+                        if (item.note.mediaType == ru.antonkw.kwbooktrack.data.db.entity.MediaType.MOVIES) {
+                            R.string.about_movie_deleted_fallback
+                        } else {
+                            R.string.about_book_deleted_fallback
+                        },
+                    ),
                     style = MaterialTheme.typography.titleSmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,

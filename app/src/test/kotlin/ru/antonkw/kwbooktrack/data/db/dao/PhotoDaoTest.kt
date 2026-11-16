@@ -47,11 +47,4 @@ class PhotoDaoTest {
         assertThat(id).isGreaterThan(0L)
     }
 
-    @Test
-    fun deleteForBookRemovesAll() = runTest {
-        photoDao.insert(PhotoEntity(mediaId = bookId, mediaType = MediaType.BOOKS, path = "/tmp/a.jpg", createdAt = 0L))
-        photoDao.insert(PhotoEntity(mediaId = bookId, mediaType = MediaType.BOOKS, path = "/tmp/b.jpg", createdAt = 0L))
-        val deleted = photoDao.deleteForMedia(bookId, MediaType.BOOKS)
-        assertThat(deleted).isEqualTo(2)
-    }
 }

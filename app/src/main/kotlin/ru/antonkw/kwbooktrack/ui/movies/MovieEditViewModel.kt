@@ -17,6 +17,7 @@ import ru.antonkw.kwbooktrack.data.repository.MovieRepository
 import ru.antonkw.kwbooktrack.data.storage.CoverStorage
 import ru.antonkw.kwbooktrack.data.time.toEpochMs
 import ru.antonkw.kwbooktrack.data.time.toLocalDate
+import java.io.File
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
@@ -104,6 +105,21 @@ class MovieEditViewModel @Inject constructor(
     fun setDownloaded(value: Boolean) = update { copy(isDownloaded = value) }
     fun setRating(value: Int?) = update { copy(rating = value) }
 
+    /**
+     * Временную обложку убираем, сохранённую — нет.
+     *
+     * Пользователь выбрал обложку и нажал «Назад»: файл `cover_{uuid}.webp`
+     * остался бы в `filesDir/covers/` навсегда. Обложка, уже сохранённая в БД,
+     * — источник истины, её удалять нельзя.
+     */
+    public override fun onCleared() {
+        super.onCleared()
+        val path = _state.value.coverPath
+        if (path != null && path != originalCoverPath) {
+            runCatching { File(path).delete() }
+        }
+    }
+
     /** Обложка из галереи: файл сохраняется, путь — в состояние. */
     fun attachCover(uri: Uri) {
         viewModelScope.launch {
@@ -125,7 +141,7 @@ class MovieEditViewModel @Inject constructor(
         if (s.title.isBlank()) return
         viewModelScope.launch {
             val coverPath = s.coverPath?.let { coverStorage.promote(it) }
-            val movie = MovieEntity(
+            val form = MovieEntity(
                 id = if (isEditing) editingMovieId else 0L,
                 title = s.title.trim(),
                 originalTitle = s.originalTitle.trim().takeIf { it.isNotEmpty() },
@@ -149,10 +165,20 @@ class MovieEditViewModel @Inject constructor(
             if (isEditing) {
                 val existing = movieRepository.findById(editingMovieId)
                 if (existing != null) {
-                    movieRepository.update(movie.copy(createdAt = existing.createdAt))
+                    // Поля, которых в форме нет (комментарии Tellico, чужие
+                    // поля, источник), сохраняем: правка названия не должна
+                    // стирать то, что приехало из импорта.
+                    movieRepository.update(
+                        form.copy(
+                            comments = existing.comments,
+                            extraFields = existing.extraFields,
+                            source = existing.source,
+                            createdAt = existing.createdAt,
+                        ),
+                    )
                 }
             } else {
-                movieRepository.insert(movie)
+                movieRepository.insert(form)
             }
             // Прежняя обложка больше не нужна: путь новой — с UUID-именем.
             originalCoverPath

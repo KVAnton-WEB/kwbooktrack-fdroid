@@ -103,6 +103,11 @@ fun TellicoImportScreen(
                         )
                         Text(stringResource(R.string.tellico_import_total_format, r.total))
                         Text(stringResource(R.string.tellico_import_imported_format, r.imported))
+                        // Фильмы — отдельным числом: в общем «импортировано» их
+                        // не разглядеть.
+                        if (r.movies > 0) {
+                            Text(stringResource(R.string.tellico_import_movies_format, r.movies))
+                        }
                         Text(stringResource(R.string.tellico_import_skipped_format, r.skipped))
                         Text(stringResource(R.string.tellico_import_covers_format, r.coversCopied))
                         Text(stringResource(R.string.tellico_import_notes_format, r.notesImported))

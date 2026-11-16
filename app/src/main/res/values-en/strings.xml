@@ -11,12 +11,16 @@
     <string name="about_backup_description">Export your library to a ZIP archive with CSV and covers, export it as a native Tellico archive (.tc), or import a previously saved archive.</string>
     <string name="action_export">Export</string>
     <string name="action_export_tellico">Export to Tellico (.tc)</string>
+    <string name="export_success_zip_format">Export ready: %1$d books, %2$d movies, %3$d photos</string>
+    <string name="export_success_books_format">Export ready: %1$d books</string>
+    <string name="export_success_movies_format">Export ready: %1$d movies</string>
     <string name="export_success_format">Export ready: %1$d books, %2$d photos</string>
     <string name="export_failed_format">Export failed: %1$s</string>
     <string name="export_failed_unknown">Export failed: unknown error</string>
     <string name="about_total_books">Total books: %1$d</string>
     <string name="about_finished_books">Finished: %1$d of %2$d (%3$d%%)</string>
     <string name="about_book_deleted_fallback">(book deleted)</string>
+    <string name="about_movie_deleted_fallback">(movie deleted)</string>
 
     <!-- Book fields (v5) -->
     <string name="field_subtitle">Subtitle</string>
@@ -328,6 +332,7 @@
     <string name="tellico_import_pick_file">Pick file</string>
     <string name="tellico_import_run">Run import</string>
     <string name="tellico_import_running">Importing…</string>
+    <string name="tellico_import_movies_format">Movies: %1$d</string>
     <string name="tellico_import_result_format">Imported: %1$d, skipped: %2$d</string>
     <string name="tellico_import_covers_format">Covers copied: %1$d</string>
     <string name="tellico_import_notes_format">Notes, sessions, tags and photos added: %1$d</string>
@@ -359,6 +364,7 @@
     <string name="movie_field_watched_at">Watched on</string>
     <string name="movie_field_url">Link</string>
     <string name="movie_field_plot">Plot</string>
+    <string name="movie_field_comments">Comments</string>
     <string name="movie_field_review">Review</string>
     <string name="movie_field_downloaded">Downloaded</string>
     <string name="movie_delete_title">Delete movie?</string>

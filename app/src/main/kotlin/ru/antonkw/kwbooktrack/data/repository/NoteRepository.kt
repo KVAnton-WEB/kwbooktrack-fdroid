@@ -57,6 +57,4 @@ class NoteRepository @Inject constructor(
         return noteDao.delete(note)
     }
 
-    suspend fun deleteForMedia(mediaId: Long, mediaType: MediaType): Int =
-        noteDao.deleteForMedia(mediaId, mediaType)
 }

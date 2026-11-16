@@ -76,7 +76,6 @@ interface PhotoStorage {
     fun saveNamed(name: String, source: InputStream, extension: String): String
 
     fun deleteForNote(noteId: Long)
-    fun deleteForBook(bookId: Long)
 
     /**
      * Delete specific photo files by absolute path. Used by BookRepository
@@ -114,14 +113,6 @@ class FilePhotoStorage @Inject constructor(
         val prefix = "note_${noteId}_"
         photosDir.listFiles { f -> f.isFile && f.name.startsWith(prefix) }
             ?.forEach { it.delete() }
-    }
-
-    override fun deleteForBook(bookId: Long) {
-        // PhotoEntity uses ON DELETE SET NULL for noteId and ON DELETE CASCADE for
-        // bookId, so the DB rows are gone after BookRepository.delete — but the
-        // underlying files in filesDir/photos/ stay. The repository reads those
-        // paths up front via PhotoDao.pathsForBook() and calls [deletePaths]
-        // below, so this entry point is a no-op for symmetry.
     }
 
     override fun deletePaths(paths: Collection<String>) {

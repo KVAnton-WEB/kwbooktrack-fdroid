@@ -25,7 +25,7 @@ import javax.inject.Inject
 data class NoteListItem(
     val note: NoteEntity,
     /** Название владельца заметки — книги или фильма. */
-    val mediaTitle: String,
+    val mediaTitle: String?,
     /** Подпись владельца — автор книги или режиссёр фильма. */
     val mediaSubtitle: String,
 )
@@ -64,15 +64,18 @@ class NotesListViewModel @Inject constructor(
             .map { note ->
                 // Владелец — книга или фильм: id у них считаются независимо,
                 // поэтому ищет по паре (id, тип).
-                val title: String
+                // Заголовок может быть null — владельца удалили. Текст
+                // подставляет экран: в ViewModel живут строки ресурсов, а не
+                // зашитый русский текст.
+                val title: String?
                 val subtitle: String
                 if (note.mediaType == MediaType.MOVIES) {
                     val movie = moviesById[note.mediaId]
-                    title = movie?.title ?: "(фильм удалён)"
+                    title = movie?.title
                     subtitle = movie?.director.orEmpty()
                 } else {
                     val book = booksById[note.mediaId]
-                    title = book?.title ?: "(книга удалена)"
+                    title = book?.title
                     subtitle = book?.author.orEmpty()
                 }
                 NoteListItem(
@@ -81,7 +84,7 @@ class NotesListViewModel @Inject constructor(
                     mediaSubtitle = subtitle,
                 )
             }
-        NotesListUiState.Loaded(items) as NotesListUiState
+        NotesListUiState.Loaded(items)
     }
         .catch { e ->
             // Ошибка базы не должна выглядеть как «заметок нет»: молчаливый

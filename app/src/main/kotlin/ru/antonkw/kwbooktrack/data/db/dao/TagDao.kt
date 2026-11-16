@@ -43,8 +43,16 @@ interface TagDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertCrossRef(ref: MediaTagCrossRef): Long
 
-    @Query("DELETE FROM media_tags WHERE media_id = :mediaId AND media_type = :mediaType")
-    suspend fun clearCrossRefsForMedia(mediaId: Long, mediaType: MediaType): Int
+    /**
+     * Теги владельца — потоком: список должен обновляться, когда теги
+     * меняются, а не когда меняется сам владелец.
+     */
+    @Query(
+        "SELECT t.name AS name FROM tags t " +
+            "JOIN media_tags mt ON mt.tag_id = t.id " +
+            "WHERE mt.media_id = :mediaId AND mt.media_type = :mediaType ORDER BY t.name",
+    )
+    fun observeTagsOfMedia(mediaId: Long, mediaType: MediaType): kotlinx.coroutines.flow.Flow<List<String>>
 
     @Query("DELETE FROM tags")
     suspend fun deleteAll(): Int

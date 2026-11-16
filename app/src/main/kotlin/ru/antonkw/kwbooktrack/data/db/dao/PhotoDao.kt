@@ -31,9 +31,6 @@ interface PhotoDao {
     @Delete
     suspend fun delete(photo: PhotoEntity): Int
 
-    @Query("DELETE FROM photos WHERE media_id = :mediaId AND media_type = :mediaType")
-    suspend fun deleteForMedia(mediaId: Long, mediaType: MediaType): Int
-
     @Query("SELECT COUNT(*) FROM photos")
     suspend fun count(): Int
 

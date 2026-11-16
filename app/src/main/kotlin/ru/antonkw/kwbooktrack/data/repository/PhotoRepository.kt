@@ -23,20 +23,6 @@ class PhotoRepository @Inject constructor(
 
     suspend fun delete(photo: PhotoEntity): Int = photoDao.delete(photo)
 
-    suspend fun deleteForMedia(mediaId: Long, mediaType: MediaType): Int =
-        photoDao.deleteForMedia(mediaId, mediaType)
-
-    /**
-     * Удалить файлы фото владельца, строки которого сейчас будут стёрты.
-     *
-     * Пути читаются заранее — после удаления строк их уже не узнать. Без
-     * этого файлы фото остались бы в `filesDir/photos/` навсегда.
-     */
-    suspend fun deleteFilesForMedia(mediaId: Long, mediaType: MediaType) {
-        val paths = photoDao.pathsForMedia(mediaId, mediaType)
-        photoStorage.deletePaths(paths)
-    }
-
     /** Удалить файлы фото по известным путям. */
     suspend fun deleteFiles(paths: Collection<String>) {
         photoStorage.deletePaths(paths)

@@ -128,12 +128,24 @@ fun AboutScreen(
         if (uri != null) exportViewModel.exportTellicoToUri(uri)
     }
 
-    val exportSuccessFormat = stringResource(R.string.export_success_format)
+    // Строки читаем до эффекта: stringResource нельзя звать из LaunchedEffect.
+    val exportSuccessZipFormat = stringResource(R.string.export_success_zip_format)
+    val exportSuccessBooksFormat = stringResource(R.string.export_success_books_format)
+    val exportSuccessMoviesFormat = stringResource(R.string.export_success_movies_format)
     LaunchedEffect(exportState.lastManifest) {
         val m = exportState.lastManifest ?: return@LaunchedEffect
-        snackbarHostState.showSnackbar(
-            exportSuccessFormat.format(m.counts.books, m.counts.photos),
-        )
+        // Подпись зависит от того, что выгрузили: в своём zip-бэкапе и книги,
+        // и фильмы, а в родном `.tc` — одна коллекция.
+        val text = when {
+            exportState.exportedKind == ExportKind.TELLICO &&
+                exportState.exportedMediaType == MediaType.MOVIES ->
+                exportSuccessMoviesFormat.format(m.counts.movies)
+            exportState.exportedKind == ExportKind.TELLICO ->
+                exportSuccessBooksFormat.format(m.counts.books)
+            else ->
+                exportSuccessZipFormat.format(m.counts.books, m.counts.movies, m.counts.photos)
+        }
+        snackbarHostState.showSnackbar(text)
         exportViewModel.acknowledge()
     }
     LaunchedEffect(exportState.error) {
