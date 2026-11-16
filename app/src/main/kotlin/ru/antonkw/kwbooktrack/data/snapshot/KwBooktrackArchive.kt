@@ -4,7 +4,7 @@ import kotlinx.serialization.Serializable
 
 /**
  * Формат `extra.json` — части своего zip-бэкапа (`manifest.json` + `books.csv` +
- * `extra.json` + `covers/` + `photos/`).
+ * `movies.csv` + `extra.json` + `covers/` + `photos/`).
  *
  * DTO — общие для экспортера и импортёра: формат объявлен в одном месте, иначе
  * копии в двух файлах разъедутся, а поймает это только тест.
@@ -14,13 +14,30 @@ import kotlinx.serialization.Serializable
  * в JSON есть всегда, и «вид» записи не зависит от значений по умолчанию.
  */
 @Serializable
-data class ExtraArchive(val books: Map<String, BookExtras> = emptyMap())
+data class ExtraArchive(
+    val books: Map<String, BookExtras> = emptyMap(),
+    /** Данные фильмов — по id фильма строкой. */
+    val movies: Map<String, MovieExtras> = emptyMap(),
+)
 
 /** Данные книги из `extra.json`. */
 @Serializable
 data class BookExtras(
     val notes: List<NoteJson> = emptyList(),
     val sessions: List<SessionJson> = emptyList(),
+    val tags: List<String> = emptyList(),
+    val photos: List<PhotoJson> = emptyList(),
+    val extraFields: Map<String, ExtraField> = emptyMap(),
+)
+
+/**
+ * Данные фильма из `extra.json`.
+ *
+ * Как у книги, но без сессий чтения: трекера страниц у фильма нет.
+ */
+@Serializable
+data class MovieExtras(
+    val notes: List<NoteJson> = emptyList(),
     val tags: List<String> = emptyList(),
     val photos: List<PhotoJson> = emptyList(),
     val extraFields: Map<String, ExtraField> = emptyMap(),

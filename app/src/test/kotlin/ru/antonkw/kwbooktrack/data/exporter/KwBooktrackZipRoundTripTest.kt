@@ -27,6 +27,8 @@ import ru.antonkw.kwbooktrack.data.tagsOf
 import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
+import ru.antonkw.kwbooktrack.data.db.entity.MediaSource
+import ru.antonkw.kwbooktrack.data.db.entity.MovieEntity
 import ru.antonkw.kwbooktrack.data.db.entity.NoteEntity
 import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
 import ru.antonkw.kwbooktrack.data.db.entity.PhotoEntity
@@ -64,6 +66,7 @@ class KwBooktrackZipRoundTripTest {
     private lateinit var exportUseCase: ExportZipUseCase
     private lateinit var importUseCase: ImportKwBooktrackZipUseCase
     private lateinit var sourceBooks: BookRepository
+    private lateinit var sourceMovies: MovieRepository
     private lateinit var sourceNotes: NoteRepository
     private lateinit var sourceSessions: SessionRepository
     private lateinit var sourceTags: TagRepository
@@ -81,13 +84,14 @@ class KwBooktrackZipRoundTripTest {
         sourceDb = TestDb.createInMemory(context)
         sourcePhotos = PhotoRepository(sourceDb.photoDao(), NoOpPhotoStorage)
         sourceBooks = BookRepository(sourceDb.bookDao(), sourceDb.tagDao(), NoOpCoverStorage, sourcePhotos)
+        sourceMovies = MovieRepository(sourceDb.movieDao(), NoOpCoverStorage, sourcePhotos)
         sourceNotes = NoteRepository(sourceDb.noteDao(), NoOpPhotoStorage)
         sourceSessions = SessionRepository(sourceDb.readingSessionDao())
         sourceTags = TagRepository(sourceDb.tagDao())
         exportUseCase = ExportZipUseCase(
             snapshotBuilder = SnapshotBuilder(
                 bookRepository = sourceBooks,
-            movieRepository = MovieRepository(sourceDb.movieDao(), NoOpCoverStorage, PhotoRepository(sourceDb.photoDao(), NoOpPhotoStorage)),
+                movieRepository = sourceMovies,
                 noteDao = sourceDb.noteDao(),
                 sessionDao = sourceDb.readingSessionDao(),
                 photoDao = sourceDb.photoDao(),
@@ -264,6 +268,50 @@ class KwBooktrackZipRoundTripTest {
         assertThat(book.getValue("photos").jsonArray).isEmpty()
     }
 
+    @Test
+    fun movieRoundTripKeepsFieldsNotesAndTags() = runTest {
+        seedMovie()
+
+        val file = File(tempDir, "backup.zip")
+        exportUseCase(file)
+
+        // Обложка фильма лежит в архиве рядом с книжными.
+        val entries = zipEntries(file)
+        assertThat(entries.keys).contains("covers/movie-cover.png")
+
+        val result = importUseCase(file, outputDir)
+        assertThat(result.movies).isEqualTo(1)
+
+        val movie = targetDb.movieDao().observeAll().first().single()
+        assertThat(movie.title).isEqualTo("Дюна")
+        assertThat(movie.originalTitle).isEqualTo("Dune")
+        assertThat(movie.year).isEqualTo(2021)
+        assertThat(movie.genre).isEqualTo("фантастика; приключения")
+        assertThat(movie.nationality).isEqualTo("США")
+        assertThat(movie.director).isEqualTo("Дени Вильнёв")
+        assertThat(movie.cast).isEqualTo("Тимоти Шаламе::Пол Атрейдес")
+        assertThat(movie.durationMin).isEqualTo(155)
+        assertThat(movie.rating).isEqualTo(5)
+        assertThat(movie.watchedAt).isEqualTo(day(2021, 10, 22))
+        assertThat(movie.plot).isEqualTo("Пустыня планеты Аренис")
+        assertThat(movie.comments).isEqualTo("Комментарий")
+        assertThat(movie.url).isEqualTo("https://www.kinopoisk.ru/film/1")
+        assertThat(movie.isDownloaded).isTrue()
+        assertThat(movie.source).isEqualTo(MediaSource.TELLICO)
+        // Обложка фильма перенесена: в БД — локальный путь, файл на месте.
+        assertThat(movie.coverPath).isNotNull()
+        assertThat(File(movie.coverPath!!).exists()).isTrue()
+
+        // Заметка фильма — общая таблица заметок, владелец — пара (id, MOVIES).
+        val notes = targetDb.noteDao().observeByMedia(movie.id, MediaType.MOVIES).first()
+        assertThat(notes).hasSize(1)
+        assertThat(notes.single().bodyMd).isEqualTo("Заметка о фильме")
+        assertThat(notes.single().createdAt).isEqualTo(MOVIE_NOTE_AT)
+
+        val tags = targetDb.tagDao().tagsForAllMedia()
+        assertThat(tags.map { it.name }).containsExactly("кино")
+    }
+
     /** Книга с двумя заметками, сессией, тегом, фото, обложкой и чужим полем. */
     private suspend fun seedLibrary() {
         val cover = File(tempDir, "cover.png").apply { writeBytes(pngBytes()) }
@@ -325,6 +373,43 @@ class KwBooktrackZipRoundTripTest {
         )
     }
 
+    /** Фильм с заметкой и тегом — как в библиотеке. */
+    private suspend fun seedMovie() {
+        val cover = File(tempDir, "movie-cover.png").apply { writeBytes(pngBytes(Color.GREEN)) }
+        val movieId = sourceMovies.insert(
+            MovieEntity(
+                title = "Дюна",
+                originalTitle = "Dune",
+                year = 2021,
+                genre = "фантастика; приключения",
+                nationality = "США",
+                director = "Дени Вильнёв",
+                cast = "Тимоти Шаламе::Пол Атрейдес",
+                durationMin = 155,
+                rating = 5,
+                watchedAt = day(2021, 10, 22),
+                coverPath = cover.absolutePath,
+                plot = "Пустыня планеты Аренис",
+                comments = "Комментарий",
+                url = "https://www.kinopoisk.ru/film/1",
+                isDownloaded = true,
+                createdAt = day(2024, 2, 1),
+                updatedAt = day(2024, 2, 20),
+                source = MediaSource.TELLICO,
+            ),
+        )
+        sourceNotes.insert(
+            NoteEntity(
+                mediaId = movieId, mediaType = MediaType.MOVIES,
+                bodyMd = "Заметка о фильме",
+                kind = NoteKind.NOTE,
+                createdAt = MOVIE_NOTE_AT,
+                updatedAt = MOVIE_NOTE_AT,
+            ),
+        )
+        sourceTags.attachToMedia(movieId, MediaType.MOVIES, sourceTags.findOrCreate("кино"))
+    }
+
     private fun zipEntries(file: File): Map<String, ByteArray> {
         val out = mutableMapOf<String, ByteArray>()
         ZipInputStream(file.inputStream().buffered()).use { zip ->
@@ -356,6 +441,7 @@ class KwBooktrackZipRoundTripTest {
         const val NOTE_AT = 1_730_000_100_000L
         const val SESSION_AT = 1_730_000_200_000L
         const val PHOTO_AT = 1_730_000_300_000L
+        const val MOVIE_NOTE_AT = 1_730_000_500_000L
 
         val CSV_FORMAT: CSVFormat = CSVFormat.Builder.create(CSVFormat.EXCEL)
             .setDelimiter(';')

@@ -17,7 +17,12 @@ import ru.antonkw.kwbooktrack.data.TestDb
 import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
+import ru.antonkw.kwbooktrack.data.db.entity.MediaSource
+import ru.antonkw.kwbooktrack.data.db.entity.MediaType
+import ru.antonkw.kwbooktrack.data.db.entity.MovieEntity
+import ru.antonkw.kwbooktrack.data.db.entity.NoteEntity
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
+import ru.antonkw.kwbooktrack.data.repository.NoteRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
 import ru.antonkw.kwbooktrack.data.snapshot.SnapshotBuilder
 import java.io.File
@@ -31,6 +36,7 @@ import ru.antonkw.kwbooktrack.data.repository.MovieRepository
 class ExportZipUseCaseTest {
     private lateinit var db: KwBooktrackDatabase
     private lateinit var repo: BookRepository
+    private lateinit var movieRepo: MovieRepository
     private lateinit var useCase: ExportZipUseCase
     private lateinit var tempDir: File
 
@@ -47,10 +53,15 @@ class ExportZipUseCaseTest {
             NoOpCoverStorage,
             PhotoRepository(db.photoDao(), NoOpPhotoStorage),
         )
+        movieRepo = MovieRepository(
+            db.movieDao(),
+            NoOpCoverStorage,
+            PhotoRepository(db.photoDao(), NoOpPhotoStorage),
+        )
         useCase = ExportZipUseCase(
             snapshotBuilder = SnapshotBuilder(
                 bookRepository = repo,
-            movieRepository = MovieRepository(db.movieDao(), NoOpCoverStorage, PhotoRepository(db.photoDao(), NoOpPhotoStorage)),
+                movieRepository = movieRepo,
                 noteDao = db.noteDao(),
                 sessionDao = db.readingSessionDao(),
                 photoDao = db.photoDao(),
@@ -166,7 +177,7 @@ class ExportZipUseCaseTest {
             val deleting = ExportZipUseCase(
                 snapshotBuilder = SnapshotBuilder(
                     bookRepository = repo,
-            movieRepository = MovieRepository(db.movieDao(), NoOpCoverStorage, PhotoRepository(db.photoDao(), NoOpPhotoStorage)),
+                    movieRepository = movieRepo,
                     noteDao = db.noteDao(),
                     sessionDao = db.readingSessionDao(),
                     photoDao = db.photoDao(),
@@ -191,6 +202,54 @@ class ExportZipUseCaseTest {
             val entries = readZipEntries(outFile)
             assertThat(entries.keys).contains("books.csv")
             assertThat(entries.keys.none { it.startsWith("covers/") }).isTrue()
+        }
+    }
+
+    @Test
+    fun exportWritesMoviesCsv() {
+        runBlocking {
+            movieRepo.insert(sampleMovie("Дюна", 2021))
+            movieRepo.insert(sampleMovie("Интерстеллар", 2014))
+
+            val outFile = File(tempDir, "export.zip")
+            useCase(outFile)
+
+            val entries = readZipEntries(outFile)
+            assertThat(entries.keys).contains("movies.csv")
+            val csv = entries["movies.csv"]!!
+            // Заголовок `movies.csv` — ровно эти колонки и в этом порядке.
+            assertThat(csv.lineSequence().first()).isEqualTo(MOVIES_HEADER)
+            val format = CSVFormat.Builder.create(CSVFormat.EXCEL).setDelimiter(';').setHeader().setSkipHeaderRecord(true).build()
+            val records = CSVParser(StringReader(csv), format).use { it.records }
+            assertThat(records).hasSize(2)
+            assertThat(records.map { it.get("title") }.toSet()).containsExactly("Дюна", "Интерстеллар")
+        }
+    }
+
+    @Test
+    fun exportCountsIncludeMovies() {
+        runBlocking {
+            val movieId = movieRepo.insert(sampleMovie("Дюна", 2021))
+            movieRepo.insert(sampleMovie("Интерстеллар", 2014))
+            // Заметка фильма попадает в архив — значит, и в счётчик.
+            NoteRepository(db.noteDao(), NoOpPhotoStorage).insert(
+                NoteEntity(
+                    mediaId = movieId,
+                    mediaType = MediaType.MOVIES,
+                    bodyMd = "Заметка",
+                    createdAt = 0L,
+                    updatedAt = 0L,
+                ),
+            )
+
+            val outFile = File(tempDir, "export.zip")
+            useCase(outFile)
+
+            val manifestJson = readZipEntries(outFile)["manifest.json"]!!
+            assertThat(manifestJson).contains("\"movies\":2")
+            val parsed = Json.decodeFromString(ExportManifest.serializer(), manifestJson)
+            assertThat(parsed.counts.movies).isEqualTo(2)
+            assertThat(parsed.counts.notes).isEqualTo(1)
         }
     }
 
@@ -221,4 +280,23 @@ class ExportZipUseCaseTest {
         createdAt = 0L,
         updatedAt = 0L,
     )
+
+    private fun sampleMovie(title: String, year: Int) = MovieEntity(
+        title = title,
+        year = year,
+        source = MediaSource.MANUAL,
+        createdAt = 0L,
+        updatedAt = 0L,
+    )
+
+    private companion object {
+        /**
+         * Заголовок `movies.csv` — как в плане: ровно эти колонки и в этом
+         * порядке. Литерал, а не константа экспортёра: иначе тест повторял бы
+         * сам себя и не заметил бы изменения формата.
+         */
+        const val MOVIES_HEADER =
+            "title;original_title;year;genre;nationality;director;cast;duration_min;rating;watched_at;" +
+                "cover_path;plot;comments;url;is_downloaded;source;id;created_at;updated_at"
+    }
 }

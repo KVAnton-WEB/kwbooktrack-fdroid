@@ -18,6 +18,7 @@ import ru.antonkw.kwbooktrack.data.tagsOf
 import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
+import ru.antonkw.kwbooktrack.data.db.entity.MediaSource
 import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
 import ru.antonkw.kwbooktrack.data.exporter.AppVersionProvider
 import ru.antonkw.kwbooktrack.data.exporter.ExportZipUseCase
@@ -29,8 +30,10 @@ import ru.antonkw.kwbooktrack.data.repository.TagRepository
 import ru.antonkw.kwbooktrack.data.snapshot.SnapshotApplier
 import ru.antonkw.kwbooktrack.data.snapshot.SnapshotBuilder
 import ru.antonkw.kwbooktrack.data.storage.CoverTranscoder
+import ru.antonkw.kwbooktrack.data.time.toEpochMs
 import java.io.File
 import java.nio.file.Files
+import java.time.LocalDate
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import ru.antonkw.kwbooktrack.data.db.entity.MediaType
@@ -384,6 +387,75 @@ class ImportKwBooktrackZipUseCaseTest {
         }
     }
 
+    @Test
+    fun importsMoviesFromCsv() {
+        runBlocking {
+            val zip = backupZipWithMovies()
+
+            val result = importer(zip, outputDir)
+
+            assertThat(result.isSuccess).isTrue()
+            assertThat(result.movies).isEqualTo(1)
+
+            val movie = targetDb.movieDao().observeAll().first().single()
+            assertThat(movie.title).isEqualTo("Дюна")
+            assertThat(movie.originalTitle).isEqualTo("Dune")
+            assertThat(movie.year).isEqualTo(2021)
+            assertThat(movie.genre).isEqualTo("фантастика; приключения")
+            assertThat(movie.nationality).isEqualTo("США")
+            assertThat(movie.director).isEqualTo("Дени Вильнёв")
+            assertThat(movie.cast).isEqualTo("Тимоти Шаламе::Пол Атрейдес")
+            assertThat(movie.durationMin).isEqualTo(155)
+            assertThat(movie.rating).isEqualTo(5)
+            assertThat(movie.watchedAt).isEqualTo(LocalDate.of(2021, 10, 22).toEpochMs())
+            assertThat(movie.plot).isEqualTo("Пустыня планеты Аренис")
+            assertThat(movie.comments).isEqualTo("Комментарий")
+            assertThat(movie.url).isEqualTo("https://www.kinopoisk.ru/film/1")
+            assertThat(movie.isDownloaded).isTrue()
+            assertThat(movie.source).isEqualTo(MediaSource.TELLICO)
+
+            // Заметка и тег — из секции `movies` в extra.json.
+            val notes = targetDb.noteDao().observeByMedia(movie.id, MediaType.MOVIES).first()
+            assertThat(notes).hasSize(1)
+            assertThat(notes.single().bodyMd).isEqualTo("Заметка о фильме")
+            val tags = targetDb.tagDao().tagsForAllMedia()
+                .filter { it.mediaId == movie.id && it.mediaType == MediaType.MOVIES }
+            assertThat(tags.map { it.name }).containsExactly("кино")
+        }
+    }
+
+    @Test
+    fun oldBackupWithoutMoviesStillImports() {
+        runBlocking {
+            // Старый бэкап: ни `movies.csv`, ни секции `movies` в extra.json,
+            // и в манифесте нет счётчика `movies`. У новых полей обязательно
+            // значение по умолчанию — иначе импорт падал бы с MissingFieldException.
+            val zip = File(tempDir, "old.zip")
+            ZipOutputStream(zip.outputStream()).use { out ->
+                out.putNextEntry(ZipEntry("manifest.json"))
+                out.write(MANIFEST.toByteArray())
+                out.closeEntry()
+                out.putNextEntry(ZipEntry("books.csv"))
+                out.write("title;author;id\nСтарый бэкап;Автор;620\n".toByteArray())
+                out.closeEntry()
+                out.putNextEntry(ZipEntry("extra.json"))
+                out.write(OLD_EXTRA_JSON.toByteArray())
+                out.closeEntry()
+            }
+
+            val result = importer(zip, outputDir)
+
+            assertThat(result.isSuccess).isTrue()
+            assertThat(result.imported).isEqualTo(1)
+            assertThat(result.movies).isEqualTo(0)
+            val book = targetRepo.observeAll().first().single()
+            assertThat(book.title).isEqualTo("Старый бэкап")
+            // `extra.json` без секции `movies` читается целиком: заметки книги на месте.
+            assertThat(targetNoteRepo.observeByMedia(book.id, MediaType.BOOKS).first()).isNotEmpty()
+            assertThat(targetDb.movieDao().observeAll().first()).isEmpty()
+        }
+    }
+
     /** Бэкап со всеми частями: книга, `extra.json`, обложка и фото. */
     private fun backupZip(): File {
         val zip = File(tempDir, "backup.zip")
@@ -402,6 +474,26 @@ class ImportKwBooktrackZipUseCaseTest {
             out.closeEntry()
             out.putNextEntry(ZipEntry("photos/abc.jpg"))
             out.write(byteArrayOf(4, 5, 6))
+            out.closeEntry()
+        }
+        return zip
+    }
+
+    /** Бэкап с фильмом: `movies.csv` и секция `movies` в `extra.json`. */
+    private fun backupZipWithMovies(): File {
+        val zip = File(tempDir, "backup-movies.zip")
+        ZipOutputStream(zip.outputStream()).use { out ->
+            out.putNextEntry(ZipEntry("manifest.json"))
+            out.write(MANIFEST.toByteArray())
+            out.closeEntry()
+            out.putNextEntry(ZipEntry("books.csv"))
+            out.write(BOOKS_CSV.toByteArray())
+            out.closeEntry()
+            out.putNextEntry(ZipEntry("movies.csv"))
+            out.write(MOVIES_CSV.toByteArray())
+            out.closeEntry()
+            out.putNextEntry(ZipEntry("extra.json"))
+            out.write(EXTRA_JSON_WITH_MOVIES.toByteArray())
             out.closeEntry()
         }
         return zip
@@ -435,5 +527,38 @@ class ImportKwBooktrackZipUseCaseTest {
               "photos":[{"file":"photos/abc.jpg","noteIndex":2,"createdAt":1730000002000}],
               "extraFields":{"посоветовал":{"t":"Посоветовал","v":"Книжный поезд"}}}}}
         """.trimIndent()
+
+        /** Секция `movies` в `extra.json` — по id фильма. */
+        private val EXTRA_JSON_WITH_MOVIES = """
+            {"books":{"620":{
+              "notes":[{"kind":"NOTE","page":null,"body":"Заметка","createdAt":1730000001000}],
+              "sessions":[],
+              "tags":["фэнтези"],
+              "photos":[],
+              "extraFields":{}}},
+             "movies":{"77":{
+               "notes":[{"kind":"NOTE","page":null,"body":"Заметка о фильме","createdAt":1730000005000}],
+               "tags":["кино"],
+               "photos":[],
+               "extraFields":{"в залах":{"t":"В залах","v":"2"}}}}}
+        """.trimIndent()
+
+        /** Старый `extra.json`: секции `movies` в нём нет. */
+        private val OLD_EXTRA_JSON = """
+            {"books":{"620":{
+              "notes":[{"kind":"NOTE","page":null,"body":"Заметка","createdAt":1730000001000}],
+              "sessions":[],
+              "tags":["фэнтези"],
+              "photos":[],
+              "extraFields":{}}}}
+        """.trimIndent()
+
+        private val MOVIES_CSV = (
+            "title;original_title;year;genre;nationality;director;cast;duration_min;rating;watched_at;" +
+                "cover_path;plot;comments;url;is_downloaded;source;id;created_at;updated_at\n" +
+                "Дюна;Dune;2021;\"фантастика; приключения\";США;Дени Вильнёв;Тимоти Шаламе::Пол Атрейдес;" +
+                "155;5;2021-10-22;620.jpg;Пустыня планеты Аренис;Комментарий;https://www.kinopoisk.ru/film/1;" +
+                "1;TELLICO;77;1700000000000;1700000009999\n"
+            )
     }
 }
