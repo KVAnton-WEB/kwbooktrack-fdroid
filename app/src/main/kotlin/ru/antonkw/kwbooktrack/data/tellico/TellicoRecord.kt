@@ -3,14 +3,13 @@ package ru.antonkw.kwbooktrack.data.tellico
 import ru.antonkw.kwbooktrack.data.snapshot.ExtraField
 
 /**
- * Промежуточная модель записи Tellico.
+ * Запись коллекции Tellico.
  *
- * Ключ [fields] — **внутреннее имя поля Tellico** (`title`, `место-покупки`),
- * а не человеческий заголовок: именно это имя кладётся в `<field name=…>`
- * при экспорте, поэтому `.tc` заполняет существующие поля коллекции, а не
- * создаёт дубликаты.
+ * @param collectionType тип коллекции: 2 — книги, 3 — фильмы. По нему
+ *   импортёр выбирает маппер: у книг и фильмов разные поля.
  */
 data class TellicoRecord(
     val fields: Map<String, String> = emptyMap(),
     val extra: Map<String, ExtraField> = emptyMap(),
+    val collectionType: Int = TellicoFields.COLLECTION_BOOKS,
 )

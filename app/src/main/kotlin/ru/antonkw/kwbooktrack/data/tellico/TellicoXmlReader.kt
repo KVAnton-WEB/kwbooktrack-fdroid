@@ -43,16 +43,33 @@ class TellicoXmlReader @Inject constructor() {
         } catch (e: Exception) {
             throw IllegalStateException("Не удалось прочитать XML Tellico", e)
         } ?: throw IllegalStateException("Не удалось прочитать XML Tellico")
-        val collection = root.collect("collection").firstOrNull { it.attribute("type") == "2" }
-            ?: throw IllegalStateException("Это не коллекция книг")
-        val declarations = collection.children
-            .firstOrNull { it.name == "fields" }
-            ?.let { parseDeclarations(it) }
-            .orEmpty()
-        return collection.children
-            .filter { it.name == "entry" }
-            .map { parseEntry(it, declarations) }
+        // Читаем все коллекции, но обрабатываем только книги и фильмы.
+        // Остальные типы (библиография, игры) пропускаем: у библиографии год
+        // называется `year`, а не `pub_year`, и без разбора она превратилась бы
+        // в книги.
+        val collections = root.collect("collection")
+            .filter { it.attribute("type") in SUPPORTED_TYPES }
+        if (collections.isEmpty()) {
+            throw IllegalStateException("Это не коллекция книг и не фильмов")
+        }
+        return collections.flatMap { collection ->
+            val type = collection.attribute("type").toIntOrNull() ?: TellicoFields.COLLECTION_BOOKS
+            val declarations = collection.children
+                .firstOrNull { it.name == "fields" }
+                ?.let { parseDeclarations(it) }
+                .orEmpty()
+            val known = TellicoFields.knownFields(type)
+            collection.children
+                .filter { it.name == "entry" }
+                .map { parseEntry(it, declarations, known, type) }
+        }
     }
+
+    /** Типы коллекций, которые приложение умеет импортировать. */
+    private val SUPPORTED_TYPES = setOf(
+        TellicoFields.COLLECTION_BOOKS.toString(),
+        TellicoFields.COLLECTION_MOVIES.toString(),
+    )
 
     /**
      * Парсер без сети: файл Tellico ссылается на внешний DTD, а в записи могут быть
@@ -82,7 +99,12 @@ class TellicoXmlReader @Inject constructor() {
             }
             .toMap()
 
-    private fun parseEntry(entry: XmlNode, declarations: Map<String, Declaration>): TellicoRecord {
+    private fun parseEntry(
+        entry: XmlNode,
+        declarations: Map<String, Declaration>,
+        known: Set<String>,
+        collectionType: Int,
+    ): TellicoRecord {
         val fields = mutableMapOf<String, String>()
         val extra = mutableMapOf<String, ExtraField>()
         for (element in entry.children) {
@@ -92,13 +114,13 @@ class TellicoXmlReader @Inject constructor() {
             val separator = if ((declaration?.columns ?: 0) > 1) "\n" else "; "
             val value = values.joinToString(separator)
             if (value.isEmpty()) continue
-            if (name in TellicoFields.KNOWN) {
+            if (name in known) {
                 fields[name] = value
             } else {
                 extra[name] = ExtraField(title = declaration?.title ?: name, value = value)
             }
         }
-        return TellicoRecord(fields, extra)
+        return TellicoRecord(fields, extra, collectionType)
     }
 
     /** Имя поля и его значения: контейнер многозначного поля, дата или обычный текст. */
@@ -110,10 +132,26 @@ class TellicoXmlReader @Inject constructor() {
             // Контейнер: все дети — одноимённые элементы, имя контейнера — имя поля + `s`.
             val isContainer = children.all { it.name == childName } && name == childName + "s"
             if (isContainer) {
-                return childName to children.map { it.textContent().trim() }.filter { it.isNotEmpty() }
+                return childName to children.map { it.cellValues() }.filter { it.isNotEmpty() }
             }
         }
         return name to listOf(textContent().trim())
+    }
+
+    /**
+     * Значение одного элемента контейнера.
+     *
+     * Табличное поле Tellico записано «по столбцам»:
+     * `<cast><column>Актёр</column><column>Роль</column></cast>`. Текст элемента
+     * через [textContent] склеил бы колонки **вместе с whitespace** между
+     * ними — перевод строки попал бы в значение, а граница «актёр / роль»
+     * потерялась бы. Поэтому колонки соединяем через `::` — так же, как их
+     * читает импортёр.
+     */
+    private fun XmlNode.cellValues(): String {
+        val columns = children.filter { it.name == "column" }
+        if (columns.isEmpty()) return textContent().trim()
+        return columns.joinToString("::") { it.textContent().trim() }
     }
 
     /** Дата Tellico → ISO: `yyyy`, `yyyy-MM` или `yyyy-MM-dd` (месяц и день с нулём). */

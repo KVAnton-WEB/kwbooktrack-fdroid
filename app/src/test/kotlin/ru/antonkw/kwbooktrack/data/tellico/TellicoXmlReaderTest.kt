@@ -90,11 +90,13 @@ class TellicoXmlReaderTest {
     }
 
     @Test
-    fun nonBookCollectionIsRejected() {
+    fun unsupportedCollectionIsRejected() {
+        // type=1 — библиография: у неё год называется `year`, а не `pub_year`,
+        // и без разбора она превратилась бы в книги.
         val xml = """
             <?xml version="1.0" encoding="UTF-8"?>
             <tellico xmlns="http://periapsis.org/tellico/">
-              <collection title="Статьи" type="3">
+              <collection title="Статьи" type="1">
                 <entry id="1"><title>Статья</title></entry>
               </collection>
             </tellico>
@@ -103,7 +105,85 @@ class TellicoXmlReaderTest {
         val error = runCatching { reader.read(xml.toByteArray()) }.exceptionOrNull()
 
         assertThat(error).isInstanceOf(IllegalStateException::class.java)
-        assertThat(error).hasMessageThat().contains("Это не коллекция книг")
+        assertThat(error).hasMessageThat().contains("Это не коллекция книг и не фильмов")
+    }
+
+    @Test
+    fun readsMovieCollection() {
+        val record = record(
+            fields = "<title>Малхолланд Драйв</title><running-time>147</running-time>",
+            collectionType = 3,
+        )
+
+        assertThat(record.collectionType).isEqualTo(3)
+        assertThat(record.fields["title"]).isEqualTo("Малхолланд Драйв")
+        assertThat(record.fields["running-time"]).isEqualTo("147")
+    }
+
+    @Test
+    fun readsBothCollections() {
+        val xml = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <tellico xmlns="http://periapsis.org/tellico/">
+              <collection title="Мои книги" type="2">
+                <entry id="1"><title>Дюна</title></entry>
+              </collection>
+              <collection title="Мои фильмы" type="3">
+                <entry id="2"><title>Малхолланд Драйв</title></entry>
+              </collection>
+            </tellico>
+        """.trimIndent()
+
+        val records = reader.read(xml.toByteArray())
+
+        assertThat(records).hasSize(2)
+        assertThat(records.map { it.collectionType }).containsExactly(2, 3).inOrder()
+        assertThat(records.map { it.fields["title"] }).containsExactly("Дюна", "Малхолланд Драйв").inOrder()
+    }
+
+    @Test
+    fun skipsUnsupportedCollectionBesideSupportedOne() {
+        val xml = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <tellico xmlns="http://periapsis.org/tellico/">
+              <collection title="Статьи" type="1">
+                <entry id="1"><title>Статья</title></entry>
+              </collection>
+              <collection title="Мои книги" type="2">
+                <entry id="2"><title>Дюна</title></entry>
+              </collection>
+            </tellico>
+        """.trimIndent()
+
+        val records = reader.read(xml.toByteArray())
+
+        assertThat(records).hasSize(1)
+        assertThat(records.single().fields["title"]).isEqualTo("Дюна")
+    }
+
+    @Test
+    fun castColumnsJoinedWithDoubleColon() {
+        // Реальная коллекция фильмов пишет актёров «по столбцам»: актёр и
+        // роль отдельными <column>. Склеивать их без разделителя нельзя —
+        // теряется граница ячеек.
+        val record = record(
+            fields = "<casts><cast><column>Уоттс, Наоми</column><column>Роль</column></cast></casts>",
+            declarations = "<field name=\"cast\" type=\"8\"><prop name=\"columns\">2</prop></field>",
+            collectionType = 3,
+        )
+
+        assertThat(record.fields["cast"]).isEqualTo("Уоттс, Наоми::Роль")
+    }
+
+    @Test
+    fun castWithSingleColumnKeepsOnlyActor() {
+        val record = record(
+            fields = "<casts><cast><column>Уоттс, Наоми</column></cast></casts>",
+            declarations = "<field name=\"cast\" type=\"8\"><prop name=\"columns\">2</prop></field>",
+            collectionType = 3,
+        )
+
+        assertThat(record.fields["cast"]).isEqualTo("Уоттс, Наоми")
     }
 
     @Test
@@ -197,11 +277,12 @@ class TellicoXmlReaderTest {
         }
     }
 
-    /** Одна запись коллекции книг: [fields] — тело `<entry>`, [declarations] — объявления `<field>`. */
-    private fun record(fields: String, declarations: String = ""): TellicoRecord {
+    /** Одна запись коллекции: [fields] — тело `<entry>`, [declarations] — объявления `<field>`. */
+    private fun record(fields: String, declarations: String = "", collectionType: Int = 2): TellicoRecord {
         val xml = TEMPLATE
             .replace("{declarations}", declarations)
             .replace("{fields}", fields)
+            .replace("{type}", collectionType.toString())
         return reader.read(xml.toByteArray()).single()
     }
 
@@ -209,7 +290,7 @@ class TellicoXmlReaderTest {
         val TEMPLATE = """
             <?xml version="1.0" encoding="UTF-8"?>
             <tellico xmlns="http://periapsis.org/tellico/">
-              <collection title="Мои книги" type="2">
+              <collection title="Мои книги" type="{type}">
                 <fields>{declarations}</fields>
                 <entry id="1">{fields}</entry>
               </collection>
