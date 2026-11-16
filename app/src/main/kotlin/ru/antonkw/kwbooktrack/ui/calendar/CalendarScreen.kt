@@ -78,7 +78,14 @@ fun CalendarScreen(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.calendar_title)) },
+                title = {
+                    Text(
+                        stringResource(
+                            if (mediaType == MediaType.MOVIES) R.string.calendar_title_movies
+                            else R.string.calendar_title,
+                        ),
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
@@ -91,7 +98,10 @@ fun CalendarScreen(
             modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
         ) {
             Text(
-                text = stringResource(R.string.calendar_prompt),
+                text = stringResource(
+                    if (mediaType == MediaType.MOVIES) R.string.calendar_prompt_movies
+                    else R.string.calendar_prompt,
+                ),
                 style = MaterialTheme.typography.bodyMedium,
             )
 

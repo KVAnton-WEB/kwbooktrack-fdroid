@@ -317,6 +317,8 @@
 
     <!-- Calendar -->
     <string name="calendar_title">Календарь чтения</string>
+    <string name="calendar_title_movies">Календарь просмотров</string>
+    <string name="calendar_prompt_movies">Сколько фильмов вы посмотрели в этом месяце?</string>
 
     <!-- Statistics -->
     <string name="stats_title">Статистика</string>

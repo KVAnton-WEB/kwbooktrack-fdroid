@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Close
@@ -560,11 +561,22 @@ private fun MediaTypeDropdown(
         expanded = expanded,
         onExpandedChange = { expanded = !expanded },
     ) {
-        Text(
-            text = stringResource(selected.mediaLabelRes),
-            style = MaterialTheme.typography.titleLarge,
+        // Стрелка — как у фильтра «Тип»: без неё заголовок выглядит
+        // обычным текстом, и про переключение не догадаться.
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.menuAnchor(),
-        )
+        ) {
+            Text(
+                text = stringResource(selected.mediaLabelRes),
+                style = MaterialTheme.typography.titleLarge,
+            )
+            Icon(
+                imageVector = Icons.Filled.ArrowDropDown,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },

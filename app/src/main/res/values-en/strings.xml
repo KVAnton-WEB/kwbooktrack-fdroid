@@ -314,6 +314,8 @@
 
     <!-- Calendar -->
     <string name="calendar_title">Reading calendar</string>
+    <string name="calendar_title_movies">Watching calendar</string>
+    <string name="calendar_prompt_movies">How many movies did you watch this month?</string>
 
     <!-- Statistics -->
     <string name="stats_title">Statistics</string>
