@@ -3,6 +3,7 @@ package ru.antonkw.kwbooktrack.data.importer
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Before
@@ -22,6 +23,7 @@ import ru.antonkw.kwbooktrack.data.repository.TagRepository
 import ru.antonkw.kwbooktrack.data.snapshot.SnapshotApplier
 import ru.antonkw.kwbooktrack.data.storage.CoverTranscoder
 import ru.antonkw.kwbooktrack.data.tellico.TellicoCsvReader
+import ru.antonkw.kwbooktrack.data.tellico.TellicoFields
 import ru.antonkw.kwbooktrack.data.tellico.TellicoRecord
 import java.io.File
 import java.nio.file.Files
@@ -48,12 +50,14 @@ class ImportTellicoUseCaseTest {
         useCase = ImportTellicoUseCase(
             csvReader = TellicoCsvReader(),
             mapper = TellicoBookMapper(),
+            movieMapper = TellicoMovieMapper(),
             applier = applierFor(bookRepository, photoRepository),
         )
         // Тот же импорт, но книга «отменяется» на чтении.
         cancellingUseCase = ImportTellicoUseCase(
             csvReader = TellicoCsvReader(),
             mapper = TellicoBookMapper(),
+            movieMapper = TellicoMovieMapper(),
             applier = applierFor(
                 BookRepository(
                     CancellingBookDao(db.bookDao()),
@@ -134,6 +138,58 @@ class ImportTellicoUseCaseTest {
 
         assertThat(error).isInstanceOf(CancellationException::class.java)
     }
+
+    @Test
+    fun importsMoviesFromMovieCollection() = runTest {
+        val result = useCase(
+            listOf(movieRecord("Малхолланд Драйв")),
+            ImportTellicoOptions(assetRoot = staging, coverOutputDir = outputDir),
+        )
+
+        assertThat(result.imported).isEqualTo(1)
+        assertThat(result.movies).isEqualTo(1)
+        val movies = db.movieDao().observeAll().first()
+        assertThat(movies).hasSize(1)
+        assertThat(movies.single().title).isEqualTo("Малхолланд Драйв")
+        // Запись фильма не должна попасть в книги.
+        assertThat(db.bookDao().observeAll().first()).isEmpty()
+    }
+
+    @Test
+    fun countsBooksAndMoviesSeparately() = runTest {
+        val result = useCase(
+            listOf(recordWithCover(), movieRecord("Малхолланд Драйв")),
+            ImportTellicoOptions(assetRoot = staging, coverOutputDir = outputDir),
+        )
+
+        assertThat(result.imported).isEqualTo(2)
+        assertThat(result.movies).isEqualTo(1)
+    }
+
+    @Test
+    fun skippedMovieDoesNotBreakBookImport() = runTest {
+        // Фильм без названия пропускается, но книга из того же файла
+        // импортируется: одна плохая запись не должна ронять импорт.
+        val result = useCase(
+            listOf(movieRecord(""), recordWithCover()),
+            ImportTellicoOptions(assetRoot = staging, coverOutputDir = outputDir),
+        )
+
+        assertThat(result.imported).isEqualTo(1)
+        assertThat(result.skipped).isEqualTo(1)
+        assertThat(result.movies).isEqualTo(0)
+        assertThat(db.bookDao().observeAll().first()).hasSize(1)
+    }
+
+    private fun movieRecord(title: String): TellicoRecord =
+        TellicoRecord(
+            fields = mapOf(
+                "title" to title,
+                "year" to "1999",
+                "running-time" to "147",
+            ),
+            collectionType = TellicoFields.COLLECTION_MOVIES,
+        )
 
     private fun recordWithCover(cover: String = "abc.webp", title: String = "Дюна"): TellicoRecord =
         TellicoRecord(

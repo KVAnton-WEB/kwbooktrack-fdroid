@@ -54,6 +54,7 @@ import java.util.zip.ZipInputStream
 import javax.xml.parsers.DocumentBuilderFactory
 import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 import ru.antonkw.kwbooktrack.data.repository.MovieRepository
+import ru.antonkw.kwbooktrack.data.importer.TellicoMovieMapper
 
 /**
  * Экспорт библиотеки в `.tc` (zip с `tellico.xml`, обложками и фото) и обратный
@@ -104,6 +105,7 @@ class TellicoTcRoundTripTest {
             importUseCase = ImportTellicoUseCase(
                 csvReader = TellicoCsvReader(),
                 mapper = TellicoBookMapper(),
+                    movieMapper = TellicoMovieMapper(),
                 applier = SnapshotApplier(
                     bookRepository = targetBooks,
                 movieRepository = MovieRepository(targetDb.movieDao(), NoOpCoverStorage, targetPhotos),

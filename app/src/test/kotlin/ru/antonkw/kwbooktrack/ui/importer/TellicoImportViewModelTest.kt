@@ -37,6 +37,7 @@ import java.io.File
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import ru.antonkw.kwbooktrack.data.repository.MovieRepository
+import ru.antonkw.kwbooktrack.data.importer.TellicoMovieMapper
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -71,7 +72,7 @@ class TellicoImportViewModelTest {
             transcoder = CoverTranscoder(),
         )
         useCase = ImportTellicoZipUseCase(
-            importUseCase = ImportTellicoUseCase(TellicoCsvReader(), TellicoBookMapper(), applier),
+            importUseCase = ImportTellicoUseCase(TellicoCsvReader(), TellicoBookMapper(), TellicoMovieMapper(), applier),
             csvReader = TellicoCsvReader(),
             xmlReader = TellicoXmlReader(),
         )

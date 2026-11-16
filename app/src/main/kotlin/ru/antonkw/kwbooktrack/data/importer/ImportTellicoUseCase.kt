@@ -3,9 +3,11 @@ package ru.antonkw.kwbooktrack.data.importer
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import ru.antonkw.kwbooktrack.data.snapshot.ApplyStats
 import ru.antonkw.kwbooktrack.data.snapshot.ImportAssets
 import ru.antonkw.kwbooktrack.data.snapshot.SnapshotApplier
 import ru.antonkw.kwbooktrack.data.tellico.TellicoCsvReader
+import ru.antonkw.kwbooktrack.data.tellico.TellicoFields
 import ru.antonkw.kwbooktrack.data.tellico.TellicoRecord
 import java.io.File
 import java.io.Reader
@@ -28,6 +30,8 @@ data class ImportTellicoResult(
     val coversCopied: Int,
     val notesImported: Int,
     val dryRun: Boolean,
+    /** Сколько из импортированных записей — фильмы. */
+    val movies: Int = 0,
     val errors: List<Throwable> = emptyList(),
     val warnings: List<String> = emptyList(),
 ) {
@@ -52,10 +56,14 @@ data class ImportTellicoOptions(
  *
  * Записи → снимки → [SnapshotApplier]: обложки, заметки, сессии, теги и фото
  * сливает он же, здесь только разбор.
+ *
+ * Тип коллекции решает, кто разбирает запись: `type="2"` — книги, `type="3"` —
+ * фильмы. Остальные типы ридер не отдаёт.
  */
 class ImportTellicoUseCase @Inject constructor(
     private val csvReader: TellicoCsvReader,
     private val mapper: TellicoBookMapper,
+    private val movieMapper: TellicoMovieMapper,
     private val applier: SnapshotApplier,
 ) {
 
@@ -66,34 +74,65 @@ class ImportTellicoUseCase @Inject constructor(
         val assets = ImportAssets(options.assetRoot, options.coverOutputDir)
         var imported = 0
         var skipped = 0
+        var movies = 0
         var coversCopied = 0
         var notesImported = 0
         var coversReferenced = 0
         val errors = mutableListOf<Throwable>()
         for (record in records) {
-            val snapshot = mapper.map(record)
-            if (snapshot == null) {
-                skipped++
-                continue
+            val isMovie = record.collectionType == TellicoFields.COLLECTION_MOVIES
+            val coverPath: String?
+            val stats: ApplyStats
+            if (isMovie) {
+                val snapshot = movieMapper.map(record)
+                if (snapshot == null) {
+                    skipped++
+                    continue
+                }
+                coverPath = snapshot.movie.coverPath
+                if (options.dryRun) {
+                    imported++
+                    movies++
+                    continue
+                }
+                try {
+                    // Файловый I/O апплиера — не на потоке вызывающего.
+                    stats = withContext(Dispatchers.IO) { applier.apply(snapshot, assets) }
+                    imported++
+                    movies++
+                } catch (e: CancellationException) {
+                    // Отмена импорта — не ошибка записи: пробрасываем дальше.
+                    throw e
+                } catch (e: Exception) {
+                    errors += e
+                    skipped++
+                    continue
+                }
+            } else {
+                val snapshot = mapper.map(record)
+                if (snapshot == null) {
+                    skipped++
+                    continue
+                }
+                coverPath = snapshot.book.coverPath
+                if (options.dryRun) {
+                    imported++
+                    continue
+                }
+                try {
+                    stats = withContext(Dispatchers.IO) { applier.apply(snapshot, assets) }
+                    imported++
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    errors += e
+                    skipped++
+                    continue
+                }
             }
-            if (!snapshot.book.coverPath.isNullOrBlank()) coversReferenced++
-            if (options.dryRun) {
-                imported++
-                continue
-            }
-            try {
-                // Файловый I/O апплиера — не на потоке вызывающего.
-                val stats = withContext(Dispatchers.IO) { applier.apply(snapshot, assets) }
-                imported++
-                coversCopied += stats.covers
-                notesImported += stats.notes + stats.sessions + stats.tags + stats.photos
-            } catch (e: CancellationException) {
-                // Отмена импорта — не ошибка записи: пробрасываем дальше.
-                throw e
-            } catch (e: Exception) {
-                errors += e
-                skipped++
-            }
+            if (!coverPath.isNullOrBlank()) coversReferenced++
+            coversCopied += stats.covers
+            notesImported += stats.notes + stats.sessions + stats.tags + stats.photos
         }
         return ImportTellicoResult(
             total = records.size,
@@ -102,6 +141,7 @@ class ImportTellicoUseCase @Inject constructor(
             coversCopied = coversCopied,
             notesImported = notesImported,
             dryRun = options.dryRun,
+            movies = movies,
             errors = errors,
             warnings = warnings(coversReferenced, coversCopied, options.dryRun),
         )
