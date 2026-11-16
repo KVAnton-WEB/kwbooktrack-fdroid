@@ -336,4 +336,38 @@
 
     <!-- Common errors -->
     <string name="error_generic">Something went wrong</string>
+    <string name="media_type_books">Books</string>
+    <string name="media_type_movies">Movies</string>
+    <string name="cd_add_movie">Add movie</string>
+    <string name="search_hint_movies">Search by title, director, actor…</string>
+    <string name="empty_no_matches_movies">No movies match the filter</string>
+    <string name="empty_library_movies">No movies in the library yet</string>
+    <string name="filter_watched">Watched</string>
+    <string name="filter_unwatched">Not watched</string>
+    <string name="movie_duration_label">%1$d min</string>
+    <string name="movie_detail_title">Movie</string>
+    <string name="movie_not_found">Movie not found</string>
+    <string name="movie_field_title">Title</string>
+    <string name="movie_field_original_title">Original title</string>
+    <string name="movie_field_year">Year</string>
+    <string name="movie_field_genre">Genres</string>
+    <string name="movie_field_nationality">Country</string>
+    <string name="movie_field_director">Director</string>
+    <string name="movie_field_cast">Cast</string>
+    <string name="movie_field_duration">Duration</string>
+    <string name="movie_field_duration_min">Duration, min</string>
+    <string name="movie_field_watched_at">Watched on</string>
+    <string name="movie_field_url">Link</string>
+    <string name="movie_field_plot">Plot</string>
+    <string name="movie_field_review">Review</string>
+    <string name="movie_field_downloaded">Downloaded</string>
+    <string name="movie_delete_title">Delete movie?</string>
+    <string name="movie_delete_message">The movie and its notes, tags and photos will be deleted.</string>
+    <string name="movie_edit_title">Edit movie</string>
+    <string name="movie_add_title">New movie</string>
+    <string name="label_tags">Tags</string>
+    <string name="notes_section">Notes and quotes</string>
+    <string name="photos_section">Photos</string>
+    <string name="action_remove_cover">Remove cover</string>
+    <string name="label_rating">Rating</string>
 </resources>

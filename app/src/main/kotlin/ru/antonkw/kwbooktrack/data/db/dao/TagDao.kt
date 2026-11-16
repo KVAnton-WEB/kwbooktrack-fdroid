@@ -30,6 +30,13 @@ interface TagDao {
     )
     suspend fun tagsForAllMedia(): List<MediaTagName>
 
+    /** Теги одного владельца — книга или фильм. */
+    @Query(
+        "SELECT t.name AS name FROM tags t JOIN media_tags mt ON mt.tag_id = t.id " +
+            "WHERE mt.media_id = :mediaId AND mt.media_type = :mediaType ORDER BY t.name",
+    )
+    suspend fun tagsOfMedia(mediaId: Long, mediaType: MediaType): List<String>
+
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insert(tag: TagEntity): Long
 

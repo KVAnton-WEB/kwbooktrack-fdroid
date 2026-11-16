@@ -55,7 +55,7 @@ class NoteEditorViewModelTest {
 
     private fun newVm(bookId: Long = 1L, noteId: Long = 0L) = NoteEditorViewModel(
         androidx.lifecycle.SavedStateHandle(
-            mapOf("bookId" to bookId, "noteId" to noteId).filterValues { it != 0L || it == bookId },
+            mapOf("mediaId" to bookId, "noteId" to noteId).filterValues { it != 0L || it == bookId },
         ),
         noteRepository,
         photoRepository,
@@ -123,7 +123,7 @@ class NoteEditorViewModelTest {
         // рецензию было не сохранить вовсе.
         val bookId = insertBook()
         val vm = NoteEditorViewModel(
-            androidx.lifecycle.SavedStateHandle(mapOf("bookId" to bookId, "kind" to "REVIEW")),
+            androidx.lifecycle.SavedStateHandle(mapOf("mediaId" to bookId, "kind" to "REVIEW")),
             noteRepository,
             photoRepository,
             ApplicationProvider.getApplicationContext(),

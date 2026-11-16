@@ -29,6 +29,10 @@ interface MovieDao {
     @Query("SELECT * FROM movies WHERE id = :id LIMIT 1")
     suspend fun findById(id: Long): MovieEntity?
 
+    /** Фильм по id потоком — для экрана карточки. */
+    @Query("SELECT * FROM movies WHERE id = :id LIMIT 1")
+    fun observeById(id: Long): Flow<MovieEntity?>
+
     /**
      * Ключ слияния при импорте — название и год: у фильма нет ISBN.
      *

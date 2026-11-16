@@ -24,6 +24,7 @@ import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
 import ru.antonkw.kwbooktrack.data.db.entity.NoteEntity
 import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
+import ru.antonkw.kwbooktrack.data.repository.MovieRepository
 import ru.antonkw.kwbooktrack.data.repository.NoteRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
 import ru.antonkw.kwbooktrack.data.db.entity.MediaType
@@ -34,6 +35,7 @@ class NotesListViewModelTest {
     private lateinit var db: KwBooktrackDatabase
     private lateinit var bookRepository: BookRepository
     private lateinit var noteRepository: NoteRepository
+    private lateinit var movieRepository: MovieRepository
     private val dispatcher = StandardTestDispatcher()
 
     @Before
@@ -48,6 +50,7 @@ class NotesListViewModelTest {
             photoRepository,
         )
         noteRepository = NoteRepository(db.noteDao(), NoOpPhotoStorage)
+        movieRepository = MovieRepository(db.movieDao(), NoOpCoverStorage, photoRepository)
     }
 
     @After
@@ -59,7 +62,7 @@ class NotesListViewModelTest {
 
     @Test
     fun emptyDbReportsNoNotes() = runTest(dispatcher) {
-        val vm = NotesListViewModel(noteRepository, bookRepository)
+        val vm = NotesListViewModel(noteRepository, bookRepository, movieRepository)
         TestViewModels.track(vm)
         advanceUntilIdle()
         val state = vm.uiState.first { it is NotesListUiState.Loaded } as NotesListUiState.Loaded
@@ -81,14 +84,14 @@ class NotesListViewModelTest {
             NoteEntity(mediaId = bookId, mediaType = MediaType.BOOKS, bodyMd = "Review", kind = NoteKind.REVIEW, createdAt = 0L, updatedAt = 0L),
         )
 
-        val vm = NotesListViewModel(noteRepository, bookRepository)
+        val vm = NotesListViewModel(noteRepository, bookRepository, movieRepository)
         TestViewModels.track(vm)
         advanceUntilIdle()
         val state = vm.uiState.first { it is NotesListUiState.Loaded } as NotesListUiState.Loaded
         // Review is filtered out, only Note + Quote are listed.
         assertThat(state.items).hasSize(2)
         assertThat(state.items.map { it.note.kind }).containsExactly(NoteKind.NOTE, NoteKind.QUOTE)
-        assertThat(state.items.first().bookTitle).isEqualTo("Dune")
+        assertThat(state.items.first().mediaTitle).isEqualTo("Dune")
     }
 
     @Test
@@ -103,7 +106,7 @@ class NotesListViewModelTest {
             NoteEntity(mediaId = bookId, mediaType = MediaType.BOOKS, bodyMd = "to be cascaded", kind = NoteKind.NOTE, createdAt = 0L, updatedAt = 0L),
         )
 
-        val vmBefore = NotesListViewModel(noteRepository, bookRepository)
+        val vmBefore = NotesListViewModel(noteRepository, bookRepository, movieRepository)
         TestViewModels.track(vmBefore)
         advanceUntilIdle()
         val before = vmBefore.uiState.first { it is NotesListUiState.Loaded } as NotesListUiState.Loaded
@@ -111,7 +114,7 @@ class NotesListViewModelTest {
 
         bookRepository.deleteById(bookId)
 
-        val vmAfter = NotesListViewModel(noteRepository, bookRepository)
+        val vmAfter = NotesListViewModel(noteRepository, bookRepository, movieRepository)
         TestViewModels.track(vmAfter)
         advanceUntilIdle()
         val after = vmAfter.uiState.first { it is NotesListUiState.Loaded } as NotesListUiState.Loaded

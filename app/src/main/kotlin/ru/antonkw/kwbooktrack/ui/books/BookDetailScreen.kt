@@ -76,6 +76,7 @@ import ru.antonkw.kwbooktrack.data.time.toLocalDate
 import ru.antonkw.kwbooktrack.data.time.toLocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import ru.antonkw.kwbooktrack.ui.common.CoverImage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -199,7 +200,7 @@ fun BookDetailScreen(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
-                            BookCoverImage(
+                            CoverImage(
                                 path = coverPath,
                                 sizeDp = 96,
                                 modifier = Modifier.padding(end = 4.dp),

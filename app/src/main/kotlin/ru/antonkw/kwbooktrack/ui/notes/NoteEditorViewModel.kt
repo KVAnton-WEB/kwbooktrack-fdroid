@@ -45,14 +45,13 @@ class NoteEditorViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val noteId: Long = savedStateHandle.get<Long>(KEY_NOTE_ID) ?: 0L
-    // For new notes (noteId == 0L) the owner comes from the nav route;
-    // for edits the route only carries noteId, so we resolve the owner from
-    // the existing NoteEntity to avoid detaching the note from its book on save.
-    private var mediaId: Long = savedStateHandle.get<Long>(KEY_BOOK_ID) ?: -1L
-
-    // Тип владельца. Пока маршрут уносит только id книги, новые заметки
-    // принадлежат книге; для правки тип берётся из самой заметки.
-    private var mediaType: MediaType = MediaType.BOOKS
+    // Владелец заметки — книга или фильм. У новой заметки он приезжает в
+    // маршруте; у правки маршрут несёт только id заметки, и владельца мы
+    // берём из самой заметки — иначе она отвязалась бы от своей книги.
+    private var mediaId: Long = savedStateHandle.get<Long>(KEY_MEDIA_ID) ?: -1L
+    private var mediaType: MediaType = savedStateHandle.get<String>(KEY_MEDIA_TYPE)
+        ?.let { runCatching { MediaType.valueOf(it) }.getOrNull() }
+        ?: MediaType.BOOKS
 
     // Pre-selected note kind from the nav route (e.g. REVIEW for the
     // "Write review" entry point). Edits always keep the existing kind —
@@ -178,7 +177,8 @@ class NoteEditorViewModel @Inject constructor(
     }
 
     companion object {
-        const val KEY_BOOK_ID = "bookId"
+        const val KEY_MEDIA_ID = "mediaId"
+        const val KEY_MEDIA_TYPE = "mediaType"
         const val KEY_NOTE_ID = "noteId"
         const val KEY_KIND = "kind"
     }

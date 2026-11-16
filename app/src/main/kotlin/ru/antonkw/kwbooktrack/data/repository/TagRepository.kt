@@ -27,4 +27,8 @@ class TagRepository @Inject constructor(
 
     suspend fun clearForMedia(mediaId: Long, mediaType: MediaType): Int =
         tagDao.clearCrossRefsForMedia(mediaId, mediaType)
+
+    /** Теги владельца — книга или фильм. */
+    suspend fun tagsOfMedia(mediaId: Long, mediaType: MediaType): List<String> =
+        tagDao.tagsOfMedia(mediaId, mediaType)
 }

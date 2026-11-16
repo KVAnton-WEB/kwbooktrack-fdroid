@@ -154,14 +154,14 @@ private fun NoteListRow(item: NoteListItem, onClick: () -> Unit) {
                     .padding(start = 12.dp),
             ) {
                 Text(
-                    text = item.bookTitle,
+                    text = item.mediaTitle,
                     style = MaterialTheme.typography.titleSmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (item.author.isNotBlank()) {
+                if (item.mediaSubtitle.isNotBlank()) {
                     Text(
-                        text = item.author,
+                        text = item.mediaSubtitle,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,

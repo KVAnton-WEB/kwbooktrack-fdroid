@@ -70,10 +70,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 import ru.antonkw.kwbooktrack.data.db.entity.NoteEntity
 import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
 import ru.antonkw.kwbooktrack.data.db.entity.PhotoEntity
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
+import ru.antonkw.kwbooktrack.data.repository.MovieRepository
 import ru.antonkw.kwbooktrack.data.repository.NoteRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
 import ru.antonkw.kwbooktrack.data.time.toLocalDateTime
@@ -87,8 +89,8 @@ sealed interface NoteDetailUiState {
     data object Loading : NoteDetailUiState
     data class Loaded(
         val note: NoteEntity,
-        val bookTitle: String,
-        val bookAuthor: String,
+        val mediaTitle: String,
+        val mediaSubtitle: String,
         val coverPath: String?,
         val photos: List<PhotoEntity>,
     ) : NoteDetailUiState
@@ -100,6 +102,7 @@ class NoteDetailViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val noteRepository: NoteRepository,
     private val bookRepository: BookRepository,
+    private val movieRepository: MovieRepository,
     private val photoRepository: PhotoRepository,
 ) : ViewModel() {
     private val _state = MutableStateFlow<NoteDetailUiState>(NoteDetailUiState.Loading)
@@ -120,13 +123,32 @@ class NoteDetailViewModel @Inject constructor(
                 return@launch
             }
             val deletedFallback = context.getString(R.string.about_book_deleted_fallback)
-            bookRepository.observeAll().combine(photoRepository.observeByNote(noteId)) { books, photos ->
-                val book = books.firstOrNull { it.id == note.mediaId }
+            combine(
+                bookRepository.observeAll(),
+                movieRepository.observeAll(),
+                photoRepository.observeByNote(noteId),
+            ) { books, movies, photos ->
+                // Владелец — книга или фильм: id у них считаются независимо,
+                // поэтому ищем по паре (id, тип).
+                val title: String
+                val subtitle: String
+                val cover: String?
+                if (note.mediaType == MediaType.MOVIES) {
+                    val movie = movies.firstOrNull { it.id == note.mediaId }
+                    title = movie?.title ?: deletedFallback
+                    subtitle = movie?.director.orEmpty()
+                    cover = movie?.coverPath
+                } else {
+                    val book = books.firstOrNull { it.id == note.mediaId }
+                    title = book?.title ?: deletedFallback
+                    subtitle = book?.author.orEmpty()
+                    cover = book?.coverPath
+                }
                 NoteDetailUiState.Loaded(
                     note = note,
-                    bookTitle = book?.title ?: deletedFallback,
-                    bookAuthor = book?.author.orEmpty(),
-                    coverPath = book?.coverPath,
+                    mediaTitle = title,
+                    mediaSubtitle = subtitle,
+                    coverPath = cover,
                     photos = photos,
                 )
             }.collect { _state.value = it }
@@ -148,7 +170,7 @@ class NoteDetailViewModel @Inject constructor(
 fun NoteDetailScreen(
     noteId: Long,
     onBack: () -> Unit,
-    onOpenBook: (Long) -> Unit,
+    onOpenMedia: (MediaType, Long) -> Unit,
     onEditNote: (Long) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: NoteDetailViewModel = hiltViewModel(),
@@ -220,7 +242,7 @@ fun NoteDetailScreen(
                         IconButton(onClick = {
                             val send = Intent(Intent.ACTION_SEND).apply {
                                 type = "text/plain"
-                                putExtra(Intent.EXTRA_SUBJECT, loaded.bookTitle)
+                                putExtra(Intent.EXTRA_SUBJECT, loaded.mediaTitle)
                                 putExtra(Intent.EXTRA_TEXT, buildShareText(loaded, pageLine))
                             }
                             context.startActivity(Intent.createChooser(send, context.getString(R.string.action_share)))
@@ -252,14 +274,14 @@ fun NoteDetailScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center,
                 ) { Text(stringResource(R.string.note_not_found)) }
-                is NoteDetailUiState.Loaded -> NoteDetailContent(s, onOpenBook)
+                is NoteDetailUiState.Loaded -> NoteDetailContent(s, onOpenMedia)
             }
         }
     }
 }
 
 @Composable
-private fun NoteDetailContent(state: NoteDetailUiState.Loaded, onOpenBook: (Long) -> Unit) {
+private fun NoteDetailContent(state: NoteDetailUiState.Loaded, onOpenMedia: (MediaType, Long) -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -270,7 +292,7 @@ private fun NoteDetailContent(state: NoteDetailUiState.Loaded, onOpenBook: (Long
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable { onOpenBook(state.note.mediaId) },
+                .clickable { onOpenMedia(state.note.mediaType, state.note.mediaId) },
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             // AsyncImage falls back to the error branch when the file is missing;
@@ -278,7 +300,7 @@ private fun NoteDetailContent(state: NoteDetailUiState.Loaded, onOpenBook: (Long
             if (!state.coverPath.isNullOrBlank()) {
                 AsyncImage(
                     model = java.io.File(state.coverPath),
-                    contentDescription = state.bookTitle,
+                    contentDescription = state.mediaTitle,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.size(width = 96.dp, height = 144.dp),
                 )
@@ -294,12 +316,12 @@ private fun NoteDetailContent(state: NoteDetailUiState.Loaded, onOpenBook: (Long
                 )
             }
             Text(
-                text = state.bookTitle,
+                text = state.mediaTitle,
                 style = MaterialTheme.typography.titleMedium,
             )
-            if (state.bookAuthor.isNotBlank()) {
+            if (state.mediaSubtitle.isNotBlank()) {
                 Text(
-                    text = state.bookAuthor,
+                    text = state.mediaSubtitle,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -371,10 +393,10 @@ private fun NoteDetailContent(state: NoteDetailUiState.Loaded, onOpenBook: (Long
 
 private fun buildShareText(state: NoteDetailUiState.Loaded, pageLine: String?): String {
     val header = buildString {
-        append(state.bookTitle)
-        if (state.bookAuthor.isNotBlank()) {
+        append(state.mediaTitle)
+        if (state.mediaSubtitle.isNotBlank()) {
             append(" — ")
-            append(state.bookAuthor)
+            append(state.mediaSubtitle)
         }
     }
     val body = state.note.bodyMd.trim()

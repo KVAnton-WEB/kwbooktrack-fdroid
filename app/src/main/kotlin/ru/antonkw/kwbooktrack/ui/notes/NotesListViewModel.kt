@@ -14,16 +14,20 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
+import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 import ru.antonkw.kwbooktrack.data.db.entity.NoteEntity
 import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
+import ru.antonkw.kwbooktrack.data.repository.MovieRepository
 import ru.antonkw.kwbooktrack.data.repository.NoteRepository
 import javax.inject.Inject
 
 data class NoteListItem(
     val note: NoteEntity,
-    val bookTitle: String,
-    val author: String,
+    /** Название владельца заметки — книги или фильма. */
+    val mediaTitle: String,
+    /** Подпись владельца — автор книги или режиссёр фильма. */
+    val mediaSubtitle: String,
 )
 
 sealed interface NotesListUiState {
@@ -36,10 +40,12 @@ sealed interface NotesListUiState {
 class NotesListViewModel @Inject constructor(
     private val noteRepository: NoteRepository,
     private val bookRepository: BookRepository,
+    private val movieRepository: MovieRepository,
 ) : ViewModel() {
 
     private val query = MutableStateFlow("")
     private val booksFlow = bookRepository.observeAll()
+    private val moviesFlow = movieRepository.observeAll()
 
     // bookRepository.observeAll() hoisted out of the per-keystroke flow so a
     // search box update doesn't tear down + recreate the Room subscription.
@@ -50,16 +56,29 @@ class NotesListViewModel @Inject constructor(
             if (q.isBlank()) noteRepository.observeAll() else noteRepository.search(q.trim())
         }
 
-    val uiState: StateFlow<NotesListUiState> = combine(notesFlow, booksFlow) { notes, books ->
+    val uiState: StateFlow<NotesListUiState> = combine(notesFlow, booksFlow, moviesFlow) { notes, books, movies ->
         val booksById = books.associateBy { it.id }
+        val moviesById = movies.associateBy { it.id }
         val items = notes
             .filter { it.kind != NoteKind.REVIEW }
             .map { note ->
-                val book = booksById[note.mediaId]
+                // Владелец — книга или фильм: id у них считаются независимо,
+                // поэтому ищет по паре (id, тип).
+                val title: String
+                val subtitle: String
+                if (note.mediaType == MediaType.MOVIES) {
+                    val movie = moviesById[note.mediaId]
+                    title = movie?.title ?: "(фильм удалён)"
+                    subtitle = movie?.director.orEmpty()
+                } else {
+                    val book = booksById[note.mediaId]
+                    title = book?.title ?: "(книга удалена)"
+                    subtitle = book?.author.orEmpty()
+                }
                 NoteListItem(
                     note = note,
-                    bookTitle = book?.title ?: "(книга удалена)",
-                    author = book?.author.orEmpty(),
+                    mediaTitle = title,
+                    mediaSubtitle = subtitle,
                 )
             }
         NotesListUiState.Loaded(items) as NotesListUiState

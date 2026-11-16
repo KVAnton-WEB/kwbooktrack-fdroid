@@ -58,6 +58,9 @@ class MovieRepository @Inject constructor(
 
     suspend fun findById(id: Long): MovieEntity? = movieDao.findById(id)
 
+    /** Фильм по id потоком — для экрана карточки. */
+    fun observeById(id: Long): Flow<MovieEntity?> = movieDao.observeById(id)
+
     suspend fun insert(movie: MovieEntity): Long {
         val now = System.currentTimeMillis()
         val withTimestamps = movie.copy(

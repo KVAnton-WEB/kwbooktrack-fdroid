@@ -1,4 +1,4 @@
-package ru.antonkw.kwbooktrack.ui.books
+package ru.antonkw.kwbooktrack.ui.library
 
 import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -72,7 +72,15 @@ import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import ru.antonkw.kwbooktrack.R
 import ru.antonkw.kwbooktrack.data.time.toLocalDate
+import ru.antonkw.kwbooktrack.ui.common.CoverImage
+import ru.antonkw.kwbooktrack.ui.common.FilterDropdown
 import ru.antonkw.kwbooktrack.ui.common.MonthYearPickerDialog
+import ru.antonkw.kwbooktrack.ui.common.PeriodOption
+import ru.antonkw.kwbooktrack.ui.common.PeriodOptions
+import ru.antonkw.kwbooktrack.ui.common.periodText
+import ru.antonkw.kwbooktrack.ui.common.mediaLabelRes
+import ru.antonkw.kwbooktrack.data.db.entity.MediaType
+import ru.antonkw.kwbooktrack.data.db.entity.MovieEntity
 import ru.antonkw.kwbooktrack.ui.common.rememberScrollbarController
 import ru.antonkw.kwbooktrack.ui.common.scrollbarGestures
 import ru.antonkw.kwbooktrack.ui.common.labelRes
@@ -82,20 +90,22 @@ import java.time.YearMonth
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun BookListScreen(
-    onBookClick: (Long) -> Unit = {},
+fun LibraryScreen(
+    onMediaClick: (MediaType, Long) -> Unit = { _, _ -> },
     onOpenStats: () -> Unit = {},
-    onAddBook: () -> Unit = {},
+    onAddMedia: (MediaType) -> Unit = {},
     onOpenCalendar: () -> Unit = {},
     onOpenNotes: () -> Unit = {},
     onOpenAbout: () -> Unit = {},
     modifier: Modifier = Modifier,
-    viewModel: BookListViewModel = hiltViewModel(),
+    viewModel: LibraryViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val query by viewModel.currentQuery.collectAsStateWithLifecycle()
     val isGrid by viewModel.currentLayout.collectAsStateWithLifecycle()
-    val filterType by viewModel.currentFilterType.collectAsStateWithLifecycle()
+    val mediaType by viewModel.currentMediaType.collectAsStateWithLifecycle()
+    val bookFilter by viewModel.currentBookFilter.collectAsStateWithLifecycle()
+    val movieFilter by viewModel.currentMovieFilter.collectAsStateWithLifecycle()
     val period by viewModel.currentPeriod.collectAsStateWithLifecycle()
     val filter by viewModel.currentFilter.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -110,13 +120,29 @@ fun BookListScreen(
     }
 
     val scanPrompt = stringResource(R.string.scan_prompt)
-    val filterOptions = BookFilterType.entries.map { stringResource(it.labelRes) }
+    // Набор вариантов фильтра «Тип» — свой для каждого типа носителя.
+    val isMovies = mediaType == MediaType.MOVIES
+    val filterOptions = if (isMovies) {
+        MovieFilterType.entries.map { stringResource(it.labelRes) }
+    } else {
+        BookFilterType.entries.map { stringResource(it.labelRes) }
+    }
+    val selectedFilterLabel = if (isMovies) {
+        stringResource(movieFilter.labelRes)
+    } else {
+        stringResource(bookFilter.labelRes)
+    }
 
     Scaffold(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.book_list_title)) },
+                title = {
+                    MediaTypeDropdown(
+                        selected = mediaType,
+                        onSelected = viewModel::setMediaType,
+                    )
+                },
                 actions = {
                     IconButton(onClick = onOpenCalendar) {
                         Icon(Icons.Filled.CalendarMonth, contentDescription = stringResource(R.string.cd_calendar))
@@ -141,8 +167,13 @@ fun BookListScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = onAddBook) {
-                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.cd_add_book))
+            FloatingActionButton(onClick = { onAddMedia(mediaType) }) {
+                Icon(
+                    Icons.Filled.Add,
+                    contentDescription = stringResource(
+                        if (isMovies) R.string.cd_add_movie else R.string.cd_add_book,
+                    ),
+                )
             }
         },
     ) { padding ->
@@ -161,20 +192,32 @@ fun BookListScreen(
                                 Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.cd_clear_query))
                             }
                         }
-                        IconButton(onClick = {
-                            val act = context as? Activity ?: return@IconButton
-                            val options = ScanOptions().apply {
-                                setDesiredBarcodeFormats(ScanOptions.PRODUCT_CODE_TYPES)
-                                setPrompt(scanPrompt)
-                                setBeepEnabled(false)
+                        // Сканер ISBN — только для книг: у фильма ISBN нет.
+                        if (!isMovies) {
+                            IconButton(onClick = {
+                                val act = context as? Activity ?: return@IconButton
+                                val options = ScanOptions().apply {
+                                    setDesiredBarcodeFormats(ScanOptions.PRODUCT_CODE_TYPES)
+                                    setPrompt(scanPrompt)
+                                    setBeepEnabled(false)
+                                }
+                                scanLauncher.launch(options)
+                            }) {
+                                Icon(
+                                    Icons.Filled.QrCodeScanner,
+                                    contentDescription = stringResource(R.string.cd_scan_isbn),
+                                )
                             }
-                            scanLauncher.launch(options)
-                        }) {
-                            Icon(Icons.Filled.QrCodeScanner, contentDescription = stringResource(R.string.cd_scan_isbn))
                         }
                     }
                 },
-                placeholder = { Text(stringResource(R.string.search_hint)) },
+                placeholder = {
+                    Text(
+                        stringResource(
+                            if (isMovies) R.string.search_hint_movies else R.string.search_hint,
+                        ),
+                    )
+                },
                 singleLine = true,
             )
 
@@ -208,9 +251,15 @@ fun BookListScreen(
                 )
                 FilterDropdown(
                     label = stringResource(R.string.label_type),
-                    selectedLabel = stringResource(filterType.labelRes),
+                    selectedLabel = selectedFilterLabel,
                     options = filterOptions,
-                    onSelected = { idx -> viewModel.setFilterType(BookFilterType.entries[idx]) },
+                    onSelected = { idx ->
+                        if (isMovies) {
+                            viewModel.setMovieFilter(MovieFilterType.entries[idx])
+                        } else {
+                            viewModel.setBookFilter(BookFilterType.entries[idx])
+                        }
+                    },
                     modifier = Modifier.weight(1f),
                 )
                 if (filter.isActive) {
@@ -218,10 +267,10 @@ fun BookListScreen(
                 }
             }
 
-            val loadedState = state as? BookListUiState.Loaded
+            val loadedState = state as? LibraryUiState.Loaded
             if (filter.isActive && loadedState != null) {
                 Text(
-                    text = stringResource(R.string.matches_count, loadedState.books.size),
+                    text = stringResource(R.string.matches_count, loadedState.items.size),
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -229,14 +278,19 @@ fun BookListScreen(
             }
 
             when (val s = state) {
-                BookListUiState.Loading -> CenterBox { CircularProgressIndicator() }
-                is BookListUiState.Loaded -> {
-                    if (s.books.isEmpty()) {
+                LibraryUiState.Loading -> CenterBox { CircularProgressIndicator() }
+                is LibraryUiState.Loaded -> {
+                    if (s.items.isEmpty()) {
                         CenterBox {
                             Text(
                                 text = when {
                                     !query.isBlank() -> stringResource(R.string.empty_search, query)
-                                    filter.isActive -> stringResource(R.string.empty_no_matches)
+                                    filter.isActive -> if (isMovies) {
+                                        stringResource(R.string.empty_no_matches_movies)
+                                    } else {
+                                        stringResource(R.string.empty_no_matches)
+                                    }
+                                    isMovies -> stringResource(R.string.empty_library_movies)
                                     else -> stringResource(R.string.empty_library)
                                 },
                                 style = MaterialTheme.typography.bodyMedium,
@@ -260,7 +314,7 @@ fun BookListScreen(
                                 bottom = 16.dp + 72.dp,
                             )
                             if (isGrid) {
-                                val rows = remember(s.books) { s.books.chunked(3) }
+                                val rows = remember(s.items) { s.items.chunked(3) }
                                 LazyColumn(
                                     state = listState,
                                     contentPadding = contentPadding,
@@ -269,7 +323,7 @@ fun BookListScreen(
                                         .fillMaxSize()
                                         .scrollbarGestures(controller),
                                 ) {
-                                    itemsIndexed(rows, key = { i, row -> "${row.firstOrNull()?.book?.id ?: 0L}_$i" }) { i, row ->
+                                    itemsIndexed(rows, key = { i, row -> "${row.firstOrNull()?.id ?: 0L}_$i" }) { i, row ->
                                         Row(
                                             modifier = Modifier
                                                 .fillMaxWidth()
@@ -277,13 +331,22 @@ fun BookListScreen(
                                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                                         ) {
                                             row.forEach { item ->
-                                                BookCoverCard(
-                                                    item = item,
-                                                    onClick = { onBookClick(item.book.id) },
-                                                    modifier = Modifier
-                                                        .weight(1f)
-                                                        .fillMaxHeight(),
-                                                )
+                                                when (item) {
+                                                    is LibraryItem.Book -> BookCoverCard(
+                                                        item = item,
+                                                        onClick = { onMediaClick(MediaType.BOOKS, item.id) },
+                                                        modifier = Modifier
+                                                            .weight(1f)
+                                                            .fillMaxHeight(),
+                                                    )
+                                                    is LibraryItem.Movie -> MovieCoverCard(
+                                                        item = item,
+                                                        onClick = { onMediaClick(MediaType.MOVIES, item.id) },
+                                                        modifier = Modifier
+                                                            .weight(1f)
+                                                            .fillMaxHeight(),
+                                                    )
+                                                }
                                             }
                                             repeat(3 - row.size) {
                                                 Box(modifier = Modifier.weight(1f))
@@ -300,8 +363,15 @@ fun BookListScreen(
                                         .fillMaxSize()
                                         .scrollbarGestures(controller),
                                 ) {
-                                    items(s.books, key = { it.book.id }) {
-                                        BookListCard(it, onClick = { onBookClick(it.book.id) })
+                                    items(s.items, key = { it.id }) { item ->
+                                        when (item) {
+                                            is LibraryItem.Book -> BookListCard(item) {
+                                                onMediaClick(MediaType.BOOKS, item.id)
+                                            }
+                                            is LibraryItem.Movie -> MovieListCard(item) {
+                                                onMediaClick(MediaType.MOVIES, item.id)
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -344,11 +414,11 @@ fun BookListScreen(
 }
 
 @Composable
-private fun BookListCard(item: BookWithProgress, onClick: () -> Unit) {
+private fun BookListCard(item: LibraryItem.Book, onClick: () -> Unit) {
     val book = item.book
     Card(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)) {
         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            BookCoverImage(
+            CoverImage(
                 path = book.coverPath,
                 sizeDp = 64,
                 modifier = Modifier.padding(end = 12.dp),
@@ -409,7 +479,7 @@ private fun BookListCard(item: BookWithProgress, onClick: () -> Unit) {
 
 @Composable
 private fun BookCoverCard(
-    item: BookWithProgress,
+    item: LibraryItem.Book,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -421,7 +491,7 @@ private fun BookCoverCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
         Column(modifier = Modifier.fillMaxHeight()) {
-            BookCoverImage(
+            CoverImage(
                 path = book.coverPath,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -473,6 +543,151 @@ private fun BookCoverCard(
     }
 }
 
+/**
+ * Переключатель типа носителя в заголовке — «Книги ⇄ Фильмы».
+ *
+ * Тот же выпадающий список, что у фильтра «Тип»: список вариантов и список
+ * значений — одно и то же, и порядок enum'а задаёт порядок в меню.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MediaTypeDropdown(
+    selected: MediaType,
+    onSelected: (MediaType) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = !expanded },
+    ) {
+        Text(
+            text = stringResource(selected.mediaLabelRes),
+            style = MaterialTheme.typography.titleLarge,
+            modifier = Modifier.menuAnchor(),
+        )
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            MediaType.entries.forEach { type ->
+                DropdownMenuItem(
+                    text = { Text(stringResource(type.mediaLabelRes)) },
+                    onClick = { onSelected(type); expanded = false },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MovieListCard(item: LibraryItem.Movie, onClick: () -> Unit) {
+    val movie = item.movie
+    Card(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)) {
+        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            CoverImage(
+                path = movie.coverPath,
+                sizeDp = 64,
+                modifier = Modifier.padding(end = 12.dp),
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = movie.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = movie.director.orEmpty(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                val meta = listOfNotNull(
+                    movie.genre,
+                    movie.durationMin?.let { stringResource(R.string.movie_duration_label, it) },
+                ).joinToString(" · ")
+                if (meta.isNotEmpty()) {
+                    Text(
+                        text = meta,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                if (movie.rating != null && movie.rating > 0) {
+                    Row(modifier = Modifier.padding(top = 2.dp)) {
+                        repeat(movie.rating) {
+                            Icon(
+                                imageVector = Icons.Filled.Star,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.tertiary,
+                                modifier = Modifier.size(12.dp),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MovieCoverCard(
+    item: LibraryItem.Movie,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val movie = item.movie
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+    ) {
+        Column(modifier = Modifier.fillMaxHeight()) {
+            CoverImage(
+                path = movie.coverPath,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(3f / 4f),
+            )
+            Column(modifier = Modifier.padding(8.dp)) {
+                Text(
+                    text = movie.title,
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = movie.director.orEmpty(),
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.height(IntrinsicSize.Min),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (movie.rating != null && movie.rating > 0) {
+                        repeat(movie.rating) {
+                            Icon(
+                                imageVector = Icons.Filled.Star,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.tertiary,
+                                modifier = Modifier.size(12.dp),
+                            )
+                        }
+                    } else {
+                        Spacer(modifier = Modifier.size(12.dp))
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun CenterBox(content: @Composable () -> Unit) {
     Box(
@@ -480,106 +695,5 @@ private fun CenterBox(content: @Composable () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         content()
-    }
-}
-
-/**
- * Разрешает `PeriodOption` (StringRes + опциональный аргумент) в локализованную строку.
- * Для месяца аргумент имеет формат `year|stringResId` — парсим и подставляем оба.
- */
-@Composable
-private fun periodText(option: PeriodOption): String {
-    val arg = option.formatArg ?: return stringResource(option.labelRes)
-    return when (option.labelRes) {
-        R.string.period_year -> stringResource(option.labelRes, arg)
-        R.string.period_year_month -> {
-            val parts = arg.split("|", limit = 2)
-            val year = parts.getOrNull(0)?.toIntOrNull()
-            val monthRes = parts.getOrNull(1)?.toIntOrNull()
-            if (year != null && monthRes != null) {
-                stringResource(option.labelRes, year, stringResource(monthRes))
-            } else {
-                stringResource(option.labelRes, arg)
-            }
-        }
-        else -> stringResource(option.labelRes, arg)
-    }
-}
-
-@Composable
-internal fun BookCoverImage(
-    path: String?,
-    sizeDp: Int? = null,
-    modifier: Modifier = Modifier,
-    contentDescription: String? = null,
-    onClick: (() -> Unit)? = null,
-) {
-    val base = when {
-        sizeDp != null -> modifier.size(sizeDp.dp)
-        else -> modifier
-    }
-    // clickable last in the chain → it inherits the size constraint, so the
-    // touch target is the cover itself and not the whole slot.
-    val interactive = if (onClick != null) base.clickable(onClick = onClick) else base
-    if (path.isNullOrBlank()) {
-        Box(
-            modifier = interactive.background(MaterialTheme.colorScheme.surfaceVariant),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = Icons.Filled.MenuBook,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    } else {
-        AsyncImage(
-            model = java.io.File(path),
-            contentDescription = contentDescription,
-            modifier = interactive,
-            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-        )
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun FilterDropdown(
-    label: String,
-    selectedLabel: String,
-    options: List<String>,
-    onSelected: (Int) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    var expanded by remember { mutableStateOf(false) }
-    ExposedDropdownMenuBox(
-        expanded = expanded,
-        onExpandedChange = { expanded = !expanded },
-        modifier = modifier,
-    ) {
-        OutlinedTextField(
-            value = selectedLabel,
-            onValueChange = {},
-            readOnly = true,
-            label = { Text(label) },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-            modifier = Modifier.menuAnchor().fillMaxWidth(),
-            singleLine = true,
-        )
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            options.forEachIndexed { idx, opt ->
-                DropdownMenuItem(
-                    text = { Text(opt) },
-                    onClick = {
-                        onSelected(idx)
-                        expanded = false
-                    },
-                )
-            }
-        }
     }
 }
