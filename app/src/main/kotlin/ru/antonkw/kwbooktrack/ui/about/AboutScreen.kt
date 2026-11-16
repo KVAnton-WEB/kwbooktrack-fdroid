@@ -46,10 +46,14 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
 import ru.antonkw.kwbooktrack.data.exporter.AppVersionProvider
+import ru.antonkw.kwbooktrack.data.db.entity.MediaType
+import ru.antonkw.kwbooktrack.data.media.MediaTypeStore
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.MovieRepository
 import ru.antonkw.kwbooktrack.R
 import javax.inject.Inject
+import ru.antonkw.kwbooktrack.ui.common.FilterDropdown
+import ru.antonkw.kwbooktrack.ui.common.mediaLabelRes
 
 data class AboutInfo(
     val version: String,
@@ -62,10 +66,23 @@ data class AboutInfo(
 class AboutViewModel @Inject constructor(
     private val bookRepository: BookRepository,
     private val movieRepository: MovieRepository,
+    private val mediaTypeStore: MediaTypeStore,
     private val appVersionProvider: AppVersionProvider,
 ) : ViewModel() {
     private val _info = MutableStateFlow(AboutInfo(appVersionProvider.appVersion, 0, 0, 0))
     val info: StateFlow<AboutInfo> = _info.asStateFlow()
+
+    /**
+     * Тип коллекции, которая уйдёт в экспорт Tellico.
+     *
+     * В файле `.tc` помещается одна коллекция — Tellico держит одну на файл
+     * и при двух смешал бы записи, поэтому видно, что именно выгрузится.
+     */
+    val mediaType: StateFlow<MediaType> = mediaTypeStore.type
+
+    fun setMediaType(type: MediaType) {
+        mediaTypeStore.set(type)
+    }
 
     init {
         viewModelScope.launch {
@@ -89,6 +106,7 @@ fun AboutScreen(
     exportViewModel: AboutExportViewModel = hiltViewModel(),
 ) {
     val info by viewModel.info.collectAsStateWithLifecycle()
+    val mediaType by viewModel.mediaType.collectAsStateWithLifecycle()
     val exportState by exportViewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
@@ -199,6 +217,17 @@ fun AboutScreen(
                         }
                         Text(text = stringResource(R.string.action_export))
                     }
+                    Text(
+                        text = stringResource(R.string.export_collection_label),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    FilterDropdown(
+                        label = stringResource(R.string.export_collection_label),
+                        selectedLabel = stringResource(mediaType.mediaLabelRes),
+                        options = MediaType.entries.map { stringResource(it.mediaLabelRes) },
+                        onSelected = { index -> viewModel.setMediaType(MediaType.entries[index]) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                     OutlinedButton(
                         onClick = {
                             exportTellicoLauncher.launch(AboutExportViewModel.suggestedTellicoFilename())

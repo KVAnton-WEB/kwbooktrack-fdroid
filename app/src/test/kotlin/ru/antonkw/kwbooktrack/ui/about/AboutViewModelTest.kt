@@ -24,6 +24,7 @@ import ru.antonkw.kwbooktrack.data.exporter.AppVersionProvider
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.MovieRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
+import ru.antonkw.kwbooktrack.data.media.MediaTypeStore
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -61,7 +62,7 @@ class AboutViewModelTest {
 
     @Test
     fun initialInfoUsesProviderVersionAndZeroCounters() = runTest(dispatcher) {
-        val vm = AboutViewModel(bookRepository, movieRepository, versionProvider)
+        val vm = AboutViewModel(bookRepository, movieRepository, MediaTypeStore(), versionProvider)
         advanceUntilIdle()
         val info = vm.info.first { it.totalBooks == 0 }
         assertThat(info.version).isEqualTo("9.9.9-test")
@@ -71,7 +72,7 @@ class AboutViewModelTest {
 
     @Test
     fun countsAggregatesAcrossStatuses() = runTest(dispatcher) {
-        val vm = AboutViewModel(bookRepository, movieRepository, versionProvider)
+        val vm = AboutViewModel(bookRepository, movieRepository, MediaTypeStore(), versionProvider)
         advanceUntilIdle()
 
         repeat(3) {
@@ -92,7 +93,7 @@ class AboutViewModelTest {
 
     @Test
     fun reactiveUpdateOnBookInsertion() = runTest(dispatcher) {
-        val vm = AboutViewModel(bookRepository, movieRepository, versionProvider)
+        val vm = AboutViewModel(bookRepository, movieRepository, MediaTypeStore(), versionProvider)
         advanceUntilIdle()
 
         bookRepository.insert(sampleBook(status = BookStatus.FINISHED))
