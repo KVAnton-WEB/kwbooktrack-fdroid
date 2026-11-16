@@ -7,8 +7,8 @@ import java.io.InputStream
 /** Stub CoverStorage для unit-тестов: ничего не записывает, ничего не удаляет. */
 object NoOpCoverStorage : CoverStorage {
     override fun saveTemp(source: InputStream, extension: String): String = ""
-    override fun promoteToBook(bookId: Long, tempPath: String?): String? = tempPath
-    override fun deleteForBook(bookId: Long) = Unit
+    override fun promote(tempPath: String?): String? = tempPath
+    override fun delete(path: String?) = Unit
 }
 
 /** Stub PhotoStorage для unit-тестов. */

@@ -70,58 +70,51 @@ class StoragesTest {
     }
 
     @Test
-    fun coverPromoteToBookDeletesPreviousExtensions() {
-        val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
-        val coversDir = File(ctx.filesDir, "covers")
-        // Pre-create a JPG and a PNG cover for book 42.
-        File(coversDir, "42.jpg").writeBytes(byteArrayOf(0xFF.toByte(), 0xD8.toByte()))
-        File(coversDir, "42.png").writeBytes(byteArrayOf(0x89.toByte(), 0x50.toByte()))
-        val newTemp = coverStorage.saveTemp(ByteArrayInputStream(pngBytes()), "png")
+    fun coverPromoteKeepsUuidName() {
+        // Имя обложки — UUID, а не id книги: у книг и фильмов id считаются
+        // независимо, и имя по id у них совпадало бы.
+        val temp = coverStorage.saveTemp(ByteArrayInputStream(pngBytes()), "png")
+        val promoted = coverStorage.promote(temp)
 
-        coverStorage.promoteToBook(42L, newTemp)
-
-        // The picked cover decodes, so saveTemp already stored it as .webp and
-        // the prefix sweep drops the stale .jpg/.png.
-        assertThat(File(coversDir, "42.webp").exists()).isTrue()
-        assertThat(File(coversDir, "42.jpg").exists()).isFalse()
-        assertThat(File(coversDir, "42.png").exists()).isFalse()
+        assertThat(promoted).isEqualTo(temp)
+        assertThat(File(promoted!!).name).startsWith("cover_")
+        assertThat(File(promoted).exists()).isTrue()
     }
 
     @Test
-    fun coverPromoteToBookSurvivesWhenTempIsAlreadyAtBookIdPath() {
-        // edit-mode, no-cover-change: state.coverPath is the existing
-        // covers/{bookId}.{ext} file itself, so src.absolutePath ==
-        // target.absolutePath. The pre-fix code unlinked the file via the
-        // deleteForBook(bookId) prefix sweep before short-circuiting the
-        // copyTo branch — the row then held a path to a non-existent file.
-        // After fix: the source must be skipped from the sweep and survive.
-        val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
-        val coversDir = File(ctx.filesDir, "covers")
-        val existing = File(coversDir, "42.jpg").apply {
-            writeBytes(byteArrayOf(0xCA.toByte(), 0xFE.toByte()))
-        }
-        val originalBytes = existing.readBytes()
-
-        val returned = coverStorage.promoteToBook(42L, existing.absolutePath)
-
-        assertThat(returned).isEqualTo(existing.absolutePath)
-        assertThat(existing.exists()).isTrue()
-        assertThat(existing.readBytes()).isEqualTo(originalBytes)
+    fun coverPromoteOfNullIsNull() {
+        assertThat(coverStorage.promote(null)).isNull()
     }
 
     @Test
-    fun coverDeleteForBookRemovesAllExtensionsForThatBook() {
+    fun coverDeleteRemovesOnlyGivenFile() {
         val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
         val coversDir = File(ctx.filesDir, "covers")
-        File(coversDir, "10.jpg").writeBytes(byteArrayOf(1))
-        File(coversDir, "10.webp").writeBytes(byteArrayOf(2))
-        File(coversDir, "11.jpg").writeBytes(byteArrayOf(3))
+        val target = File(coversDir, "cover_a.webp").apply { writeBytes(byteArrayOf(1)) }
+        val keep = File(coversDir, "cover_b.webp").apply { writeBytes(byteArrayOf(2)) }
 
-        coverStorage.deleteForBook(10L)
+        coverStorage.delete(target.absolutePath)
 
-        assertThat(File(coversDir, "10.jpg").exists()).isFalse()
-        assertThat(File(coversDir, "10.webp").exists()).isFalse()
-        assertThat(File(coversDir, "11.jpg").exists()).isTrue()
+        assertThat(target.exists()).isFalse()
+        assertThat(keep.exists()).isTrue()
+    }
+
+    @Test
+    fun coverDeleteIgnoresNull() {
+        coverStorage.delete(null)
+    }
+
+    @Test
+    fun coverDeleteDoesNotTouchFilesOutsideCoversDir() {
+        // delete() unlinks by exact path, so it must still refuse to touch
+        // anything outside the covers directory — that is a safety boundary,
+        // not just a hygiene nicety.
+        val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val outside = File(ctx.filesDir, "outside.webp").apply { writeBytes(byteArrayOf(1)) }
+
+        coverStorage.delete(outside.absolutePath)
+
+        assertThat(outside.exists()).isTrue()
     }
 
     @Test

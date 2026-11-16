@@ -10,19 +10,22 @@ import javax.inject.Singleton
 
 /**
  * Абстракция над каталогом обложек в `filesDir/covers/`.
- * Реализация хранит ровно один файл на книгу с именем `{bookId}.{ext}`.
- * Temp-файлы от `attachCover` живут отдельно (`cover_{tempId}.{ext}`) и при `save()`
- * переименовываются в финальные.
+ *
+ * Имя файла обложки — UUID (`cover_{uuid}.{ext}`), а не id записи. Имя по id
+ * привязывало бы файл к строке БД: у книг и фильмов id считаются независимо
+ * и совпадают, и обложка фильма 1 перезаписала бы обложку книги 1. С UUID
+ * имя уникально, файл не привязан к строке, а удалить его можно по точному
+ * пути — в БД лежит именно путь.
  */
 interface CoverStorage {
-    /** Скопировать байты в `covers/cover_{tempId}.{ext}`, вернуть абсолютный путь. */
+    /** Скопировать байты в `covers/cover_{uuid}.{ext}`, вернуть абсолютный путь. */
     fun saveTemp(source: InputStream, extension: String): String
 
-    /** Переименовать temp-файл по `bookId` (или скопировать, если уже под другим именем). */
-    fun promoteToBook(bookId: Long, tempPath: String?): String?
+    /** Окончательный путь обложки. Имя уже уникальное — переименовывать нечего. */
+    fun promote(tempPath: String?): String?
 
-    /** Удалить все файлы обложки для данной книги (по префиксу). */
-    fun deleteForBook(bookId: Long)
+    /** Удалить файл обложки по точному пути. */
+    fun delete(path: String?)
 }
 
 @Singleton
@@ -45,43 +48,15 @@ class FileCoverStorage @Inject constructor(
         return target.absolutePath
     }
 
-    override fun promoteToBook(bookId: Long, tempPath: String?): String? {
-        if (tempPath == null) return null
-        val src = File(tempPath)
-        if (!src.exists()) return tempPath
-        val ext = src.extension.ifEmpty { "jpg" }
-        val target = File(coversDir, "$bookId.$ext")
-        return try {
-            // Drop stale covers for this book (e.g. an old .png when the new
-            // selection is .jpg), but skip the source — if src already happens
-            // to be named {bookId}.{ext} (a re-promote of an existing cover)
-            // the sweep would unlink it and the copyTo branch below is then
-            // skipped (src == target), orphaning the row that points at it.
-            deleteCoversFor(bookId, except = src)
-            if (src.absolutePath != target.absolutePath) {
-                src.copyTo(target, overwrite = true)
-                src.delete()
-            }
-            target.absolutePath
-        } catch (_: Exception) {
-            // ponytail: on a failed copy the caller persists the temp path, so
-            // the picked cover stays visible but keeps its cover_{uuid} name —
-            // deleteForBook() won't match it, so a later book delete leaks it.
-            // Renaming rather than copying in the failure path (or falling back
-            // to null and dropping the cover) both trade this for a worse bug;
-            // revisit only if failed promotions actually show up.
-            tempPath
-        }
-    }
+    override fun promote(tempPath: String?): String? = tempPath
 
-    override fun deleteForBook(bookId: Long) = deleteCoversFor(bookId)
-
-    /** Unlink every `covers/{bookId}.*` file except [except] (same file by path). */
-    private fun deleteCoversFor(bookId: Long, except: File? = null) {
-        val prefix = "$bookId."
-        coversDir.listFiles { f ->
-            f.isFile && f.name.startsWith(prefix) && f.absolutePath != except?.absolutePath
-        }?.forEach { it.delete() }
+    override fun delete(path: String?) {
+        if (path.isNullOrBlank()) return
+        val file = File(path)
+        // Только файлы из каталога обложек: путь приходит из строки БД, а
+        // удалять по нему можно что угодно.
+        if (file.parentFile != coversDir) return
+        if (file.isFile) file.delete()
     }
 }
 

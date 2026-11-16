@@ -372,7 +372,15 @@ class AddBookViewModelTest {
         coverStorage,
     )
 
-    private fun tempCovers(): List<File> =
+    /**
+     * Файлы обложек с UUID-именем.
+     *
+     * Раньше временная обложка отличалась от финальной именем
+     * (`cover_{tempId}` против `{bookId}`), и «временные» файлы можно было
+     * отличить по префиксу. Теперь имя у всех обложек одинаковое — UUID, —
+     * и отличить можно только по тому, лежит ли файл в каталоге один.
+     */
+    private fun uuidCovers(): List<File> =
         coversDir.listFiles()?.filter { it.name.startsWith("cover_") }.orEmpty()
 
     @Test
@@ -387,7 +395,7 @@ class AddBookViewModelTest {
         assertThat(cover.exists()).isTrue()
         assertThat(bookRepository.findById(id)!!.coverPath).isEqualTo(cover.absolutePath)
         // The temp copy of the new pick is cleaned up; the original is not.
-        assertThat(tempCovers()).isEmpty()
+        assertThat(uuidCovers()).isEmpty()
     }
 
     @Test
@@ -410,11 +418,16 @@ class AddBookViewModelTest {
 
         val saved = bookRepository.findById(id)!!
         // saveTemp transcodes, so a decodable pick always lands as .webp
-        // whatever extension it arrived with.
-        assertThat(saved.coverPath).isEqualTo(File(coversDir, "$id.webp").absolutePath)
-        assertThat(File(saved.coverPath!!).exists()).isTrue()
+        // whatever extension it arrived with. Имя — UUID, а не id: файл не
+        // привязан к строке БД.
+        assertThat(saved.coverPath).isNotNull()
+        val cover = File(saved.coverPath!!)
+        assertThat(cover.parentFile).isEqualTo(coversDir)
+        assertThat(cover.name).startsWith("cover_")
+        assertThat(cover.exists()).isTrue()
+        // Прежняя обложка (ещё со старым именем по id) освободила место.
         assertThat(oldCover.exists()).isFalse()
-        assertThat(tempCovers()).isEmpty()
+        assertThat(coversDir.listFiles()!!.toList()).hasSize(1)
     }
 
     @Test
@@ -454,7 +467,8 @@ class AddBookViewModelTest {
         vm.save()?.join()
 
         val saved = bookRepository.findById(id)!!
-        assertThat(saved.coverPath).isEqualTo(File(coversDir, "$id.webp").absolutePath)
+        assertThat(saved.coverPath).isNotNull()
+        assertThat(File(saved.coverPath!!).name).startsWith("cover_")
         assertThat(File(saved.coverPath!!).exists()).isTrue()
         assertThat(oldCover.exists()).isFalse()
     }
@@ -469,7 +483,8 @@ class AddBookViewModelTest {
 
         val saved = savedBook()
         assertThat(File(saved.coverPath!!).exists()).isTrue()
-        assertThat(tempCovers()).isEmpty()
+        // Никаких «временных» копий: в каталоге осталась одна обложка.
+        assertThat(coversDir.listFiles()!!.toList()).hasSize(1)
     }
 
     @Test
@@ -480,7 +495,7 @@ class AddBookViewModelTest {
         pickCover(vm, "b.jpg")
         vm.onCleared()
 
-        assertThat(tempCovers()).isEmpty()
+        assertThat(uuidCovers()).isEmpty()
     }
 
 }

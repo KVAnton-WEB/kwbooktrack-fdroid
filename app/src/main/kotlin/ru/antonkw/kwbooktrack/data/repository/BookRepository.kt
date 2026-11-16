@@ -111,17 +111,19 @@ class BookRepository @Inject constructor(
         val rows = bookDao.deleteWithContent(book.id)
         if (rows > 0) {
             photoRepository.deleteFiles(photoPaths)
-            coverStorage.deleteForBook(book.id)
+            coverStorage.delete(book.coverPath)
         }
         return rows
     }
 
     suspend fun deleteById(id: Long): Int {
+        // Путь обложки читаем до удаления строки — после её уже не узнать.
+        val coverPath = bookDao.findById(id)?.coverPath
         val photoPaths = photoRepository.observeByMedia(id, MediaType.BOOKS).first().map { it.path }
         val rows = bookDao.deleteWithContent(id)
         if (rows > 0) {
             photoRepository.deleteFiles(photoPaths)
-            coverStorage.deleteForBook(id)
+            coverStorage.delete(coverPath)
         }
         return rows
     }

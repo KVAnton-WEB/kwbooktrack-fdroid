@@ -93,12 +93,12 @@ class AddBookViewModel @Inject constructor(
     // unlink on cancel, the persisted cover is not. Without this distinction
     // onCleared()/attachCover()/clearCover() would happily delete the
     // book's actual cover when the user hits Back or Discard (and even on
-    // Save, because state.coverPath doesn't track CoverStorage.promoteToBook()).
+    // Save, because state.coverPath doesn't track CoverStorage.promote()).
     // Mutated only from init() and save() — read from the cleanup paths.
     private var originalCoverPath: String? = null
 
     // True once the user explicitly hit "remove cover" on a book that had
-    // one. Needed because promoteToBook() returns null for BOTH "cleared"
+    // one. Needed because promote() returns null for BOTH "cleared"
     // and "left alone", and save() needs to tell them apart to honour the
     // removal. Cleared again by attachCover().
     private var coverRemoved = false
@@ -327,16 +327,16 @@ class AddBookViewModel @Inject constructor(
                     else -> existing.status
                 }
                 val finishedAt = if (s.isRead) finishedDate else null
-                // What the row will point at from now on. promoteToBook()
+                // What the row will point at from now on. promote()
                 // returns null for both "left alone" and "cleared", so
                 // removedCover is what tells them apart — without it the
                 // ?: existing.coverPath fallback silently restored the cover
                 // the user had just removed.
                 val finalCoverPath: String? = if (removedCover) {
-                    coverStorage.deleteForBook(existing.id)
+                    coverStorage.delete(existing.coverPath)
                     null
                 } else {
-                    coverStorage.promoteToBook(existing.id, s.coverPath) ?: existing.coverPath
+                    coverStorage.promote(s.coverPath) ?: existing.coverPath
                 }
                 bookRepository.update(
                     existing.copy(
@@ -375,15 +375,15 @@ class AddBookViewModel @Inject constructor(
                     ),
                 )
                 // The previous persisted cover (kept alive across the edit so
-                // Discard could roll it back) is now orphaned by the promotion:
-                // promoteToBook() moved the new selection into its slot at
-                // finalCoverPath. deleteForBook() above already unlinked it when
-                // the cover was removed. Both no-op cases — nothing picked, and a
-                // re-promote of the cover already at that path — resolve
-                // finalCoverPath to the path the row already had, so the file is
-                // still the file at the same path and there is nothing to unlink.
+                // Discard could roll it back) is now orphaned: the new
+                // selection lives at finalCoverPath. delete() above already
+                // unlinked it when the cover was removed. Both no-op cases —
+                // nothing picked, and a re-promote of the cover already at that
+                // path — resolve finalCoverPath to the path the row already
+                // had, so the file is still the file at the same path and there
+                // is nothing to unlink.
                 if (finalCoverPath != null && originalCoverPath != null && originalCoverPath != finalCoverPath) {
-                    runCatching { File(originalCoverPath!!).delete() }
+                    coverStorage.delete(originalCoverPath)
                 }
                 originalCoverPath = finalCoverPath
             } else {
@@ -420,7 +420,7 @@ class AddBookViewModel @Inject constructor(
                     isSold = s.isSold,
                 )
                 val newId = bookRepository.insert(tempBook)
-                val finalCoverPath = coverStorage.promoteToBook(newId, s.coverPath)
+                val finalCoverPath = coverStorage.promote(s.coverPath)
                 if (finalCoverPath != null) {
                     bookRepository.update(tempBook.copy(id = newId, coverPath = finalCoverPath))
                 }

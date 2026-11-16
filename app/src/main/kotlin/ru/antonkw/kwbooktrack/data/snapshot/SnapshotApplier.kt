@@ -16,6 +16,7 @@ import ru.antonkw.kwbooktrack.data.storage.CoverTranscoder
 import ru.antonkw.kwbooktrack.data.storage.PhotoStorage
 import java.io.File
 import java.io.IOException
+import java.util.UUID
 import javax.inject.Inject
 
 /**
@@ -79,8 +80,11 @@ class SnapshotApplier @Inject constructor(
     }
 
     /**
-     * Обложка: файл из архива → WebP → `<coverOutputDir>/covers/{bookId}.{ext}`.
+     * Обложка: файл из архива → WebP → `<coverOutputDir>/covers/cover_{uuid}.{ext}`.
      * В БД кладётся локальный путь, а не имя файла из архива.
+     *
+     * Имя — UUID, а не id: файл не привязан к строке БД, и обложка фильма не
+     * перезапишет обложку книги с тем же id.
      */
     private suspend fun applyCover(snapshot: BookSnapshot, bookId: Long, assets: ImportAssets): Int {
         val archiveName = snapshot.book.coverPath
@@ -93,13 +97,15 @@ class SnapshotApplier @Inject constructor(
             val raw = src.readBytes()
             val webp = transcoder.toWebp(raw)
             val ext = if (webp != null) "webp" else src.extension.ifEmpty { "jpg" }
-            val dest = File(destDir, "$bookId.$ext")
+            val dest = File(destDir, "cover_${UUID.randomUUID()}.$ext")
             dest.writeBytes(webp ?: raw)
-            // Обновляем строку книги, а не снимок: что выигрывает при слиянии,
-            // уже решил upsertFromImport. Метку «изменено» не трогаем — книгу
-            // изменили не сейчас, а в источнике.
             val existing = bookRepository.findById(bookId) ?: return 0
             bookRepository.updateFromImport(existing.copy(coverPath = dest.absolutePath))
+            // Прежняя обложка больше не нужна: имя новое, и без удаления старый
+            // файл остался бы на диске навсегда.
+            existing.coverPath
+                ?.takeIf { it != dest.absolutePath }
+                ?.let { runCatching { File(it).delete() } }
             1
         } catch (e: CancellationException) {
             // Отмена импорта — не «плохая обложка»: пробрасываем дальше.
