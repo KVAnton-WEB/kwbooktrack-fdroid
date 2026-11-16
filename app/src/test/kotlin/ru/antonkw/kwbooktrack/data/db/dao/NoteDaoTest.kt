@@ -15,6 +15,7 @@ import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
 import ru.antonkw.kwbooktrack.data.db.entity.NoteEntity
 import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
+import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 
 @RunWith(RobolectricTestRunner::class)
 class NoteDaoTest {
@@ -44,7 +45,7 @@ class NoteDaoTest {
     fun insertAndFindRoundTrip() = runTest {
         val id = noteDao.insert(
             NoteEntity(
-                bookId = bookId,
+                mediaId = bookId, mediaType = MediaType.BOOKS,
                 bodyMd = "thought",
                 kind = NoteKind.NOTE,
                 createdAt = 0L,
@@ -60,10 +61,10 @@ class NoteDaoTest {
     @Test
     fun insertRespectsKind() = runTest {
         noteDao.insert(
-            NoteEntity(bookId = bookId, bodyMd = "a", kind = NoteKind.QUOTE, createdAt = 0L, updatedAt = 0L),
+            NoteEntity(mediaId = bookId, mediaType = MediaType.BOOKS, bodyMd = "a", kind = NoteKind.QUOTE, createdAt = 0L, updatedAt = 0L),
         )
         noteDao.insert(
-            NoteEntity(bookId = bookId, bodyMd = "b", kind = NoteKind.REVIEW, createdAt = 0L, updatedAt = 0L),
+            NoteEntity(mediaId = bookId, mediaType = MediaType.BOOKS, bodyMd = "b", kind = NoteKind.REVIEW, createdAt = 0L, updatedAt = 0L),
         )
         val quotes = noteDao.observeByKind(NoteKind.QUOTE).first()
         val reviews = noteDao.observeByKind(NoteKind.REVIEW).first()
@@ -74,7 +75,7 @@ class NoteDaoTest {
     @Test
     fun deleteRemovesNote() = runTest {
         val id = noteDao.insert(
-            NoteEntity(bookId = bookId, bodyMd = "x", createdAt = 0L, updatedAt = 0L),
+            NoteEntity(mediaId = bookId, mediaType = MediaType.BOOKS, bodyMd = "x", createdAt = 0L, updatedAt = 0L),
         )
         val note = noteDao.findById(id)!!
         noteDao.delete(note)

@@ -3,6 +3,7 @@ package ru.antonkw.kwbooktrack.data.repository
 import androidx.sqlite.db.SimpleSQLiteQuery
 import kotlinx.coroutines.flow.Flow
 import ru.antonkw.kwbooktrack.data.db.dao.NoteDao
+import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 import ru.antonkw.kwbooktrack.data.db.entity.NoteEntity
 import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
 import ru.antonkw.kwbooktrack.data.storage.PhotoStorage
@@ -16,7 +17,9 @@ class NoteRepository @Inject constructor(
 ) {
     fun observeAll(): Flow<List<NoteEntity>> = noteDao.observeAll()
 
-    fun observeByBook(bookId: Long): Flow<List<NoteEntity>> = noteDao.observeByBook(bookId)
+    /** Заметки владельца — книга или фильм. */
+    fun observeByMedia(mediaId: Long, mediaType: MediaType): Flow<List<NoteEntity>> =
+        noteDao.observeByMedia(mediaId, mediaType)
 
     fun observeByKind(kind: NoteKind): Flow<List<NoteEntity>> = noteDao.observeByKind(kind)
 
@@ -54,5 +57,6 @@ class NoteRepository @Inject constructor(
         return noteDao.delete(note)
     }
 
-    suspend fun deleteForBook(bookId: Long): Int = noteDao.deleteForBook(bookId)
+    suspend fun deleteForMedia(mediaId: Long, mediaType: MediaType): Int =
+        noteDao.deleteForMedia(mediaId, mediaType)
 }

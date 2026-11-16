@@ -2,7 +2,7 @@ package ru.antonkw.kwbooktrack.data.importer
 
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
-import ru.antonkw.kwbooktrack.data.db.entity.BookSource
+import ru.antonkw.kwbooktrack.data.db.entity.MediaSource
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
 import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
 import ru.antonkw.kwbooktrack.data.snapshot.ExtraField
@@ -28,7 +28,7 @@ class TellicoBookMapperTest {
 
         assertThat(snapshot.book.title).isEqualTo("Властелин Колец")
         assertThat(snapshot.book.author).isEqualTo("Толкин, Джон")
-        assertThat(snapshot.book.source).isEqualTo(BookSource.TELLICO)
+        assertThat(snapshot.book.source).isEqualTo(MediaSource.TELLICO)
     }
 
     @Test

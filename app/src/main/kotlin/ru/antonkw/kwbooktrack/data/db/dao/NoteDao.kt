@@ -9,6 +9,7 @@ import androidx.room.RawQuery
 import androidx.room.Update
 import androidx.sqlite.db.SupportSQLiteQuery
 import kotlinx.coroutines.flow.Flow
+import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 import ru.antonkw.kwbooktrack.data.db.entity.NoteEntity
 import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
 
@@ -21,8 +22,9 @@ interface NoteDao {
     @Query("SELECT * FROM notes ORDER BY created_at DESC")
     suspend fun getAll(): List<NoteEntity>
 
-    @Query("SELECT * FROM notes WHERE book_id = :bookId ORDER BY created_at DESC")
-    fun observeByBook(bookId: Long): Flow<List<NoteEntity>>
+    /** Заметки владельца — книга или фильм. */
+    @Query("SELECT * FROM notes WHERE media_id = :mediaId AND media_type = :mediaType ORDER BY created_at DESC")
+    fun observeByMedia(mediaId: Long, mediaType: MediaType): Flow<List<NoteEntity>>
 
     @Query("SELECT * FROM notes WHERE kind = :kind ORDER BY created_at DESC")
     fun observeByKind(kind: NoteKind): Flow<List<NoteEntity>>
@@ -63,8 +65,8 @@ interface NoteDao {
     @Delete
     suspend fun delete(note: NoteEntity): Int
 
-    @Query("DELETE FROM notes WHERE book_id = :bookId")
-    suspend fun deleteForBook(bookId: Long): Int
+    @Query("DELETE FROM notes WHERE media_id = :mediaId AND media_type = :mediaType")
+    suspend fun deleteForMedia(mediaId: Long, mediaType: MediaType): Int
 
     @Query("SELECT COUNT(*) FROM notes")
     suspend fun count(): Int

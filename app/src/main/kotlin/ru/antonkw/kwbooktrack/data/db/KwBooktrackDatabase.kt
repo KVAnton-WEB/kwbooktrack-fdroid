@@ -11,7 +11,7 @@ import ru.antonkw.kwbooktrack.data.db.dao.PhotoDao
 import ru.antonkw.kwbooktrack.data.db.dao.ReadingSessionDao
 import ru.antonkw.kwbooktrack.data.db.dao.TagDao
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
-import ru.antonkw.kwbooktrack.data.db.entity.BookTagCrossRef
+import ru.antonkw.kwbooktrack.data.db.entity.MediaTagCrossRef
 import ru.antonkw.kwbooktrack.data.db.entity.NoteEntity
 import ru.antonkw.kwbooktrack.data.db.entity.PhotoEntity
 import ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity
@@ -25,9 +25,9 @@ import ru.antonkw.kwbooktrack.data.db.migration.Migrate1To2
         NoteEntity::class,
         PhotoEntity::class,
         TagEntity::class,
-        BookTagCrossRef::class,
+        MediaTagCrossRef::class,
     ],
-    version = 9,
+    version = 10,
     // Schema export is disabled: all transitions are explicit Migrations
     // wired into DatabaseModule via .addMigrations(...), so Room doesn't
     // need a checked-in json file per step. The previous

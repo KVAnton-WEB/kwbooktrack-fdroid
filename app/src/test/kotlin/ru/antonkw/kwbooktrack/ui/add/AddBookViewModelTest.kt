@@ -23,7 +23,7 @@ import org.robolectric.Shadows
 import ru.antonkw.kwbooktrack.data.TestDb
 import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
-import ru.antonkw.kwbooktrack.data.db.entity.BookSource
+import ru.antonkw.kwbooktrack.data.db.entity.MediaSource
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
@@ -82,7 +82,7 @@ class AddBookViewModelTest {
         assertThat(book.author).isEqualTo("Frank Herbert")
         assertThat(book.isbn13).isEqualTo("9780441172719")
         assertThat(book.pageCount).isEqualTo(500)
-        assertThat(book.source).isEqualTo(BookSource.MANUAL)
+        assertThat(book.source).isEqualTo(MediaSource.MANUAL)
     }
 
     @Test

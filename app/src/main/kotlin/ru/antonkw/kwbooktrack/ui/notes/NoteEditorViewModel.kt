@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 import ru.antonkw.kwbooktrack.data.db.entity.NoteEntity
 import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
 import ru.antonkw.kwbooktrack.data.db.entity.PhotoEntity
@@ -44,10 +45,14 @@ class NoteEditorViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val noteId: Long = savedStateHandle.get<Long>(KEY_NOTE_ID) ?: 0L
-    // For new notes (noteId == 0L) the bookId comes from the nav route;
-    // for edits the route only carries noteId, so we resolve bookId from the
-    // existing NoteEntity to avoid detaching the note from its book on save.
-    private var bookId: Long = savedStateHandle.get<Long>(KEY_BOOK_ID) ?: -1L
+    // For new notes (noteId == 0L) the owner comes from the nav route;
+    // for edits the route only carries noteId, so we resolve the owner from
+    // the existing NoteEntity to avoid detaching the note from its book on save.
+    private var mediaId: Long = savedStateHandle.get<Long>(KEY_BOOK_ID) ?: -1L
+
+    // Тип владельца. Пока маршрут уносит только id книги, новые заметки
+    // принадлежат книге; для правки тип берётся из самой заметки.
+    private var mediaType: MediaType = MediaType.BOOKS
 
     // Pre-selected note kind from the nav route (e.g. REVIEW for the
     // "Write review" entry point). Edits always keep the existing kind —
@@ -68,7 +73,8 @@ class NoteEditorViewModel @Inject constructor(
             viewModelScope.launch {
                 val note = noteRepository.findById(noteId)
                 if (note != null) {
-                    bookId = note.bookId
+                    mediaId = note.mediaId
+                    mediaType = note.mediaType
                     _loadedKind.value = note.kind
                 }
                 val photos = photoRepository.observeByNote(noteId).first()
@@ -125,7 +131,8 @@ class NoteEditorViewModel @Inject constructor(
             val now = System.currentTimeMillis()
             val entity = NoteEntity(
                 id = if (noteId > 0L) noteId else 0L,
-                bookId = bookId,
+                mediaId = mediaId,
+                mediaType = mediaType,
                 page = s.pageText.toIntOrNull(),
                 bodyMd = s.body,
                 kind = effectiveKind,
@@ -158,7 +165,8 @@ class NoteEditorViewModel @Inject constructor(
             } ?: return
             photoRepository.insert(
                 PhotoEntity(
-                    bookId = bookId,
+                    mediaId = mediaId,
+                    mediaType = mediaType,
                     noteId = targetNoteId,
                     path = target.absolutePath,
                     createdAt = System.currentTimeMillis(),

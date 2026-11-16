@@ -50,6 +50,7 @@ import java.nio.file.Files
 import java.time.LocalDate
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
+import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 
 /**
  * Свой zip-бэкап без потерь: `books.csv` + `extra.json` + `photos/` + обложки —
@@ -201,7 +202,7 @@ class KwBooktrackZipRoundTripTest {
         assertThat(book.updatedAt).isEqualTo(source.updatedAt)
         assertThat(book.extraFields["посоветовал"]?.value).isEqualTo("Книжный поезд")
 
-        val notes = targetDb.noteDao().observeByBook(book.id).first()
+        val notes = targetDb.noteDao().observeByMedia(book.id, MediaType.BOOKS).first()
         assertThat(notes).hasSize(2)
         assertThat(notes.map { it.kind }.toSet()).containsExactly(NoteKind.QUOTE, NoteKind.NOTE)
         assertThat(notes.single { it.kind == NoteKind.QUOTE }.bodyMd).isEqualTo("Цитата")
@@ -216,7 +217,7 @@ class KwBooktrackZipRoundTripTest {
 
         assertThat(targetDb.tagDao().tagsOf(book.id).map { it.name }).containsExactly("фэнтези")
 
-        val photos = targetDb.photoDao().observeByBook(book.id).first()
+        val photos = targetDb.photoDao().observeByMedia(book.id, MediaType.BOOKS).first()
         assertThat(photos).hasSize(1)
         assertThat(photos.single().noteId).isEqualTo(notes.single { it.kind == NoteKind.QUOTE }.id)
         assertThat(File(photos.single().path).exists()).isTrue()
@@ -237,10 +238,10 @@ class KwBooktrackZipRoundTripTest {
 
         val book = targetDb.bookDao().observeAll().first().single()
         assertThat(targetDb.bookDao().observeAll().first()).hasSize(1)
-        assertThat(targetDb.noteDao().observeByBook(book.id).first()).hasSize(2)
+        assertThat(targetDb.noteDao().observeByMedia(book.id, MediaType.BOOKS).first()).hasSize(2)
         assertThat(targetDb.readingSessionDao().observeByBook(book.id).first()).hasSize(1)
         assertThat(targetDb.tagDao().tagsOf(book.id)).hasSize(1)
-        assertThat(targetDb.photoDao().observeByBook(book.id).first()).hasSize(1)
+        assertThat(targetDb.photoDao().observeByMedia(book.id, MediaType.BOOKS).first()).hasSize(1)
     }
 
     @Test
@@ -281,7 +282,7 @@ class KwBooktrackZipRoundTripTest {
         )
         val quoteId = sourceNotes.insert(
             NoteEntity(
-                bookId = bookId,
+                mediaId = bookId, mediaType = MediaType.BOOKS,
                 page = 12,
                 bodyMd = "Цитата",
                 kind = NoteKind.QUOTE,
@@ -291,7 +292,7 @@ class KwBooktrackZipRoundTripTest {
         )
         sourceNotes.insert(
             NoteEntity(
-                bookId = bookId,
+                mediaId = bookId, mediaType = MediaType.BOOKS,
                 bodyMd = "Заметка",
                 kind = NoteKind.NOTE,
                 createdAt = NOTE_AT,
@@ -309,11 +310,11 @@ class KwBooktrackZipRoundTripTest {
                 note = "Читал",
             ),
         )
-        sourceTags.attachToBook(bookId, sourceTags.findOrCreate("фэнтези"))
+        sourceTags.attachToMedia(bookId, MediaType.BOOKS, sourceTags.findOrCreate("фэнтези"))
         val photo = File(tempDir, "photo.png").apply { writeBytes(pngBytes(Color.BLUE)) }
         sourcePhotos.insert(
             PhotoEntity(
-                bookId = bookId,
+                mediaId = bookId, mediaType = MediaType.BOOKS,
                 noteId = quoteId,
                 path = photo.absolutePath,
                 createdAt = PHOTO_AT,

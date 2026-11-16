@@ -21,7 +21,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
-import ru.antonkw.kwbooktrack.data.db.entity.BookSource
+import ru.antonkw.kwbooktrack.data.db.entity.MediaSource
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.storage.CoverStorage
@@ -400,7 +400,7 @@ class AddBookViewModel @Inject constructor(
                     finishedAt = if (s.isRead) finishedDate else null,
                     createdAt = now,
                     updatedAt = now,
-                    source = BookSource.MANUAL,
+                    source = MediaSource.MANUAL,
                     purchaseDate = purchaseDate,
                     purchasePrice = purchasePrice,
                     subtitle = s.subtitle.takeUnless { it.isBlank() },

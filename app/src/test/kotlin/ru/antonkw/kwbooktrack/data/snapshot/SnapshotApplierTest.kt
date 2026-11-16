@@ -31,6 +31,7 @@ import ru.antonkw.kwbooktrack.data.storage.CoverTranscoder
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.nio.file.Files
+import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 
 /**
  * Семантика слияния снимка в БД: повторный импорт не плодит дубли,
@@ -94,7 +95,7 @@ class SnapshotApplierTest {
         applier.apply(snapshot(), assets)
         applier.apply(snapshot(), assets)
 
-        val notes = noteRepository.observeByBook(bookId()).first()
+        val notes = noteRepository.observeByMedia(bookId(), MediaType.BOOKS).first()
         assertThat(notes).hasSize(2)
         assertThat(notes.map { it.bodyMd }).containsExactly("Цитата", "Заметка")
     }
@@ -124,9 +125,9 @@ class SnapshotApplierTest {
         applier.apply(snap, assets)
         applier.apply(snap, assets)
 
-        val photos = photoRepository.observeByBook(bookId()).first()
+        val photos = photoRepository.observeByMedia(bookId(), MediaType.BOOKS).first()
         assertThat(photos).hasSize(1)
-        assertThat(File(photos.single().path).name).isEqualTo("${PHOTO_MD5}_${bookId()}.jpg")
+        assertThat(File(photos.single().path).name).isEqualTo("${PHOTO_MD5}_books_${bookId()}.jpg")
     }
 
     @Test
@@ -138,8 +139,8 @@ class SnapshotApplierTest {
 
         applier.apply(snap, assets)
 
-        val notes = noteRepository.observeByBook(bookId()).first().sortedBy { it.id }
-        val photo = photoRepository.observeByBook(bookId()).first().single()
+        val notes = noteRepository.observeByMedia(bookId(), MediaType.BOOKS).first().sortedBy { it.id }
+        val photo = photoRepository.observeByMedia(bookId(), MediaType.BOOKS).first().single()
         assertThat(photo.noteId).isEqualTo(notes[1].id)
     }
 
@@ -194,7 +195,7 @@ class SnapshotApplierTest {
 
         val book = bookRepository.findById(bookId())!!
         assertThat(book.coverPath).isNull()
-        assertThat(photoRepository.observeByBook(book.id).first()).isEmpty()
+        assertThat(photoRepository.observeByMedia(book.id, MediaType.BOOKS).first()).isEmpty()
         assertThat(stats.photos).isEqualTo(0)
         assertThat(stats.covers).isEqualTo(0)
     }
@@ -236,7 +237,7 @@ class SnapshotApplierTest {
 
         val imported = db.bookDao().observeAll().first().first { it.title == "Дорога" }
         assertThat(imported.id).isNotEqualTo(42L)
-        assertThat(noteRepository.observeByBook(imported.id).first()).hasSize(2)
+        assertThat(noteRepository.observeByMedia(imported.id, MediaType.BOOKS).first()).hasSize(2)
     }
 
     @Test

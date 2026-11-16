@@ -3,6 +3,7 @@ package ru.antonkw.kwbooktrack.data.snapshot
 import android.util.Log
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
+import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 import ru.antonkw.kwbooktrack.data.db.entity.NoteEntity
 import ru.antonkw.kwbooktrack.data.db.entity.PhotoEntity
 import ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity
@@ -62,10 +63,10 @@ class SnapshotApplier @Inject constructor(
         val bookId = bookRepository.upsertFromImport(book)
 
         val covers = applyCover(snapshot, bookId, assets)
-        val notes = applyNotes(snapshot, bookId, now)
+        val notes = applyNotes(snapshot, bookId, MediaType.BOOKS, now)
         val sessions = applySessions(snapshot, bookId)
-        val tags = applyTags(snapshot, bookId)
-        val photos = applyPhotos(snapshot, bookId, notes.ids, assets, now)
+        val tags = applyTags(snapshot, bookId, MediaType.BOOKS)
+        val photos = applyPhotos(snapshot, bookId, MediaType.BOOKS, notes.ids, assets, now)
 
         return ApplyStats(
             books = 1,
@@ -115,8 +116,13 @@ class SnapshotApplier @Inject constructor(
      * уже существующие не трогаются. Возвращает id заметок снимка по порядку —
      * на них ссылаются фото ([PhotoSnapshot.noteIndex]).
      */
-    private suspend fun applyNotes(snapshot: BookSnapshot, bookId: Long, now: Long): NotesApplied {
-        val existing = noteRepository.observeByBook(bookId).first().toMutableList()
+    private suspend fun applyNotes(
+        snapshot: BookSnapshot,
+        mediaId: Long,
+        mediaType: MediaType,
+        now: Long,
+    ): NotesApplied {
+        val existing = noteRepository.observeByMedia(mediaId, mediaType).first().toMutableList()
         val ids = ArrayList<Long>(snapshot.notes.size)
         var added = 0
         for (note in snapshot.notes) {
@@ -128,7 +134,8 @@ class SnapshotApplier @Inject constructor(
                 continue
             }
             val entity = NoteEntity(
-                bookId = bookId,
+                mediaId = mediaId,
+                mediaType = mediaType,
                 page = note.page,
                 bodyMd = note.body,
                 kind = note.kind,
@@ -168,13 +175,13 @@ class SnapshotApplier @Inject constructor(
     }
 
     /** Теги: findOrCreate + attachToBook — кросс-ссылка уникальна, дублей нет. */
-    private suspend fun applyTags(snapshot: BookSnapshot, bookId: Long): Int {
+    private suspend fun applyTags(snapshot: BookSnapshot, mediaId: Long, mediaType: MediaType): Int {
         var added = 0
         for (name in snapshot.tags) {
             val tagId = tagRepository.findOrCreate(name)
             // findOrCreate отдаёт -1 на пустом имени — такого тега нет.
             if (tagId <= 0L) continue
-            tagRepository.attachToBook(bookId, tagId)
+            tagRepository.attachToMedia(mediaId, mediaType, tagId)
             added++
         }
         return added
@@ -187,12 +194,13 @@ class SnapshotApplier @Inject constructor(
      */
     private suspend fun applyPhotos(
         snapshot: BookSnapshot,
-        bookId: Long,
+        mediaId: Long,
+        mediaType: MediaType,
         noteIds: List<Long>,
         assets: ImportAssets,
         now: Long,
     ): Int {
-        val paths = photoRepository.observeByBook(bookId).first().map { it.path }.toMutableSet()
+        val paths = photoRepository.observeByMedia(mediaId, mediaType).first().map { it.path }.toMutableSet()
         var added = 0
         for (photo in snapshot.photos) {
             val src = assets.find(photo.archivePath) ?: continue
@@ -201,14 +209,22 @@ class SnapshotApplier @Inject constructor(
             val bytes = try {
                 src.readBytes()
             } catch (e: IOException) {
-                Log.w(TAG, "photo read failed for bookId=$bookId src=$src", e)
+                Log.w(TAG, "photo read failed for mediaId=$mediaId src=$src", e)
                 continue
             }
-            val path = photoStorage.saveNamed("${archive.nameWithoutExtension}_$bookId", bytes.inputStream(), ext)
+            // Тип носителя в имени: id книг и id фильмов считаются независимо
+            // и могут совпасть, а одинаковое содержимое даёт одинаковый md5 —
+            // без типа два разных файла получили бы одно имя.
+            val path = photoStorage.saveNamed(
+                "${archive.nameWithoutExtension}_${mediaType.name.lowercase()}_$mediaId",
+                bytes.inputStream(),
+                ext,
+            )
             if (!paths.add(path)) continue
             photoRepository.insert(
                 PhotoEntity(
-                    bookId = bookId,
+                    mediaId = mediaId,
+                    mediaType = mediaType,
                     // noteIndex — 1-based индекс заметки в снимке.
                     noteId = photo.noteIndex?.let { noteIds.getOrNull(it - 1) },
                     path = path,

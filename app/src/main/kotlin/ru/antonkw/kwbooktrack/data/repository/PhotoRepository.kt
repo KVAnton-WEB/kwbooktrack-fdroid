@@ -2,6 +2,7 @@ package ru.antonkw.kwbooktrack.data.repository
 
 import kotlinx.coroutines.flow.Flow
 import ru.antonkw.kwbooktrack.data.db.dao.PhotoDao
+import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 import ru.antonkw.kwbooktrack.data.db.entity.PhotoEntity
 import ru.antonkw.kwbooktrack.data.storage.PhotoStorage
 import javax.inject.Inject
@@ -12,7 +13,9 @@ class PhotoRepository @Inject constructor(
     private val photoDao: PhotoDao,
     private val photoStorage: PhotoStorage,
 ) {
-    fun observeByBook(bookId: Long): Flow<List<PhotoEntity>> = photoDao.observeByBook(bookId)
+    /** Фото владельца — книга или фильм. */
+    fun observeByMedia(mediaId: Long, mediaType: MediaType): Flow<List<PhotoEntity>> =
+        photoDao.observeByMedia(mediaId, mediaType)
 
     fun observeByNote(noteId: Long): Flow<List<PhotoEntity>> = photoDao.observeByNote(noteId)
 
@@ -20,16 +23,22 @@ class PhotoRepository @Inject constructor(
 
     suspend fun delete(photo: PhotoEntity): Int = photoDao.delete(photo)
 
-    suspend fun deleteForBook(bookId: Long): Int = photoDao.deleteForBook(bookId)
+    suspend fun deleteForMedia(mediaId: Long, mediaType: MediaType): Int =
+        photoDao.deleteForMedia(mediaId, mediaType)
 
     /**
-     * Delete the actual files for a book whose DB rows are about to be wiped
-     * by CASCADE. Reads paths first so we know exactly which files to unlink,
-     * then calls into the storage layer. BookRepository.delete uses this to
-     * avoid leaving orphan files in filesDir/photos/ forever.
+     * Удалить файлы фото владельца, строки которого сейчас будут стёрты.
+     *
+     * Пути читаются заранее — после удаления строк их уже не узнать. Без
+     * этого файлы фото остались бы в `filesDir/photos/` навсегда.
      */
-    suspend fun deleteOrphanFilesForBook(bookId: Long) {
-        val paths = photoDao.pathsForBook(bookId)
+    suspend fun deleteFilesForMedia(mediaId: Long, mediaType: MediaType) {
+        val paths = photoDao.pathsForMedia(mediaId, mediaType)
+        photoStorage.deletePaths(paths)
+    }
+
+    /** Удалить файлы фото по известным путям. */
+    suspend fun deleteFiles(paths: Collection<String>) {
         photoStorage.deletePaths(paths)
     }
 }

@@ -7,7 +7,7 @@ enum class BookStatus {
     ABANDONED,
 }
 
-enum class BookSource {
+enum class MediaSource {
     MANUAL,
     TELLICO,
     BOOKMORY,
@@ -18,4 +18,16 @@ enum class NoteKind {
     NOTE,
     QUOTE,
     REVIEW,
+}
+
+/**
+ * Тип носителя: книга или фильм.
+ *
+ * Владелец заметки, цитаты, тега и фото — не обязательно книга: фильмы
+ * умеют то же самое. Поэтому «владелец» — это пара (`media_id`,
+ * `media_type`), а не один id.
+ */
+enum class MediaType {
+    BOOKS,
+    MOVIES,
 }

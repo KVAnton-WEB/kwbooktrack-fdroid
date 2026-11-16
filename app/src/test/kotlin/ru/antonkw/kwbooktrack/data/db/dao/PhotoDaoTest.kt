@@ -13,6 +13,7 @@ import ru.antonkw.kwbooktrack.data.TestDb
 import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
 import ru.antonkw.kwbooktrack.data.db.entity.PhotoEntity
+import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 
 @RunWith(RobolectricTestRunner::class)
 class PhotoDaoTest {
@@ -41,16 +42,16 @@ class PhotoDaoTest {
     @Test
     fun insertAndRoundTrip() = runTest {
         val id = photoDao.insert(
-            PhotoEntity(bookId = bookId, path = "/tmp/a.jpg", createdAt = 0L),
+            PhotoEntity(mediaId = bookId, mediaType = MediaType.BOOKS, path = "/tmp/a.jpg", createdAt = 0L),
         )
         assertThat(id).isGreaterThan(0L)
     }
 
     @Test
     fun deleteForBookRemovesAll() = runTest {
-        photoDao.insert(PhotoEntity(bookId = bookId, path = "/tmp/a.jpg", createdAt = 0L))
-        photoDao.insert(PhotoEntity(bookId = bookId, path = "/tmp/b.jpg", createdAt = 0L))
-        val deleted = photoDao.deleteForBook(bookId)
+        photoDao.insert(PhotoEntity(mediaId = bookId, mediaType = MediaType.BOOKS, path = "/tmp/a.jpg", createdAt = 0L))
+        photoDao.insert(PhotoEntity(mediaId = bookId, mediaType = MediaType.BOOKS, path = "/tmp/b.jpg", createdAt = 0L))
+        val deleted = photoDao.deleteForMedia(bookId, MediaType.BOOKS)
         assertThat(deleted).isEqualTo(2)
     }
 }

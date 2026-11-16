@@ -1,8 +1,9 @@
 package ru.antonkw.kwbooktrack.data.bookmory
 
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
-import ru.antonkw.kwbooktrack.data.db.entity.BookSource
+import ru.antonkw.kwbooktrack.data.db.entity.MediaSource
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
+import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 import ru.antonkw.kwbooktrack.data.db.entity.NoteEntity
 import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
 import ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity
@@ -63,7 +64,7 @@ class ImportBookmoryUseCase @Inject constructor(
                     finishedAt = parsed.sessions.lastOrNull()?.endedAt?.toEpochMs(),
                     createdAt = System.currentTimeMillis(),
                     updatedAt = System.currentTimeMillis(),
-                    source = BookSource.BOOKMORY,
+                    source = MediaSource.BOOKMORY,
                 ),
             )
             books++
@@ -120,7 +121,8 @@ class ImportBookmoryUseCase @Inject constructor(
                     ?: System.currentTimeMillis()
                 noteRepository.insert(
                     NoteEntity(
-                        bookId = bookId,
+                        mediaId = bookId,
+                        mediaType = MediaType.BOOKS,
                         page = note.page,
                         bodyMd = HtmlToMarkdown.convert(note.content),
                         kind = NoteKind.NOTE,

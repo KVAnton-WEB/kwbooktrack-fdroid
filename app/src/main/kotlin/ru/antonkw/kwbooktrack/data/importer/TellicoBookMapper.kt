@@ -1,7 +1,7 @@
 package ru.antonkw.kwbooktrack.data.importer
 
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
-import ru.antonkw.kwbooktrack.data.db.entity.BookSource
+import ru.antonkw.kwbooktrack.data.db.entity.MediaSource
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
 import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
 import ru.antonkw.kwbooktrack.data.snapshot.BookSnapshot
@@ -57,7 +57,7 @@ class TellicoBookMapper @Inject constructor() {
             finishedAt = parseDate(f(record, "дата-прочтения")),
             createdAt = parseDate(f(record, "cdate")) ?: now,
             updatedAt = parseDate(f(record, "mdate")) ?: now,
-            source = BookSource.TELLICO,
+            source = MediaSource.TELLICO,
             purchaseDate = parseDate(f(record, "pur_date")),
             purchasePrice = parsePrice(f(record, "pur_price")),
             binding = f(record, "binding"),

@@ -33,6 +33,7 @@ import java.io.File
 import java.nio.file.Files
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
+import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 
 /**
  * Импорт родного архива Tellico `.tc`: zip с `tellico.xml`, обложками и фото.
@@ -89,7 +90,7 @@ class TellicoTcImportTest {
         assertThat(book.author).isEqualTo("Фрэнк Герберт")
         assertThat(book.status).isEqualTo(BookStatus.FINISHED)
 
-        val notes = db.noteDao().observeByBook(book.id).first()
+        val notes = db.noteDao().observeByMedia(book.id, MediaType.BOOKS).first()
         val quote = notes.single { it.kind == NoteKind.QUOTE }
         assertThat(quote.page).isEqualTo(1)
         assertThat(quote.bodyMd).isEqualTo("цитата")
@@ -101,7 +102,7 @@ class TellicoTcImportTest {
 
         assertThat(db.tagDao().tagsOf(book.id).map { it.name }).containsExactly("фэнтези")
 
-        val photo = db.photoDao().observeByBook(book.id).first().single()
+        val photo = db.photoDao().observeByMedia(book.id, MediaType.BOOKS).first().single()
         assertThat(photo.noteId).isEqualTo(quote.id)
         assertThat(File(photo.path).exists()).isTrue()
 

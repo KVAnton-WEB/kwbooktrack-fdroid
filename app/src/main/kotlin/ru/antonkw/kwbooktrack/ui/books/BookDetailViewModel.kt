@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
+import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 import ru.antonkw.kwbooktrack.data.db.entity.NoteEntity
 import ru.antonkw.kwbooktrack.data.db.entity.PhotoEntity
 import ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity
@@ -70,8 +71,8 @@ class BookDetailViewModel @Inject constructor(
                     kotlinx.coroutines.flow.flowOf(all.firstOrNull { it.id == bookId })
                 },
                 sessionRepository.observeByBook(bookId),
-                noteRepository.observeByBook(bookId),
-                photoRepository.observeByBook(bookId),
+                noteRepository.observeByMedia(bookId, MediaType.BOOKS),
+                photoRepository.observeByMedia(bookId, MediaType.BOOKS),
             ) { book, sessions, notes, photos ->
                 val progress = computeProgress(book, sessions)
                 BookDetailUiState(
@@ -127,7 +128,7 @@ class BookDetailViewModel @Inject constructor(
             // layer unlinks them. Going through photoStorage keeps the cleanup
             // in one place and avoids unlinking a file the user might have
             // reattached to a different book.
-            val photoPaths = photoRepository.observeByBook(bookId).first().map { it.path }
+            val photoPaths = photoRepository.observeByMedia(bookId, MediaType.BOOKS).first().map { it.path }
             // FK CASCADE on sessions, notes, and photos removes DB records; the
             // repository also runs photoStorage.deletePaths for us.
             bookRepository.deleteById(bookId)

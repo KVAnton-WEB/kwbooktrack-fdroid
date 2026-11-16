@@ -6,6 +6,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
+import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 import ru.antonkw.kwbooktrack.data.db.entity.PhotoEntity
 
 @Dao
@@ -17,8 +18,9 @@ interface PhotoDao {
     @Query("SELECT * FROM photos ORDER BY created_at DESC")
     suspend fun getAll(): List<PhotoEntity>
 
-    @Query("SELECT * FROM photos WHERE book_id = :bookId ORDER BY created_at DESC")
-    fun observeByBook(bookId: Long): Flow<List<PhotoEntity>>
+    /** Фото владельца — книга или фильм. */
+    @Query("SELECT * FROM photos WHERE media_id = :mediaId AND media_type = :mediaType ORDER BY created_at DESC")
+    fun observeByMedia(mediaId: Long, mediaType: MediaType): Flow<List<PhotoEntity>>
 
     @Query("SELECT * FROM photos WHERE note_id = :noteId ORDER BY created_at DESC")
     fun observeByNote(noteId: Long): Flow<List<PhotoEntity>>
@@ -29,13 +31,13 @@ interface PhotoDao {
     @Delete
     suspend fun delete(photo: PhotoEntity): Int
 
-    @Query("DELETE FROM photos WHERE book_id = :bookId")
-    suspend fun deleteForBook(bookId: Long): Int
+    @Query("DELETE FROM photos WHERE media_id = :mediaId AND media_type = :mediaType")
+    suspend fun deleteForMedia(mediaId: Long, mediaType: MediaType): Int
 
     @Query("SELECT COUNT(*) FROM photos")
     suspend fun count(): Int
 
-    /** All paths currently linked to a book, used to delete orphan files after FK cascade. */
-    @Query("SELECT path FROM photos WHERE book_id = :bookId")
-    suspend fun pathsForBook(bookId: Long): List<String>
+    /** Пути файлов, привязанных к владельцу, — чтобы удалить их перед удалением строк. */
+    @Query("SELECT path FROM photos WHERE media_id = :mediaId AND media_type = :mediaType")
+    suspend fun pathsForMedia(mediaId: Long, mediaType: MediaType): List<String>
 }

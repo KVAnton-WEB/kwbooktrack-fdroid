@@ -27,6 +27,7 @@ import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.NoteRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
 import ru.antonkw.kwbooktrack.data.repository.SessionRepository
+import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -137,7 +138,7 @@ class BookDetailViewModelTest {
         advanceUntilIdle()
         noteRepository.insert(
             ru.antonkw.kwbooktrack.data.db.entity.NoteEntity(
-                bookId = bookId,
+                mediaId = bookId, mediaType = MediaType.BOOKS,
                 bodyMd = "test",
                 kind = ru.antonkw.kwbooktrack.data.db.entity.NoteKind.NOTE,
                 createdAt = 0L,
@@ -159,7 +160,7 @@ class BookDetailViewModelTest {
 
         assertThat(bookRepository.findById(bookId)).isNull()
         assertThat(db.readingSessionDao().observeByBook(bookId).first()).isEmpty()
-        assertThat(db.noteDao().observeByBook(bookId).first()).isEmpty()
+        assertThat(db.noteDao().observeByMedia(bookId, MediaType.BOOKS).first()).isEmpty()
     }
 
     @Test

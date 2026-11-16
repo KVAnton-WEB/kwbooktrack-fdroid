@@ -9,7 +9,7 @@ import org.apache.commons.csv.CSVFormat
 import org.apache.commons.csv.CSVParser
 import org.apache.commons.csv.CSVRecord
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
-import ru.antonkw.kwbooktrack.data.db.entity.BookSource
+import ru.antonkw.kwbooktrack.data.db.entity.MediaSource
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
 import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
 import ru.antonkw.kwbooktrack.data.exporter.ExportManifest
@@ -267,7 +267,7 @@ class ImportKwBooktrackZipUseCase @Inject constructor(
             // В старых бэкапах колонок нет — тогда «сейчас», как было раньше.
             createdAt = cell("created_at")?.toLongOrNull() ?: now,
             updatedAt = cell("updated_at")?.toLongOrNull() ?: now,
-            source = cell("source")?.let { runCatching { BookSource.valueOf(it) }.getOrNull() } ?: BookSource.MANUAL,
+            source = cell("source")?.let { runCatching { MediaSource.valueOf(it) }.getOrNull() } ?: MediaSource.MANUAL,
             purchaseDate = parseDate(cell("purchase_date")),
             purchasePrice = cell("purchase_price")?.let { parseDecimal(it) },
             binding = cell("binding"),

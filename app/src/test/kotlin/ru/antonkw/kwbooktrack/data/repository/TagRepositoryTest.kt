@@ -11,6 +11,7 @@ import org.robolectric.RobolectricTestRunner
 import ru.antonkw.kwbooktrack.data.TestDb
 import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.db.dao.TagDao
+import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 
 @RunWith(RobolectricTestRunner::class)
 class TagRepositoryTest {
@@ -63,8 +64,8 @@ class TagRepositoryTest {
             ),
         )
         val tagId = repo.findOrCreate("thriller")
-        repo.attachToBook(bookId = 1L, tagId = tagId)
-        repo.attachToBook(bookId = 1L, tagId = tagId)
+        repo.attachToMedia(mediaId = 1L, mediaType = MediaType.BOOKS, tagId = tagId)
+        repo.attachToMedia(mediaId = 1L, mediaType = MediaType.BOOKS, tagId = tagId)
         // INSERT OR IGNORE on the cross-ref table — duplicates are no-ops, no
         // crash, no double-row. (Room throws on a real dup PK violation
         // without IGNORE; this asserts the contract.)

@@ -2,7 +2,8 @@ package ru.antonkw.kwbooktrack.data.repository
 
 import kotlinx.coroutines.flow.Flow
 import ru.antonkw.kwbooktrack.data.db.dao.TagDao
-import ru.antonkw.kwbooktrack.data.db.entity.BookTagCrossRef
+import ru.antonkw.kwbooktrack.data.db.entity.MediaTagCrossRef
+import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 import ru.antonkw.kwbooktrack.data.db.entity.TagEntity
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -19,9 +20,11 @@ class TagRepository @Inject constructor(
         return tagDao.findOrCreate(normalized)
     }
 
-    suspend fun attachToBook(bookId: Long, tagId: Long) {
-        tagDao.insertCrossRef(BookTagCrossRef(bookId = bookId, tagId = tagId))
+    /** Привязать тег к владельцу — книге или фильму. */
+    suspend fun attachToMedia(mediaId: Long, mediaType: MediaType, tagId: Long) {
+        tagDao.insertCrossRef(MediaTagCrossRef(mediaId = mediaId, mediaType = mediaType, tagId = tagId))
     }
 
-    suspend fun clearForBook(bookId: Long): Int = tagDao.clearCrossRefsForBook(bookId)
+    suspend fun clearForMedia(mediaId: Long, mediaType: MediaType): Int =
+        tagDao.clearCrossRefsForMedia(mediaId, mediaType)
 }

@@ -33,6 +33,7 @@ import java.io.File
 import java.nio.file.Files
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
+import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 
 /**
  * Импорт своего zip-бэкапа: книги со всеми полями, заметки, сессии, теги,
@@ -232,7 +233,7 @@ class ImportKwBooktrackZipUseCaseTest {
             // Чужие поля — из extra.json.
             assertThat(book.extraFields["посоветовал"]?.value).isEqualTo("Книжный поезд")
 
-            val notes = targetNoteRepo.observeByBook(book.id).first()
+            val notes = targetNoteRepo.observeByMedia(book.id, MediaType.BOOKS).first()
             assertThat(notes.map { it.kind }).containsExactly(NoteKind.QUOTE, NoteKind.NOTE)
             assertThat(notes.first { it.kind == NoteKind.QUOTE }.page).isEqualTo(12)
             assertThat(notes.first { it.kind == NoteKind.QUOTE }.createdAt).isEqualTo(1_730_000_000_000L)
@@ -243,7 +244,7 @@ class ImportKwBooktrackZipUseCaseTest {
 
             assertThat(targetTagRepo.observeAll().first().map { it.name }).containsExactly("фэнтези")
 
-            val photos = targetPhotoRepo.observeByBook(book.id).first()
+            val photos = targetPhotoRepo.observeByMedia(book.id, MediaType.BOOKS).first()
             assertThat(photos).hasSize(1)
             // noteIndex — 1-based индекс заметки в снимке: вторая заметка.
             assertThat(photos.single().noteId).isEqualTo(notes.first { it.kind == NoteKind.NOTE }.id)
@@ -302,7 +303,7 @@ class ImportKwBooktrackZipUseCaseTest {
             assertThat(result.imported).isEqualTo(1)
             val book = targetRepo.observeAll().first().single()
             assertThat(book.title).isEqualTo("Старый бэкап")
-            assertThat(targetNoteRepo.observeByBook(book.id).first()).isEmpty()
+            assertThat(targetNoteRepo.observeByMedia(book.id, MediaType.BOOKS).first()).isEmpty()
             // В старом бэкапе колонок меток времени нет — откат на «сейчас».
             assertThat(book.createdAt).isGreaterThan(1_000_000_000_000L)
             assertThat(book.updatedAt).isGreaterThan(1_000_000_000_000L)
@@ -343,9 +344,9 @@ class ImportKwBooktrackZipUseCaseTest {
 
             val book = targetRepo.observeAll().first().single()
             assertThat(targetRepo.observeAll().first()).hasSize(1)
-            assertThat(targetNoteRepo.observeByBook(book.id).first()).hasSize(2)
+            assertThat(targetNoteRepo.observeByMedia(book.id, MediaType.BOOKS).first()).hasSize(2)
             assertThat(targetSessionRepo.observeByBook(book.id).first()).hasSize(1)
-            assertThat(targetPhotoRepo.observeByBook(book.id).first()).hasSize(1)
+            assertThat(targetPhotoRepo.observeByMedia(book.id, MediaType.BOOKS).first()).hasSize(1)
             assertThat(targetDb.tagDao().tagsOf(book.id)).hasSize(1)
         }
     }

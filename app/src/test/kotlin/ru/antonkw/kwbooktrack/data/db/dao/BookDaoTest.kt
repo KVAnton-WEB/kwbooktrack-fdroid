@@ -11,7 +11,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import ru.antonkw.kwbooktrack.data.TestDb
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
-import ru.antonkw.kwbooktrack.data.db.entity.BookSource
+import ru.antonkw.kwbooktrack.data.db.entity.MediaSource
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
 
 @RunWith(RobolectricTestRunner::class)
@@ -41,7 +41,7 @@ class BookDaoTest {
         assertThat(found!!.title).isEqualTo("Dune")
         assertThat(found.author).isEqualTo("Frank Herbert")
         assertThat(found.status).isEqualTo(BookStatus.WISHLIST)
-        assertThat(found.source).isEqualTo(BookSource.MANUAL)
+        assertThat(found.source).isEqualTo(MediaSource.MANUAL)
     }
 
     @Test

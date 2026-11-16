@@ -114,7 +114,7 @@ class TellicoZipImportRealTest {
         assertThat(quotes).isNotEmpty()
         assertThat(reviews).isNotEmpty()
         // Связь с книгой должна быть установлена
-        val orphanNotes = notes.count { db.bookDao().findById(it.bookId) == null }
+        val orphanNotes = notes.count { db.bookDao().findById(it.mediaId) == null }
         assertThat(orphanNotes).isEqualTo(0)
     }
 }

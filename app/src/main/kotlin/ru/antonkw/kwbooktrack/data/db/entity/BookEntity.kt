@@ -55,7 +55,7 @@ data class BookEntity(
     @ColumnInfo(name = "updated_at")
     val updatedAt: Long,
     @ColumnInfo(name = "source")
-    val source: BookSource = BookSource.MANUAL,
+    val source: MediaSource = MediaSource.MANUAL,
     @ColumnInfo(name = "purchase_date")
     val purchaseDate: Long? = null,
     @ColumnInfo(name = "purchase_price")

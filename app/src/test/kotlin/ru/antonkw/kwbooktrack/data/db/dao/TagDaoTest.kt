@@ -12,8 +12,9 @@ import org.robolectric.RobolectricTestRunner
 import ru.antonkw.kwbooktrack.data.TestDb
 import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
-import ru.antonkw.kwbooktrack.data.db.entity.BookTagCrossRef
+import ru.antonkw.kwbooktrack.data.db.entity.MediaTagCrossRef
 import ru.antonkw.kwbooktrack.data.db.entity.TagEntity
+import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 
 @RunWith(RobolectricTestRunner::class)
 class TagDaoTest {
@@ -58,8 +59,8 @@ class TagDaoTest {
     @Test
     fun attachBookTagInsertsCrossRef() = runTest {
         val tagId = tagDao.insert(TagEntity(name = "drama"))
-        tagDao.insertCrossRef(BookTagCrossRef(bookId = bookId, tagId = tagId))
-        val cleared = tagDao.clearCrossRefsForBook(bookId)
+        tagDao.insertCrossRef(MediaTagCrossRef(mediaId = bookId, mediaType = MediaType.BOOKS, tagId = tagId))
+        val cleared = tagDao.clearCrossRefsForMedia(bookId, MediaType.BOOKS)
         assertThat(cleared).isEqualTo(1)
     }
 }

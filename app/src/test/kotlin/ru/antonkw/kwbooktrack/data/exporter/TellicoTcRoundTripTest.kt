@@ -52,6 +52,7 @@ import java.time.LocalDate
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import javax.xml.parsers.DocumentBuilderFactory
+import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 
 /**
  * Экспорт библиотеки в `.tc` (zip с `tellico.xml`, обложками и фото) и обратный
@@ -299,7 +300,7 @@ class TellicoTcRoundTripTest {
         assertThat(book.extraFields["чтец"]?.value).isEqualTo("Иванова")
         assertThat(File(book.coverPath!!).exists()).isTrue()
 
-        val notes = targetDb.noteDao().observeByBook(book.id).first()
+        val notes = targetDb.noteDao().observeByMedia(book.id, MediaType.BOOKS).first()
         assertThat(notes).hasSize(3)
         assertThat(notes.map { it.kind }.toSet()).containsExactly(NoteKind.QUOTE, NoteKind.REVIEW, NoteKind.NOTE)
         assertThat(notes.single { it.kind == NoteKind.QUOTE }.page).isEqualTo(12)
@@ -310,7 +311,7 @@ class TellicoTcRoundTripTest {
 
         assertThat(targetDb.readingSessionDao().observeByBook(book.id).first()).hasSize(1)
         assertThat(targetDb.tagDao().tagsOf(book.id).map { it.name }).containsExactly("фэнтези")
-        val photo = targetDb.photoDao().observeByBook(book.id).first().single()
+        val photo = targetDb.photoDao().observeByMedia(book.id, MediaType.BOOKS).first().single()
         assertThat(File(photo.path).exists()).isTrue()
     }
 
@@ -422,8 +423,8 @@ class TellicoTcRoundTripTest {
         importUseCase(file, ImportFormat.TELLICO_XML, outputDir)
 
         val book = targetDb.bookDao().observeAll().first().single()
-        val notes = targetDb.noteDao().observeByBook(book.id).first()
-        val photo = targetDb.photoDao().observeByBook(book.id).first().single()
+        val notes = targetDb.noteDao().observeByMedia(book.id, MediaType.BOOKS).first()
+        val photo = targetDb.photoDao().observeByMedia(book.id, MediaType.BOOKS).first().single()
         // Фото привязано к цитате — первой заметке снимка (цитата → рецензия → заметка).
         assertThat(photo.noteId).isEqualTo(notes.single { it.kind == NoteKind.QUOTE }.id)
         assertThat(File(photo.path).exists()).isTrue()
@@ -439,10 +440,10 @@ class TellicoTcRoundTripTest {
 
         val book = targetDb.bookDao().observeAll().first().single()
         assertThat(targetDb.bookDao().observeAll().first()).hasSize(1)
-        assertThat(targetDb.noteDao().observeByBook(book.id).first()).hasSize(3)
+        assertThat(targetDb.noteDao().observeByMedia(book.id, MediaType.BOOKS).first()).hasSize(3)
         assertThat(targetDb.readingSessionDao().observeByBook(book.id).first()).hasSize(1)
         assertThat(targetDb.tagDao().tagsOf(book.id)).hasSize(1)
-        assertThat(targetDb.photoDao().observeByBook(book.id).first()).hasSize(1)
+        assertThat(targetDb.photoDao().observeByMedia(book.id, MediaType.BOOKS).first()).hasSize(1)
     }
 
     @Test
@@ -579,7 +580,7 @@ class TellicoTcRoundTripTest {
         )
         val quoteId = sourceNotes.insert(
             NoteEntity(
-                bookId = bookId,
+                mediaId = bookId, mediaType = MediaType.BOOKS,
                 page = 12,
                 bodyMd = "Цитата про хаос",
                 kind = NoteKind.QUOTE,
@@ -589,7 +590,7 @@ class TellicoTcRoundTripTest {
         )
         sourceNotes.insert(
             NoteEntity(
-                bookId = bookId,
+                mediaId = bookId, mediaType = MediaType.BOOKS,
                 bodyMd = "Отзыв",
                 kind = NoteKind.REVIEW,
                 createdAt = day(2024, 1, 15),
@@ -601,7 +602,7 @@ class TellicoTcRoundTripTest {
             // текст без префикса — иначе каждый цикл добавлял бы ещё `::`.
             sourceNotes.insert(
                 NoteEntity(
-                    bookId = bookId,
+                    mediaId = bookId, mediaType = MediaType.BOOKS,
                     bodyMd = "текст без страницы",
                     kind = NoteKind.QUOTE,
                     createdAt = day(2024, 1, 16),
@@ -611,7 +612,7 @@ class TellicoTcRoundTripTest {
         }
         sourceNotes.insert(
             NoteEntity(
-                bookId = bookId,
+                mediaId = bookId, mediaType = MediaType.BOOKS,
                 page = 30,
                 bodyMd = "Заметка\nс переносом",
                 kind = NoteKind.NOTE,
@@ -630,11 +631,11 @@ class TellicoTcRoundTripTest {
                 note = "Читал",
             ),
         )
-        sourceTags.attachToBook(bookId, sourceTags.findOrCreate("фэнтези"))
+        sourceTags.attachToMedia(bookId, MediaType.BOOKS, sourceTags.findOrCreate("фэнтези"))
         val photo = File(tempDir, "photo.png").apply { writeBytes(pngBytes()) }
         sourcePhotos.insert(
             PhotoEntity(
-                bookId = bookId,
+                mediaId = bookId, mediaType = MediaType.BOOKS,
                 noteId = quoteId,
                 path = photo.absolutePath,
                 createdAt = day(2024, 1, 13),
@@ -667,7 +668,7 @@ class TellicoTcRoundTripTest {
     /** Цитаты импортированной книги. */
     private suspend fun targetQuotes(): List<NoteEntity> {
         val book = targetDb.bookDao().observeAll().first().single()
-        return targetDb.noteDao().observeByBook(book.id).first().filter { it.kind == NoteKind.QUOTE }
+        return targetDb.noteDao().observeByMedia(book.id, MediaType.BOOKS).first().filter { it.kind == NoteKind.QUOTE }
     }
 
     private fun zipEntries(file: File): Map<String, ByteArray> {

@@ -121,7 +121,7 @@ class NoteDetailViewModel @Inject constructor(
             }
             val deletedFallback = context.getString(R.string.about_book_deleted_fallback)
             bookRepository.observeAll().combine(photoRepository.observeByNote(noteId)) { books, photos ->
-                val book = books.firstOrNull { it.id == note.bookId }
+                val book = books.firstOrNull { it.id == note.mediaId }
                 NoteDetailUiState.Loaded(
                     note = note,
                     bookTitle = book?.title ?: deletedFallback,
@@ -270,7 +270,7 @@ private fun NoteDetailContent(state: NoteDetailUiState.Loaded, onOpenBook: (Long
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable { onOpenBook(state.note.bookId) },
+                .clickable { onOpenBook(state.note.mediaId) },
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             // AsyncImage falls back to the error branch when the file is missing;

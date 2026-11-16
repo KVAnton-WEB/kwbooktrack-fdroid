@@ -27,6 +27,7 @@ import ru.antonkw.kwbooktrack.data.db.entity.PhotoEntity
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.NoteRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
+import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -68,7 +69,7 @@ class NoteEditorViewModelTest {
     private suspend fun insertNote(bookId: Long, body: String, page: Int? = null): Long =
         noteRepository.insert(
             NoteEntity(
-                bookId = bookId,
+                mediaId = bookId, mediaType = MediaType.BOOKS,
                 page = page,
                 bodyMd = body,
                 kind = NoteKind.NOTE,
@@ -79,7 +80,7 @@ class NoteEditorViewModelTest {
 
     private suspend fun insertPhoto(bookId: Long, noteId: Long, path: String): Long =
         photoRepository.insert(
-            PhotoEntity(bookId = bookId, noteId = noteId, path = path, createdAt = 0L),
+            PhotoEntity(mediaId = bookId, mediaType = MediaType.BOOKS, noteId = noteId, path = path, createdAt = 0L),
         )
 
     @Test
@@ -91,12 +92,12 @@ class NoteEditorViewModelTest {
         vm.save(NoteKind.NOTE)
         advanceUntilIdle()
 
-        val notes = db.noteDao().observeByBook(bookId).first()
+        val notes = db.noteDao().observeByMedia(bookId, MediaType.BOOKS).first()
         assertThat(notes).hasSize(1)
         assertThat(notes.first().page).isEqualTo(100)
         assertThat(notes.first().bodyMd).isEqualTo("Отличная глава.")
         assertThat(notes.first().kind).isEqualTo(NoteKind.NOTE)
-        assertThat(notes.first().bookId).isEqualTo(bookId)
+        assertThat(notes.first().mediaId).isEqualTo(bookId)
     }
 
     @Test
@@ -135,7 +136,7 @@ class NoteEditorViewModelTest {
         val reviews = db.noteDao().observeByKind(NoteKind.REVIEW).first { it.isNotEmpty() }
         assertThat(reviews).hasSize(1)
         assertThat(reviews.first().bodyMd).isEqualTo("Отличная книга.")
-        assertThat(reviews.first().bookId).isEqualTo(bookId)
+        assertThat(reviews.first().mediaId).isEqualTo(bookId)
     }
 
     @Test
@@ -145,7 +146,7 @@ class NoteEditorViewModelTest {
         vm.save(NoteKind.NOTE)
         advanceUntilIdle()
 
-        assertThat(db.noteDao().observeByBook(bookId).first()).isEmpty()
+        assertThat(db.noteDao().observeByMedia(bookId, MediaType.BOOKS).first()).isEmpty()
     }
 
     @Test
@@ -200,7 +201,7 @@ class NoteEditorViewModelTest {
         val vm = newVm(bookId)
         vm.save(NoteKind.NOTE)
         advanceUntilIdle()
-        assertThat(db.noteDao().observeByBook(bookId).first()).isEmpty()
+        assertThat(db.noteDao().observeByMedia(bookId, MediaType.BOOKS).first()).isEmpty()
         assertThat(vm.state.value.saved).isFalse()
     }
 
@@ -210,7 +211,7 @@ class NoteEditorViewModelTest {
         val vm = newVm(bookId)
         vm.save(NoteKind.QUOTE)
         advanceUntilIdle()
-        assertThat(db.noteDao().observeByBook(bookId).first()).isEmpty()
+        assertThat(db.noteDao().observeByMedia(bookId, MediaType.BOOKS).first()).isEmpty()
     }
 
     @Test

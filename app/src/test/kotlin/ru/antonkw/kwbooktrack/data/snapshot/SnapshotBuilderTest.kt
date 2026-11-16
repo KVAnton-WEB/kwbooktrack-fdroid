@@ -13,7 +13,7 @@ import ru.antonkw.kwbooktrack.data.NoOpPhotoStorage
 import ru.antonkw.kwbooktrack.data.TestDb
 import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
-import ru.antonkw.kwbooktrack.data.db.entity.BookTagCrossRef
+import ru.antonkw.kwbooktrack.data.db.entity.MediaTagCrossRef
 import ru.antonkw.kwbooktrack.data.db.entity.NoteEntity
 import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
 import ru.antonkw.kwbooktrack.data.db.entity.PhotoEntity
@@ -24,6 +24,7 @@ import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
 import ru.antonkw.kwbooktrack.data.snapshot.ExtraField
 import java.io.File
 import java.nio.file.Files
+import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 
 @RunWith(RobolectricTestRunner::class)
 class SnapshotBuilderTest {
@@ -64,7 +65,7 @@ class SnapshotBuilderTest {
         // (createdAt) и с рангом вида — сортировать должен сборщик.
         db.noteDao().insert(
             NoteEntity(
-                bookId = bookId,
+                mediaId = bookId, mediaType = MediaType.BOOKS,
                 bodyMd = "Поздняя заметка",
                 kind = NoteKind.NOTE,
                 createdAt = 400L,
@@ -73,7 +74,7 @@ class SnapshotBuilderTest {
         )
         db.noteDao().insert(
             NoteEntity(
-                bookId = bookId,
+                mediaId = bookId, mediaType = MediaType.BOOKS,
                 bodyMd = "Рецензия",
                 kind = NoteKind.REVIEW,
                 createdAt = 200L,
@@ -82,7 +83,7 @@ class SnapshotBuilderTest {
         )
         db.noteDao().insert(
             NoteEntity(
-                bookId = bookId,
+                mediaId = bookId, mediaType = MediaType.BOOKS,
                 bodyMd = "Цитата",
                 kind = NoteKind.QUOTE,
                 createdAt = 100L,
@@ -91,7 +92,7 @@ class SnapshotBuilderTest {
         )
         val noteId = db.noteDao().insert(
             NoteEntity(
-                bookId = bookId,
+                mediaId = bookId, mediaType = MediaType.BOOKS,
                 bodyMd = "Заметка",
                 kind = NoteKind.NOTE,
                 createdAt = 300L,
@@ -102,11 +103,11 @@ class SnapshotBuilderTest {
             ReadingSessionEntity(bookId = bookId, startedAt = 1_730_000_000_000L),
         )
         val tagId = db.tagDao().insert(TagEntity(name = "фэнтези"))
-        db.tagDao().insertCrossRef(BookTagCrossRef(bookId = bookId, tagId = tagId))
+        db.tagDao().insertCrossRef(MediaTagCrossRef(mediaId = bookId, mediaType = MediaType.BOOKS, tagId = tagId))
         val photoFile = File(tempDir, "photo.jpg").apply { writeBytes(PHOTO_BYTES) }
         db.photoDao().insert(
             PhotoEntity(
-                bookId = bookId,
+                mediaId = bookId, mediaType = MediaType.BOOKS,
                 noteId = noteId,
                 path = photoFile.absolutePath,
                 createdAt = 500L,
@@ -163,7 +164,7 @@ class SnapshotBuilderTest {
         )
         val photoId = db.photoDao().insert(
             PhotoEntity(
-                bookId = bookId,
+                mediaId = bookId, mediaType = MediaType.BOOKS,
                 path = File(tempDir, "missing.jpg").absolutePath,
                 createdAt = 1L,
             ),

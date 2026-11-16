@@ -55,7 +55,7 @@ class NotesListViewModel @Inject constructor(
         val items = notes
             .filter { it.kind != NoteKind.REVIEW }
             .map { note ->
-                val book = booksById[note.bookId]
+                val book = booksById[note.mediaId]
                 NoteListItem(
                     note = note,
                     bookTitle = book?.title ?: "(книга удалена)",

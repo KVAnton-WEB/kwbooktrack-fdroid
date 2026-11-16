@@ -2,10 +2,12 @@ package ru.antonkw.kwbooktrack.data.repository
 
 import androidx.sqlite.db.SimpleSQLiteQuery
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import ru.antonkw.kwbooktrack.data.db.dao.BookDao
 import ru.antonkw.kwbooktrack.data.db.dao.TagDao
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
+import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 import ru.antonkw.kwbooktrack.data.storage.CoverStorage
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -101,20 +103,24 @@ class BookRepository @Inject constructor(
         // Delete the row first; if DAO throws, the cover file remains, which is
         // harmless (orphan on disk) compared to a missing cover file with a row
         // still pointing at it.
-        val rows = bookDao.delete(book)
+        // Пути файлов фото читаем ДО удаления строк: после их уже не узнать.
+        val photoPaths = photoRepository.observeByMedia(book.id, MediaType.BOOKS).first().map { it.path }
+        // Сессии чтения уйдут каскадом — внешний ключ на `books` у них остался.
+        // Заметки, фото и связи тегов чистит DAO: внешнего ключа на `books` у
+        // них больше нет.
+        val rows = bookDao.deleteWithContent(book.id)
         if (rows > 0) {
-            // Pull orphan photo paths before the CASCADE wiped them; without
-            // this the actual files in filesDir/photos/ leak forever.
-            photoRepository.deleteOrphanFilesForBook(book.id)
+            photoRepository.deleteFiles(photoPaths)
             coverStorage.deleteForBook(book.id)
         }
         return rows
     }
 
     suspend fun deleteById(id: Long): Int {
-        val rows = bookDao.deleteById(id)
+        val photoPaths = photoRepository.observeByMedia(id, MediaType.BOOKS).first().map { it.path }
+        val rows = bookDao.deleteWithContent(id)
         if (rows > 0) {
-            photoRepository.deleteOrphanFilesForBook(id)
+            photoRepository.deleteFiles(photoPaths)
             coverStorage.deleteForBook(id)
         }
         return rows

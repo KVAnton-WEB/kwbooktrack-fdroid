@@ -12,7 +12,7 @@ import org.robolectric.RobolectricTestRunner
 import ru.antonkw.kwbooktrack.data.TestDb
 import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
-import ru.antonkw.kwbooktrack.data.db.entity.BookSource
+import ru.antonkw.kwbooktrack.data.db.entity.MediaSource
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
 import ru.antonkw.kwbooktrack.data.snapshot.ExtraField
 
@@ -130,7 +130,7 @@ class BookDaoMergeTest {
                 author = "Dan Simmons",
                 createdAt = 0L,
                 updatedAt = 0L,
-                source = BookSource.BOOKMORY,
+                source = MediaSource.BOOKMORY,
             ),
         )
         dao.upsertFromImport(
@@ -139,11 +139,11 @@ class BookDaoMergeTest {
                 author = "Dan Simmons",
                 createdAt = 0L,
                 updatedAt = 0L,
-                source = BookSource.TELLICO,
+                source = MediaSource.TELLICO,
             ),
         )
 
-        assertThat(dao.observeAll().first().first().source).isEqualTo(BookSource.BOOKMORY)
+        assertThat(dao.observeAll().first().first().source).isEqualTo(MediaSource.BOOKMORY)
     }
 
     @Test

@@ -5,8 +5,9 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
-import ru.antonkw.kwbooktrack.data.db.entity.BookTagCrossRef
-import ru.antonkw.kwbooktrack.data.db.entity.BookTagName
+import ru.antonkw.kwbooktrack.data.db.entity.MediaTagCrossRef
+import ru.antonkw.kwbooktrack.data.db.entity.MediaTagName
+import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 import ru.antonkw.kwbooktrack.data.db.entity.TagEntity
 
 @Dao
@@ -18,24 +19,25 @@ interface TagDao {
     suspend fun findByName(name: String): TagEntity?
 
     /**
-     * Теги всех книг по одному запросу — по алфавиту, как их показывает список тегов.
+     * Теги всех владельцев по одному запросу — по алфавиту, как их показывает
+     * список тегов.
      *
-     * Запрос на книгу стоил бы запроса на каждую книгу библиотеки.
+     * Запрос на владельца стоил бы запроса на каждую книгу библиотеки.
      */
     @Query(
-        "SELECT bt.book_id AS book_id, t.name AS name FROM tags t " +
-            "JOIN book_tags bt ON bt.tag_id = t.id ORDER BY t.name",
+        "SELECT mt.media_id AS media_id, mt.media_type AS media_type, t.name AS name FROM tags t " +
+            "JOIN media_tags mt ON mt.tag_id = t.id ORDER BY t.name",
     )
-    suspend fun tagsForAllBooks(): List<BookTagName>
+    suspend fun tagsForAllMedia(): List<MediaTagName>
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insert(tag: TagEntity): Long
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
-    suspend fun insertCrossRef(ref: BookTagCrossRef): Long
+    suspend fun insertCrossRef(ref: MediaTagCrossRef): Long
 
-    @Query("DELETE FROM book_tags WHERE book_id = :bookId")
-    suspend fun clearCrossRefsForBook(bookId: Long): Int
+    @Query("DELETE FROM media_tags WHERE media_id = :mediaId AND media_type = :mediaType")
+    suspend fun clearCrossRefsForMedia(mediaId: Long, mediaType: MediaType): Int
 
     @Query("DELETE FROM tags")
     suspend fun deleteAll(): Int

@@ -26,6 +26,7 @@ import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.NoteRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
+import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -71,13 +72,13 @@ class NotesListViewModelTest {
             BookEntity(title = "Dune", author = "Herbert", createdAt = 0L, updatedAt = 0L),
         )
         noteRepository.insert(
-            NoteEntity(bookId = bookId, bodyMd = "Note", kind = NoteKind.NOTE, createdAt = 0L, updatedAt = 0L),
+            NoteEntity(mediaId = bookId, mediaType = MediaType.BOOKS, bodyMd = "Note", kind = NoteKind.NOTE, createdAt = 0L, updatedAt = 0L),
         )
         noteRepository.insert(
-            NoteEntity(bookId = bookId, bodyMd = "Quote", kind = NoteKind.QUOTE, createdAt = 0L, updatedAt = 0L),
+            NoteEntity(mediaId = bookId, mediaType = MediaType.BOOKS, bodyMd = "Quote", kind = NoteKind.QUOTE, createdAt = 0L, updatedAt = 0L),
         )
         noteRepository.insert(
-            NoteEntity(bookId = bookId, bodyMd = "Review", kind = NoteKind.REVIEW, createdAt = 0L, updatedAt = 0L),
+            NoteEntity(mediaId = bookId, mediaType = MediaType.BOOKS, bodyMd = "Review", kind = NoteKind.REVIEW, createdAt = 0L, updatedAt = 0L),
         )
 
         val vm = NotesListViewModel(noteRepository, bookRepository)
@@ -99,7 +100,7 @@ class NotesListViewModelTest {
             BookEntity(title = "Temp", author = "Anon", createdAt = 0L, updatedAt = 0L),
         )
         noteRepository.insert(
-            NoteEntity(bookId = bookId, bodyMd = "to be cascaded", kind = NoteKind.NOTE, createdAt = 0L, updatedAt = 0L),
+            NoteEntity(mediaId = bookId, mediaType = MediaType.BOOKS, bodyMd = "to be cascaded", kind = NoteKind.NOTE, createdAt = 0L, updatedAt = 0L),
         )
 
         val vmBefore = NotesListViewModel(noteRepository, bookRepository)

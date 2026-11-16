@@ -106,6 +106,34 @@ interface BookDao {
             insert(book)
         }
     }
+
+    /**
+     * Удалить книгу вместе с её заметками, фото и связями тегов.
+     *
+     * Внешнего ключа на `books` у заметок, фото и тегов больше нет: владельцем
+     * может быть и фильм, а фильма в `books` нет, и внешний ключ его бы не
+     * пустил. Поэтому каскада не будет — содержимое удаляем сами, одной
+     * транзакцией, чтобы не оставить книгу без заметок на полпути.
+     *
+     * Сессии чтения не трогаем: у них внешний ключ на `books` остался, и они
+     * уйдут каскадом сами.
+     */
+    @Transaction
+    suspend fun deleteWithContent(bookId: Long): Int {
+        deleteTagRefs(bookId)
+        deletePhotos(bookId)
+        deleteNotes(bookId)
+        return deleteById(bookId)
+    }
+
+    @Query("DELETE FROM media_tags WHERE media_id = :bookId AND media_type = 'BOOKS'")
+    suspend fun deleteTagRefs(bookId: Long): Int
+
+    @Query("DELETE FROM photos WHERE media_id = :bookId AND media_type = 'BOOKS'")
+    suspend fun deletePhotos(bookId: Long): Int
+
+    @Query("DELETE FROM notes WHERE media_id = :bookId AND media_type = 'BOOKS'")
+    suspend fun deleteNotes(bookId: Long): Int
 }
 
 /**
