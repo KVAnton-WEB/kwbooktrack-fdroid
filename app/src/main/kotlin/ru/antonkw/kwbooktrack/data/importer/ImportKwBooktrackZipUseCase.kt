@@ -11,14 +11,20 @@ import org.apache.commons.csv.CSVRecord
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
 import ru.antonkw.kwbooktrack.data.db.entity.MediaSource
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
+import ru.antonkw.kwbooktrack.data.db.entity.MovieEntity
 import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
 import ru.antonkw.kwbooktrack.data.exporter.ExportManifest
 import ru.antonkw.kwbooktrack.data.snapshot.BookExtras
 import ru.antonkw.kwbooktrack.data.snapshot.BookSnapshot
 import ru.antonkw.kwbooktrack.data.snapshot.ExtraArchive
 import ru.antonkw.kwbooktrack.data.snapshot.ImportAssets
+import ru.antonkw.kwbooktrack.data.snapshot.MovieExtras
+import ru.antonkw.kwbooktrack.data.snapshot.MovieSnapshot
+import ru.antonkw.kwbooktrack.data.snapshot.NoteJson
 import ru.antonkw.kwbooktrack.data.snapshot.NoteSnapshot
+import ru.antonkw.kwbooktrack.data.snapshot.PhotoJson
 import ru.antonkw.kwbooktrack.data.snapshot.PhotoSnapshot
+import ru.antonkw.kwbooktrack.data.snapshot.SessionJson
 import ru.antonkw.kwbooktrack.data.snapshot.SessionSnapshot
 import ru.antonkw.kwbooktrack.data.snapshot.SnapshotApplier
 import ru.antonkw.kwbooktrack.data.text.parseDecimal
@@ -31,11 +37,13 @@ import java.util.zip.ZipFile
 import javax.inject.Inject
 
 /**
- * Импорт своего zip-бэкапа приложения (`manifest.json` + `books.csv` + `extra.json`).
+ * Импорт своего zip-бэкапа приложения (`manifest.json` + `books.csv` +
+ * `movies.csv` + `extra.json`).
  *
  * Книги и всё, что к ним относится (заметки, сессии, теги, фото, чужие поля),
  * собираются в снимки и вливаются [SnapshotApplier] — тем же путём, что и
- * импорт Tellico, поэтому повторный импорт не плодит дубли.
+ * импорт Tellico, поэтому повторный импорт не плодит дубли. Фильмы — так же,
+ * только без сессий чтения.
  *
  * Архив распаковывается во временный каталог рядом с выходным — оттуда
  * берутся обложки и фото. Каталог удаляется в `finally`.
@@ -61,6 +69,7 @@ class ImportKwBooktrackZipUseCase @Inject constructor(
             val assets = ImportAssets(staging, outputDir)
             var imported = 0
             var skipped = 0
+            var movies = 0
             var coversCopied = 0
             var notesImported = 0
             val errors = mutableListOf<Throwable>()
@@ -84,13 +93,36 @@ class ImportKwBooktrackZipUseCase @Inject constructor(
                     skipped++
                 }
             }
+            // Фильмы — те же правила, только без сессий чтения.
+            for (row in prepared.movieRows) {
+                val movie = row.movie
+                if (movie == null) {
+                    skipped++
+                    continue
+                }
+                try {
+                    val snapshot = movieSnapshot(movie, prepared.movieExtras[row.id])
+                    val stats = withContext(Dispatchers.IO) { applier.apply(snapshot, assets) }
+                    imported++
+                    movies++
+                    coversCopied += stats.covers
+                    notesImported += stats.notes + stats.tags + stats.photos
+                } catch (e: CancellationException) {
+                    // Отмена импорта — не ошибка записи: пробрасываем дальше.
+                    throw e
+                } catch (e: Exception) {
+                    errors += e
+                    skipped++
+                }
+            }
             return ImportTellicoResult(
-                total = prepared.rows.size,
+                total = prepared.rows.size + prepared.movieRows.size,
                 imported = imported,
                 skipped = skipped,
                 coversCopied = coversCopied,
                 notesImported = notesImported,
                 dryRun = false,
+                movies = movies,
                 errors = errors,
                 warnings = prepared.warnings,
             )
@@ -129,11 +161,22 @@ class ImportKwBooktrackZipUseCase @Inject constructor(
         val csvFile = findFile(staging, "books.csv")
             ?: throw IllegalStateException("books.csv не найден в архиве")
         val rows = readRows(csvFile)
-        // `extra.json` может отсутствовать (старый бэкап) — тогда импортируются только книги.
+        // `movies.csv` может отсутствовать (старый бэкап) — тогда фильмов ноль.
+        val moviesFile = findFile(staging, "movies.csv")
+        val movieRows = if (moviesFile == null) emptyList() else readMovieRows(moviesFile)
+        // `extra.json` может отсутствовать (старый бэкап) — тогда импортируются
+        // только сами книги и фильмы.
         val extrasFile = findFile(staging, "extra.json")
-        val extras = readExtras(extrasFile)
-        return Prepared(rows, extras, warnings(manifest, extrasFile, extras, rows))
+        val archive = readExtras(extrasFile)
+        val extras = archive.books.extrasById()
+        val movieExtras = archive.movies.extrasById()
+        return Prepared(rows, movieRows, extras, movieExtras, warnings(manifest, extrasFile, extras, rows))
     }
+
+    /** Ключи `extra.json` — id строки строкой; не число — не привязать. */
+    private fun <T> Map<String, T>.extrasById(): Map<Long, T> = mapNotNull { (id, extras) ->
+        id.toLongOrNull()?.let { it to extras }
+    }.toMap()
 
     /**
      * Предупреждения импорта.
@@ -170,10 +213,15 @@ class ImportKwBooktrackZipUseCase @Inject constructor(
     /** Строки `books.csv`: id книги в архиве и сама книга (null — без названия). */
     private class BookRow(val id: Long?, val book: BookEntity?)
 
-    /** Прочитанный архив: книги, `extra.json` по id книги и предупреждения. */
+    /** Строки `movies.csv`: id фильма в архиве и сам фильм (null — без названия). */
+    private class MovieRow(val id: Long?, val movie: MovieEntity?)
+
+    /** Прочитанный архив: книги, фильмы, `extra.json` и предупреждения. */
     private class Prepared(
         val rows: List<BookRow>,
+        val movieRows: List<MovieRow>,
         val extras: Map<Long, BookExtras>,
+        val movieExtras: Map<Long, MovieExtras>,
         val warnings: List<String>,
     )
 
@@ -195,50 +243,66 @@ class ImportKwBooktrackZipUseCase @Inject constructor(
         }
     }
 
-    private fun readRows(csvFile: File): List<BookRow> = try {
+    private fun readRows(csvFile: File): List<BookRow> = readCsv(csvFile, "books.csv").map { row ->
+        BookRow(id = row.cell("id")?.toLongOrNull(), book = row.toBook())
+    }
+
+    private fun readMovieRows(csvFile: File): List<MovieRow> = readCsv(csvFile, "movies.csv").map { row ->
+        MovieRow(id = row.cell("id")?.toLongOrNull(), movie = row.toMovie())
+    }
+
+    /**
+     * CSV архива — строки со значениями колонок по имени.
+     *
+     * Индекс колонок: колонки может не быть (старый бэкап), а строка может
+     * быть короче заголовка — значение тогда просто отсутствует.
+     */
+    private fun readCsv(csvFile: File, name: String): List<CsvRow> = try {
         CSVParser(csvFile.reader(), FORMAT).use { parser ->
-            // Индекс колонок: колонки может не быть (старый бэкап), а строка
-            // может быть короче заголовка — значение тогда просто отсутствует.
-            val indexes = parser.headerNames.withIndex().associate { (index, name) -> name to index }
-            parser.records.map { record ->
-                val row = CsvRow(record, indexes)
-                BookRow(id = row.cell("id")?.toLongOrNull(), book = row.toBook())
-            }
+            val indexes = parser.headerNames.withIndex().associate { (index, column) -> column to index }
+            parser.records.map { record -> CsvRow(record, indexes) }
         }
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
-        throw IllegalStateException("books.csv не прочитан: ${e.message}")
+        throw IllegalStateException("$name не прочитан: ${e.message}")
     }
 
     /**
-     * `extra.json` — заметки, сессии, теги, фото и чужие поля по id книги.
+     * `extra.json` — заметки, сессии, теги, фото и чужие поля по id книги и
+     * по id фильма.
      *
-     * Ключ — id книги строкой. Битый `extra.json` — не повод ронять импорт:
-     * книги из `books.csv` импортируются без недостающих данных.
+     * Ключ — id строки строкой. Битый `extra.json` — не повод ронять импорт:
+     * книги и фильмы из CSV импортируются без недостающих данных.
      */
-    private fun readExtras(file: File?): Map<Long, BookExtras> {
-        if (file == null) return emptyMap()
-        val archive = try {
+    private fun readExtras(file: File?): ExtraArchive {
+        if (file == null) return ExtraArchive()
+        return try {
             JSON.decodeFromString(ExtraArchive.serializer(), file.readText())
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             Log.w(TAG, "extra.json не прочитан", e)
-            return emptyMap()
+            ExtraArchive()
         }
-        return archive.books.mapNotNull { (id, extras) ->
-            id.toLongOrNull()?.let { it to extras }
-        }.toMap()
     }
 
     /** Снимок книги: сама книга + то, что лежит в `extra.json`. */
     private fun snapshot(book: BookEntity, extras: BookExtras?): BookSnapshot = BookSnapshot(
         book = book,
-        notes = extras?.noteSnapshots().orEmpty(),
-        sessions = extras?.sessionSnapshots().orEmpty(),
+        notes = extras?.notes?.noteSnapshots().orEmpty(),
+        sessions = extras?.sessions?.sessionSnapshots().orEmpty(),
         tags = extras?.tags.orEmpty(),
-        photos = extras?.photoSnapshots().orEmpty(),
+        photos = extras?.photos?.photoSnapshots().orEmpty(),
+        extraFields = extras?.extraFields.orEmpty(),
+    )
+
+    /** Снимок фильма: сам фильм + то, что лежит в `extra.json`. */
+    private fun movieSnapshot(movie: MovieEntity, extras: MovieExtras?): MovieSnapshot = MovieSnapshot(
+        movie = movie,
+        notes = extras?.notes?.noteSnapshots().orEmpty(),
+        tags = extras?.tags.orEmpty(),
+        photos = extras?.photos?.photoSnapshots().orEmpty(),
         extraFields = extras?.extraFields.orEmpty(),
     )
 
@@ -284,6 +348,41 @@ class ImportKwBooktrackZipUseCase @Inject constructor(
             isGift = isTrue(cell("is_gift")),
             isLent = isTrue(cell("is_lent")),
             isSold = isTrue(cell("is_sold")),
+        )
+    }
+
+    /**
+     * Строка `movies.csv` → фильм.
+     *
+     * Поисковые колонки (`title_search`, `people_search`) не читаем: их
+     * считает репозиторий при вставке.
+     */
+    private fun CsvRow.toMovie(): MovieEntity? {
+        val title = cell("title").orEmpty()
+        if (title.isEmpty()) return null
+        val now = System.currentTimeMillis()
+        return MovieEntity(
+            title = title,
+            originalTitle = cell("original_title"),
+            year = cell("year")?.toIntOrNull(),
+            genre = cell("genre"),
+            nationality = cell("nationality"),
+            director = cell("director"),
+            cast = cell("cast"),
+            durationMin = cell("duration_min")?.toIntOrNull(),
+            rating = cell("rating")?.toIntOrNull(),
+            watchedAt = parseDate(cell("watched_at")),
+            // Имя файла обложки в архиве: локальный путь источника нам не нужен.
+            coverPath = cell("cover_path")?.substringAfterLast('/'),
+            plot = cell("plot"),
+            comments = cell("comments"),
+            url = cell("url"),
+            isDownloaded = isTrue(cell("is_downloaded")),
+            // Метки времени — в миллисекундах epoch, как их хранит БД.
+            // В старых бэкапах колонок нет — тогда «сейчас», как было раньше.
+            createdAt = cell("created_at")?.toLongOrNull() ?: now,
+            updatedAt = cell("updated_at")?.toLongOrNull() ?: now,
+            source = cell("source")?.let { runCatching { MediaSource.valueOf(it) }.getOrNull() } ?: MediaSource.MANUAL,
         )
     }
 
@@ -376,7 +475,13 @@ class ImportKwBooktrackZipUseCase @Inject constructor(
     }
 }
 
-private fun BookExtras.noteSnapshots(): List<NoteSnapshot> = notes.map { note ->
+/**
+ * Заметки из `extra.json` — в снимок.
+ *
+ * Расширение на списке заметок, а не на `BookExtras`/`MovieExtras`: заметки
+ * одинаковы и у книги, и у фильма.
+ */
+private fun List<NoteJson>.noteSnapshots(): List<NoteSnapshot> = map { note ->
     NoteSnapshot(
         kind = runCatching { NoteKind.valueOf(note.kind) }.getOrDefault(NoteKind.NOTE),
         body = note.body,
@@ -385,7 +490,7 @@ private fun BookExtras.noteSnapshots(): List<NoteSnapshot> = notes.map { note ->
     )
 }
 
-private fun BookExtras.sessionSnapshots(): List<SessionSnapshot> = sessions.map { session ->
+private fun List<SessionJson>.sessionSnapshots(): List<SessionSnapshot> = map { session ->
     SessionSnapshot(
         startedAt = session.startedAt,
         endedAt = session.endedAt,
@@ -396,7 +501,7 @@ private fun BookExtras.sessionSnapshots(): List<SessionSnapshot> = sessions.map 
     )
 }
 
-private fun BookExtras.photoSnapshots(): List<PhotoSnapshot> = photos.map { photo ->
+private fun List<PhotoJson>.photoSnapshots(): List<PhotoSnapshot> = map { photo ->
     PhotoSnapshot(
         archivePath = photo.file,
         noteIndex = photo.noteIndex,

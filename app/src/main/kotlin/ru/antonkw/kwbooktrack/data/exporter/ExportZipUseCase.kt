@@ -8,12 +8,17 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
+import ru.antonkw.kwbooktrack.data.db.entity.MovieEntity
 import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
 import ru.antonkw.kwbooktrack.data.snapshot.BookExtras
 import ru.antonkw.kwbooktrack.data.snapshot.BookSnapshot
 import ru.antonkw.kwbooktrack.data.snapshot.ExtraArchive
+import ru.antonkw.kwbooktrack.data.snapshot.MovieExtras
+import ru.antonkw.kwbooktrack.data.snapshot.MovieSnapshot
 import ru.antonkw.kwbooktrack.data.snapshot.NoteJson
+import ru.antonkw.kwbooktrack.data.snapshot.NoteSnapshot
 import ru.antonkw.kwbooktrack.data.snapshot.PhotoJson
+import ru.antonkw.kwbooktrack.data.snapshot.PhotoSnapshot
 import ru.antonkw.kwbooktrack.data.snapshot.SessionJson
 import ru.antonkw.kwbooktrack.data.snapshot.SnapshotBuilder
 import ru.antonkw.kwbooktrack.data.text.formatDecimal
@@ -58,12 +63,13 @@ data class ExportCounts(
 )
 
 /**
- * Свой zip-бэкап приложения: `manifest.json` + `books.csv` + `extra.json` +
- * обложки (`covers/`) и фото заметок (`photos/`).
+ * Свой zip-бэкап приложения: `manifest.json` + `books.csv` + `movies.csv` +
+ * `extra.json` + обложки (`covers/`) и фото заметок (`photos/`).
  *
  * `books.csv` — только поля книги; всё, что к книге относится (заметки,
  * сессии чтения, теги, фото, чужие поля Tellico), лежит в `extra.json` по
- * id книги — иначе экспорт терял бы их. Формат `extra.json` читает
+ * id книги — иначе экспорт терял бы их. Фильмы устроены так же: `movies.csv`
+ * и секция `movies` в `extra.json`. Формат `extra.json` читает
  * `ImportKwBooktrackZipUseCase`.
  */
 class ExportZipUseCase @Inject constructor(
@@ -80,13 +86,15 @@ class ExportZipUseCase @Inject constructor(
      * SAF `CreateDocument` URI and write straight into the user-chosen target.
      */
     suspend operator fun invoke(output: OutputStream): ExportManifest {
-        // Снимок целиком и в одной транзакции: книги и всё, что к ним
+        // Снимок целиком и в одной транзакции: книги, фильмы и всё, что к ним
         // относится, должны быть из одного состояния БД — иначе манифест
         // разойдётся с содержимым архива.
-        val snapshots = database.withTransaction { snapshotBuilder.buildAll() }
-        // Подготовка — stat по каждой книге и каждому фото: это файловый I/O,
+        val (snapshots, movieSnapshots) = database.withTransaction {
+            snapshotBuilder.buildAll() to snapshotBuilder.buildMovies()
+        }
+        // Подготовка — stat по каждой книге, фильму и каждому фото: это файловый I/O,
         // из `viewModelScope` он шёл бы на главном потоке.
-        val prepared = withContext(Dispatchers.IO) { prepare(snapshots) }
+        val prepared = withContext(Dispatchers.IO) { prepare(snapshots, movieSnapshots) }
         val manifest = ExportManifest(
             appVersion = versionProvider.appVersion,
             exportedAt = System.currentTimeMillis(),
@@ -106,13 +114,19 @@ class ExportZipUseCase @Inject constructor(
                 writeCsv(zip, prepared.books.map { it.book })
                 zip.closeEntry()
 
-                // extra.json — заметки, сессии, теги, фото и чужие поля по id книги.
+                // movies.csv — те же правила, что у books.csv.
+                zip.putNextEntry(ZipEntry("movies.csv"))
+                writeMoviesCsv(zip, prepared.movies.map { it.movie })
+                zip.closeEntry()
+
+                // extra.json — заметки, сессии, теги, фото и чужие поля по id
+                // книги и по id фильма.
                 zip.putNextEntry(ZipEntry("extra.json"))
-                val extra = JSON.encodeToString(ExtraArchive.serializer(), extraArchive(prepared.books))
+                val extra = JSON.encodeToString(ExtraArchive.serializer(), extraArchive(prepared.books, prepared.movies))
                 zip.write(extra.toByteArray(StandardCharsets.UTF_8))
                 zip.closeEntry()
 
-                // covers/ — обложки книг.
+                // covers/ — обложки книг и фильмов.
                 prepared.covers.forEach { (name, file) ->
                     writeFile(zip, "covers/$name", file)
                 }
@@ -174,14 +188,48 @@ class ExportZipUseCase @Inject constructor(
     }
 
     /**
-     * Снимки → то, что попадёт в архив: книги, обложки, фото и счётчики.
+     * `movies.csv`: заголовок + строка на фильм.
      *
-     * Обложка кладётся под именем файла из `cover_path` — импорт ищет её
-     * именно по этому имени. Фото без файла в архив не попадает и в
-     * `extra.json` не упоминается.
+     * Правила те же, что у `books.csv`: разделитель `;`, кавычки по общему
+     * правилу, даты ISO, пустое значение — пустая строка. Заметки, теги, фото
+     * и чужие поля фильма — в `extra.json`.
      */
-    private fun prepare(snapshots: List<BookSnapshot>): Prepared {
+    private fun writeMoviesCsv(zip: ZipOutputStream, movies: List<MovieEntity>) {
+        zip.write(MOVIES_HEADER.toByteArray(StandardCharsets.UTF_8))
+        zip.write("\n".toByteArray(StandardCharsets.UTF_8))
+        movies.forEach { movie ->
+            val line = listOf(
+                csvField(movie.title),
+                csvField(movie.originalTitle.orEmpty()),
+                csvField(movie.year?.toString().orEmpty()),
+                csvField(movie.genre.orEmpty()),
+                csvField(movie.nationality.orEmpty()),
+                csvField(movie.director.orEmpty()),
+                csvField(movie.cast.orEmpty()),
+                csvField(movie.durationMin?.toString().orEmpty()),
+                csvField(movie.rating?.toString().orEmpty()),
+                csvField(epochToDate(movie.watchedAt)),
+                csvField(movie.coverPath?.substringAfterLast('/').orEmpty()),
+                csvField(movie.plot.orEmpty()),
+                csvField(movie.comments.orEmpty()),
+                csvField(movie.url.orEmpty()),
+                csvField(if (movie.isDownloaded) "1" else ""),
+                csvField(movie.source.name),
+                csvField(movie.id.toString()),
+                csvField(movie.createdAt.toString()),
+                csvField(movie.updatedAt.toString()),
+            ).joinToString(";")
+            zip.write(line.toByteArray(StandardCharsets.UTF_8))
+            zip.write("\n".toByteArray(StandardCharsets.UTF_8))
+        }
+    }
+
+    /**
+     * Снимки → то, что попадёт в архив: книги, фильмы, обложки, фото и счётчики.
+     */
+    private fun prepare(snapshots: List<BookSnapshot>, movieSnapshots: List<MovieSnapshot>): Prepared {
         val books = mutableListOf<BookSnapshot>()
+        val movies = mutableListOf<MovieSnapshot>()
         val covers = linkedMapOf<String, File>()
         val photos = linkedMapOf<String, File>()
         var sessions = 0
@@ -191,14 +239,19 @@ class ExportZipUseCase @Inject constructor(
         var photoCount = 0
 
         for (snapshot in snapshots) {
-            snapshot.book.coverPath?.let { path ->
-                val file = File(path)
-                if (file.isFile) covers.putIfAbsent(file.name, file)
-            }
-            val withFiles = snapshot.photos.filter { File(it.localPath).isFile }
-            withFiles.forEach { photo -> photos.putIfAbsent(photo.archivePath, File(photo.localPath)) }
+            val withFiles = collectFiles(snapshot.book.coverPath, snapshot.photos, covers, photos)
             books += snapshot.copy(photos = withFiles)
             sessions += snapshot.sessions.size
+            notes += snapshot.notes.count { it.kind == NoteKind.NOTE }
+            quotes += snapshot.notes.count { it.kind == NoteKind.QUOTE }
+            tags += snapshot.tags.size
+            photoCount += withFiles.size
+        }
+
+        // Фильмы — как книги: обложка рядом с книжными, заметки и теги — общие.
+        for (snapshot in movieSnapshots) {
+            val withFiles = collectFiles(snapshot.movie.coverPath, snapshot.photos, covers, photos)
+            movies += snapshot.copy(photos = withFiles)
             notes += snapshot.notes.count { it.kind == NoteKind.NOTE }
             quotes += snapshot.notes.count { it.kind == NoteKind.QUOTE }
             tags += snapshot.tags.size
@@ -212,8 +265,33 @@ class ExportZipUseCase @Inject constructor(
             quotes = quotes,
             photos = photoCount,
             tags = tags,
+            movies = movies.size,
         )
-        return Prepared(books, covers, photos, counts)
+        return Prepared(books, movies, covers, photos, counts)
+    }
+
+    /**
+     * Файлы снимка: обложка (по имени файла) и фото (по пути в архиве).
+     *
+     * Обложка кладётся под именем файла из `cover_path` — импорт ищет её
+     * именно по этому имени. Фото без файла в архив не попадает и в
+     * `extra.json` не упоминается.
+     *
+     * @return фото снимка, у которых файл на диске есть.
+     */
+    private fun collectFiles(
+        coverPath: String?,
+        photos: List<PhotoSnapshot>,
+        covers: MutableMap<String, File>,
+        archivePhotos: MutableMap<String, File>,
+    ): List<PhotoSnapshot> {
+        coverPath?.let { path ->
+            val file = File(path)
+            if (file.isFile) covers.putIfAbsent(file.name, file)
+        }
+        val withFiles = photos.filter { File(it.localPath).isFile }
+        withFiles.forEach { photo -> archivePhotos.putIfAbsent(photo.archivePath, File(photo.localPath)) }
+        return withFiles
     }
 
     /**
@@ -235,19 +313,12 @@ class ExportZipUseCase @Inject constructor(
         zip.closeEntry()
     }
 
-    /** `extra.json`: содержимое по id книги (строкой). */
-    private fun extraArchive(books: List<BookSnapshot>): ExtraArchive =
+    /** `extra.json`: содержимое по id книги и по id фильма (строкой). */
+    private fun extraArchive(books: List<BookSnapshot>, movies: List<MovieSnapshot>): ExtraArchive =
         ExtraArchive(
             books = books.associate { snapshot ->
                 snapshot.book.id.toString() to BookExtras(
-                    notes = snapshot.notes.map { note ->
-                        NoteJson(
-                            kind = note.kind.name,
-                            page = note.page,
-                            body = note.body,
-                            createdAt = note.createdAt,
-                        )
-                    },
+                    notes = notesJson(snapshot.notes),
                     sessions = snapshot.sessions.map { session ->
                         SessionJson(
                             startedAt = session.startedAt,
@@ -259,21 +330,43 @@ class ExportZipUseCase @Inject constructor(
                         )
                     },
                     tags = snapshot.tags,
-                    photos = snapshot.photos.map { photo ->
-                        PhotoJson(
-                            file = photo.archivePath,
-                            noteIndex = photo.noteIndex,
-                            createdAt = photo.createdAt,
-                        )
-                    },
+                    photos = photosJson(snapshot.photos),
+                    extraFields = snapshot.extraFields,
+                )
+            },
+            movies = movies.associate { snapshot ->
+                snapshot.movie.id.toString() to MovieExtras(
+                    notes = notesJson(snapshot.notes),
+                    tags = snapshot.tags,
+                    photos = photosJson(snapshot.photos),
                     extraFields = snapshot.extraFields,
                 )
             },
         )
 
-    /** Подготовленный архив: книги, обложки, фото и счётчики. */
+    /** Заметки снимка — в формате `extra.json`. */
+    private fun notesJson(notes: List<NoteSnapshot>): List<NoteJson> = notes.map { note ->
+        NoteJson(
+            kind = note.kind.name,
+            page = note.page,
+            body = note.body,
+            createdAt = note.createdAt,
+        )
+    }
+
+    /** Фото снимка — в формате `extra.json`. */
+    private fun photosJson(photos: List<PhotoSnapshot>): List<PhotoJson> = photos.map { photo ->
+        PhotoJson(
+            file = photo.archivePath,
+            noteIndex = photo.noteIndex,
+            createdAt = photo.createdAt,
+        )
+    }
+
+    /** Подготовленный архив: книги, фильмы, обложки, фото и счётчики. */
     private data class Prepared(
         val books: List<BookSnapshot>,
+        val movies: List<MovieSnapshot>,
         /** Имя файла в архиве → файл обложки. */
         val covers: Map<String, File>,
         /** Путь в архиве (`photos/{md5}.{ext}`) → файл фото. */
@@ -309,6 +402,17 @@ class ExportZipUseCase @Inject constructor(
          * «сейчас» и архив терял бы историю книги.
          */
         const val BOOKS_HEADER = "title;subtitle;author;isbn13;page_count;language;genre;publisher;year;cover_path;rating;status;started_at;finished_at;binding;purchase_place;series;series_number;condition;translator;print_year;print_pages;original_language;original_title;annotation;is_gift;is_lent;is_sold;purchase_date;purchase_price;source;id;created_at;updated_at"
+
+        /**
+         * Заголовок `movies.csv`.
+         *
+         * Как и у книг, последние две колонки — метки времени фильма в
+         * миллисекундах epoch (как их хранит БД): без них импорт ставил бы
+         * «создано/изменено» в «сейчас» и архив терял бы историю фильма.
+         *
+         * `extra_fields` и заметки с тегами и фото — в `extra.json`.
+         */
+        const val MOVIES_HEADER = "title;original_title;year;genre;nationality;director;cast;duration_min;rating;watched_at;cover_path;plot;comments;url;is_downloaded;source;id;created_at;updated_at"
     }
 }
 
