@@ -3,6 +3,7 @@ package ru.antonkw.kwbooktrack.data.snapshot
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
+import ru.antonkw.kwbooktrack.data.db.entity.MovieEntity
 import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
 
 /**
@@ -55,6 +56,21 @@ data class BookSnapshot(
     val book: BookEntity,
     val notes: List<NoteSnapshot> = emptyList(),
     val sessions: List<SessionSnapshot> = emptyList(),
+    val tags: List<String> = emptyList(),
+    val photos: List<PhotoSnapshot> = emptyList(),
+    val extraFields: Map<String, ExtraField> = emptyMap(),
+)
+
+/**
+ * Снимок фильма — как [BookSnapshot], но без сессий чтения: трекера страниц
+ * у фильма нет.
+ *
+ * Заметки, теги и фото — те же самые, что у книги: у фильма и книги общая
+ * таблица заметок, и «владелец» различается парой (id, тип).
+ */
+data class MovieSnapshot(
+    val movie: MovieEntity,
+    val notes: List<NoteSnapshot> = emptyList(),
     val tags: List<String> = emptyList(),
     val photos: List<PhotoSnapshot> = emptyList(),
     val extraFields: Map<String, ExtraField> = emptyMap(),
