@@ -15,6 +15,7 @@ import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
 import ru.antonkw.kwbooktrack.data.db.entity.MediaTagCrossRef
 import ru.antonkw.kwbooktrack.data.db.entity.NoteEntity
+import ru.antonkw.kwbooktrack.data.db.entity.MovieEntity
 import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
 import ru.antonkw.kwbooktrack.data.db.entity.PhotoEntity
 import ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity
@@ -25,6 +26,7 @@ import ru.antonkw.kwbooktrack.data.snapshot.ExtraField
 import java.io.File
 import java.nio.file.Files
 import ru.antonkw.kwbooktrack.data.db.entity.MediaType
+import ru.antonkw.kwbooktrack.data.repository.MovieRepository
 
 @RunWith(RobolectricTestRunner::class)
 class SnapshotBuilderTest {
@@ -42,6 +44,7 @@ class SnapshotBuilderTest {
                 NoOpCoverStorage,
                 PhotoRepository(db.photoDao(), NoOpPhotoStorage),
             ),
+            movieRepository = MovieRepository(db.movieDao(), NoOpCoverStorage, PhotoRepository(db.photoDao(), NoOpPhotoStorage)),
             noteDao = db.noteDao(),
             sessionDao = db.readingSessionDao(),
             photoDao = db.photoDao(),
@@ -174,6 +177,62 @@ class SnapshotBuilderTest {
 
         assertThat(photo.archivePath).isEqualTo("photos/$photoId.jpg")
         assertThat(photo.noteIndex).isNull()
+    }
+
+    @Test
+    fun buildMoviesCollectsNotesTagsAndPhotos() = runTest {
+        val movieId = db.movieDao().insert(
+            MovieEntity(
+                title = "Малхолланд Драйв",
+                year = 1999,
+                durationMin = 147,
+                createdAt = 1_000L,
+                updatedAt = 1_000L,
+            ),
+        )
+        // Заметка книги с тем же id: у книг и фильмов id считаются независимо,
+        // и сборщик не должен брать чужие.
+        val bookId = db.bookDao().insert(
+            BookEntity(title = "Дорога", author = "К. Иванов", createdAt = 1_000L, updatedAt = 1_000L),
+        )
+        db.noteDao().insert(
+            NoteEntity(
+                mediaId = movieId, mediaType = MediaType.MOVIES,
+                bodyMd = "Рецензия",
+                kind = NoteKind.REVIEW,
+                createdAt = 200L,
+                updatedAt = 200L,
+            ),
+        )
+        db.noteDao().insert(
+            NoteEntity(
+                mediaId = bookId, mediaType = MediaType.BOOKS,
+                bodyMd = "Заметка книги",
+                kind = NoteKind.NOTE,
+                createdAt = 100L,
+                updatedAt = 100L,
+            ),
+        )
+        val tagId = db.tagDao().insert(TagEntity(name = "нуар"))
+        db.tagDao().insertCrossRef(MediaTagCrossRef(mediaId = movieId, mediaType = MediaType.MOVIES, tagId = tagId))
+        val photoFile = File(tempDir, "movie-photo.jpg").apply { writeBytes(PHOTO_BYTES) }
+        db.photoDao().insert(
+            PhotoEntity(
+                mediaId = movieId, mediaType = MediaType.MOVIES,
+                path = photoFile.absolutePath,
+                createdAt = 500L,
+            ),
+        )
+
+        val snapshots = builder.buildMovies()
+
+        assertThat(snapshots).hasSize(1)
+        val snapshot = snapshots.single()
+        assertThat(snapshot.movie.title).isEqualTo("Малхолланд Драйв")
+        assertThat(snapshot.notes.map { it.body }).containsExactly("Рецензия")
+        assertThat(snapshot.tags).containsExactly("нуар")
+        assertThat(snapshot.photos).hasSize(1)
+        assertThat(snapshot.photos.single().localPath).isEqualTo(photoFile.absolutePath)
     }
 
     companion object {

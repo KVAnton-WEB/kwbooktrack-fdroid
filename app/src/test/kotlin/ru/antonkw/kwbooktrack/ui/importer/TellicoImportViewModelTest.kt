@@ -36,6 +36,7 @@ import ru.antonkw.kwbooktrack.data.tellico.TellicoXmlReader
 import java.io.File
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
+import ru.antonkw.kwbooktrack.data.repository.MovieRepository
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -61,6 +62,7 @@ class TellicoImportViewModelTest {
         noteRepository = NoteRepository(db.noteDao(), NoOpPhotoStorage)
         val applier = SnapshotApplier(
             bookRepository = bookRepository,
+                movieRepository = MovieRepository(db.movieDao(), NoOpCoverStorage, photoRepository),
             noteRepository = noteRepository,
             sessionRepository = SessionRepository(db.readingSessionDao()),
             tagRepository = TagRepository(db.tagDao()),

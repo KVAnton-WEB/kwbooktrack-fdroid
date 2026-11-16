@@ -34,6 +34,7 @@ import java.nio.file.Files
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import ru.antonkw.kwbooktrack.data.db.entity.MediaType
+import ru.antonkw.kwbooktrack.data.repository.MovieRepository
 
 /**
  * Импорт своего zip-бэкапа: книги со всеми полями, заметки, сессии, теги,
@@ -75,6 +76,7 @@ class ImportKwBooktrackZipUseCaseTest {
         export = ExportZipUseCase(
             snapshotBuilder = SnapshotBuilder(
                 bookRepository = sourceRepo,
+            movieRepository = MovieRepository(sourceDb.movieDao(), NoOpCoverStorage, PhotoRepository(sourceDb.photoDao(), NoOpPhotoStorage)),
                 noteDao = sourceDb.noteDao(),
                 sessionDao = sourceDb.readingSessionDao(),
                 photoDao = sourceDb.photoDao(),
@@ -101,6 +103,7 @@ class ImportKwBooktrackZipUseCaseTest {
         importer = ImportKwBooktrackZipUseCase(
             SnapshotApplier(
                 bookRepository = targetRepo,
+                movieRepository = MovieRepository(targetDb.movieDao(), NoOpCoverStorage, targetPhotoRepo),
                 noteRepository = targetNoteRepo,
                 sessionRepository = targetSessionRepo,
                 tagRepository = targetTagRepo,
@@ -365,6 +368,7 @@ class ImportKwBooktrackZipUseCaseTest {
                         NoOpCoverStorage,
                         photoRepository,
                     ),
+                movieRepository = MovieRepository(targetDb.movieDao(), NoOpCoverStorage, photoRepository),
                     noteRepository = NoteRepository(targetDb.noteDao(), NoOpPhotoStorage),
                     sessionRepository = SessionRepository(targetDb.readingSessionDao()),
                     tagRepository = TagRepository(targetDb.tagDao()),

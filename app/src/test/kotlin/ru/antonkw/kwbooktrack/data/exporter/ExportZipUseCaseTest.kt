@@ -25,6 +25,7 @@ import java.io.StringReader
 import java.nio.file.Files
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
+import ru.antonkw.kwbooktrack.data.repository.MovieRepository
 
 @RunWith(RobolectricTestRunner::class)
 class ExportZipUseCaseTest {
@@ -49,6 +50,7 @@ class ExportZipUseCaseTest {
         useCase = ExportZipUseCase(
             snapshotBuilder = SnapshotBuilder(
                 bookRepository = repo,
+            movieRepository = MovieRepository(db.movieDao(), NoOpCoverStorage, PhotoRepository(db.photoDao(), NoOpPhotoStorage)),
                 noteDao = db.noteDao(),
                 sessionDao = db.readingSessionDao(),
                 photoDao = db.photoDao(),
@@ -164,6 +166,7 @@ class ExportZipUseCaseTest {
             val deleting = ExportZipUseCase(
                 snapshotBuilder = SnapshotBuilder(
                     bookRepository = repo,
+            movieRepository = MovieRepository(db.movieDao(), NoOpCoverStorage, PhotoRepository(db.photoDao(), NoOpPhotoStorage)),
                     noteDao = db.noteDao(),
                     sessionDao = db.readingSessionDao(),
                     photoDao = db.photoDao(),

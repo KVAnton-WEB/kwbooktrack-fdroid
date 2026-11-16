@@ -32,6 +32,7 @@ import ru.antonkw.kwbooktrack.data.snapshot.SnapshotBuilder
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.util.zip.ZipInputStream
+import ru.antonkw.kwbooktrack.data.repository.MovieRepository
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -60,6 +61,7 @@ class AboutExportViewModelTest {
         )
         val snapshotBuilder = SnapshotBuilder(
             bookRepository = bookRepository,
+            movieRepository = MovieRepository(db.movieDao(), NoOpCoverStorage, PhotoRepository(db.photoDao(), NoOpPhotoStorage)),
             noteDao = db.noteDao(),
             sessionDao = db.readingSessionDao(),
             photoDao = db.photoDao(),

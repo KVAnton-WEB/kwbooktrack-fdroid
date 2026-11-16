@@ -51,6 +51,7 @@ import java.time.LocalDate
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import ru.antonkw.kwbooktrack.data.db.entity.MediaType
+import ru.antonkw.kwbooktrack.data.repository.MovieRepository
 
 /**
  * Свой zip-бэкап без потерь: `books.csv` + `extra.json` + `photos/` + обложки —
@@ -86,6 +87,7 @@ class KwBooktrackZipRoundTripTest {
         exportUseCase = ExportZipUseCase(
             snapshotBuilder = SnapshotBuilder(
                 bookRepository = sourceBooks,
+            movieRepository = MovieRepository(sourceDb.movieDao(), NoOpCoverStorage, PhotoRepository(sourceDb.photoDao(), NoOpPhotoStorage)),
                 noteDao = sourceDb.noteDao(),
                 sessionDao = sourceDb.readingSessionDao(),
                 photoDao = sourceDb.photoDao(),
@@ -103,6 +105,7 @@ class KwBooktrackZipRoundTripTest {
         importUseCase = ImportKwBooktrackZipUseCase(
             SnapshotApplier(
                 bookRepository = targetBooks,
+                movieRepository = MovieRepository(targetDb.movieDao(), NoOpCoverStorage, targetPhotos),
                 noteRepository = NoteRepository(targetDb.noteDao(), FilePhotoStorage(context)),
                 sessionRepository = SessionRepository(targetDb.readingSessionDao()),
                 tagRepository = TagRepository(targetDb.tagDao()),

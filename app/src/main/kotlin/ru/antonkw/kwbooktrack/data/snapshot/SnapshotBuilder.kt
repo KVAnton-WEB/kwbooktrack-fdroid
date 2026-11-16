@@ -12,6 +12,7 @@ import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
 import ru.antonkw.kwbooktrack.data.db.entity.PhotoEntity
 import ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
+import ru.antonkw.kwbooktrack.data.repository.MovieRepository
 import java.io.File
 import java.security.MessageDigest
 import javax.inject.Inject
@@ -24,6 +25,7 @@ import javax.inject.Singleton
 @Singleton
 class SnapshotBuilder @Inject constructor(
     private val bookRepository: BookRepository,
+    private val movieRepository: MovieRepository,
     private val noteDao: NoteDao,
     private val sessionDao: ReadingSessionDao,
     private val photoDao: PhotoDao,
@@ -65,6 +67,44 @@ class SnapshotBuilder @Inject constructor(
                 },
                 // Чужие поля Tellico — из колонки books.extra_fields.
                 extraFields = book.extraFields,
+            )
+        }
+    }
+
+    /**
+     * Снимки фильмов — по тем же правилам, что и книги: заметки, теги и фото
+     * общие, различается только владелец — пара (id, тип).
+     *
+     * Сессий чтения у фильмов нет: трекера страниц у них не бывает.
+     */
+    suspend fun buildMovies(): List<MovieSnapshot> {
+        // Suspend-запросы, а не Flow: Flow-запрос Room выполняет вне транзакции,
+        // и снимок собрался бы из разных состояний БД.
+        val movies = movieRepository.getAll()
+        val notesByMovie = noteDao.getAll()
+            .filter { it.mediaType == MediaType.MOVIES }
+            .groupBy { it.mediaId }
+        val photosByMovie = photoDao.getAll()
+            .filter { it.mediaType == MediaType.MOVIES }
+            .groupBy { it.mediaId }
+        val tagsByOwner = tagDao.tagsForAllMedia().groupBy { it.mediaId to it.mediaType }
+        return movies.map { movie ->
+            val notes = notesByMovie[movie.id].orEmpty().sortedWith(NOTE_ORDER)
+            // 1-based индекс заметки в итоговом списке — на него ссылаются фото.
+            val noteIndexes = notes.withIndex().associate { (index, note) -> note.id to index + 1 }
+            MovieSnapshot(
+                movie = movie,
+                notes = notes.map { it.toSnapshot() },
+                tags = tagsByOwner[movie.id to MediaType.MOVIES].orEmpty().map { it.name },
+                photos = photosByMovie[movie.id].orEmpty().map { photo ->
+                    PhotoSnapshot(
+                        archivePath = photo.archivePath(),
+                        localPath = photo.path,
+                        noteIndex = photo.noteId?.let { noteIndexes[it] },
+                        createdAt = photo.createdAt,
+                    )
+                },
+                extraFields = movie.extraFields,
             )
         }
     }

@@ -26,6 +26,7 @@ import ru.antonkw.kwbooktrack.data.tellico.TellicoCsvReader
 import ru.antonkw.kwbooktrack.data.tellico.TellicoXmlReader
 import java.io.File
 import java.nio.file.Files
+import ru.antonkw.kwbooktrack.data.repository.MovieRepository
 
 @RunWith(RobolectricTestRunner::class)
 class TellicoZipImportRealTest {
@@ -57,6 +58,7 @@ class TellicoZipImportRealTest {
                 mapper = TellicoBookMapper(),
                 applier = SnapshotApplier(
                     bookRepository = repo,
+                movieRepository = MovieRepository(db.movieDao(), NoOpCoverStorage, photoRepository),
                     noteRepository = NoteRepository(db.noteDao(), NoOpPhotoStorage),
                     sessionRepository = SessionRepository(db.readingSessionDao()),
                     tagRepository = TagRepository(db.tagDao()),

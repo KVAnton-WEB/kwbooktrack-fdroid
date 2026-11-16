@@ -8,6 +8,7 @@ import ru.antonkw.kwbooktrack.data.db.entity.NoteEntity
 import ru.antonkw.kwbooktrack.data.db.entity.PhotoEntity
 import ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
+import ru.antonkw.kwbooktrack.data.repository.MovieRepository
 import ru.antonkw.kwbooktrack.data.repository.NoteRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
 import ru.antonkw.kwbooktrack.data.repository.SessionRepository
@@ -27,6 +28,7 @@ import javax.inject.Inject
  */
 data class ApplyStats(
     val books: Int = 0,
+    val movies: Int = 0,
     val notes: Int = 0,
     val sessions: Int = 0,
     val tags: Int = 0,
@@ -43,6 +45,7 @@ data class ApplyStats(
  */
 class SnapshotApplier @Inject constructor(
     private val bookRepository: BookRepository,
+    private val movieRepository: MovieRepository,
     private val noteRepository: NoteRepository,
     private val sessionRepository: SessionRepository,
     private val tagRepository: TagRepository,
@@ -63,16 +66,45 @@ class SnapshotApplier @Inject constructor(
         )
         val bookId = bookRepository.upsertFromImport(book)
 
-        val covers = applyCover(snapshot, bookId, assets)
-        val notes = applyNotes(snapshot, bookId, MediaType.BOOKS, now)
-        val sessions = applySessions(snapshot, bookId)
-        val tags = applyTags(snapshot, bookId, MediaType.BOOKS)
-        val photos = applyPhotos(snapshot, bookId, MediaType.BOOKS, notes.ids, assets, now)
+        val covers = applyBookCover(snapshot, bookId, assets)
+        val notes = applyNotes(snapshot.notes, bookId, MediaType.BOOKS, now)
+        val sessions = applySessions(snapshot.sessions, bookId)
+        val tags = applyTags(snapshot.tags, bookId, MediaType.BOOKS)
+        val photos = applyPhotos(snapshot.photos, bookId, MediaType.BOOKS, notes.ids, assets, now)
 
         return ApplyStats(
             books = 1,
             notes = notes.added,
             sessions = sessions,
+            tags = tags,
+            photos = photos,
+            covers = covers,
+        )
+    }
+
+    /**
+     * Фильм применяется теми же правилами, что и книга: заметки, теги и фото
+     * общие, различается только владелец — пара (id, тип).
+     *
+     * Сессий чтения у фильма нет: трекера страниц у него не бывает.
+     */
+    suspend fun apply(snapshot: MovieSnapshot, assets: ImportAssets): ApplyStats {
+        val now = System.currentTimeMillis()
+        val movie = snapshot.movie.copy(
+            id = 0L,
+            coverPath = null,
+            extraFields = snapshot.movie.extraFields + snapshot.extraFields,
+        )
+        val movieId = movieRepository.upsertFromImport(movie)
+
+        val covers = applyMovieCover(snapshot, movieId, assets)
+        val notes = applyNotes(snapshot.notes, movieId, MediaType.MOVIES, now)
+        val tags = applyTags(snapshot.tags, movieId, MediaType.MOVIES)
+        val photos = applyPhotos(snapshot.photos, movieId, MediaType.MOVIES, notes.ids, assets, now)
+
+        return ApplyStats(
+            movies = 1,
+            notes = notes.added,
             tags = tags,
             photos = photos,
             covers = covers,
@@ -86,35 +118,57 @@ class SnapshotApplier @Inject constructor(
      * Имя — UUID, а не id: файл не привязан к строке БД, и обложка фильма не
      * перезапишет обложку книги с тем же id.
      */
-    private suspend fun applyCover(snapshot: BookSnapshot, bookId: Long, assets: ImportAssets): Int {
-        val archiveName = snapshot.book.coverPath
-        if (archiveName.isNullOrBlank()) return 0
-        val src = assets.find(archiveName) ?: return 0
-        val destDir = assets.coverOutputDir?.let { File(it, "covers").apply { mkdirs() } } ?: return 0
+    private suspend fun applyBookCover(snapshot: BookSnapshot, bookId: Long, assets: ImportAssets): Int {
+        val dest = copyCover(snapshot.book.coverPath, assets) ?: return 0
+        val existing = bookRepository.findById(bookId) ?: return 0
+        bookRepository.updateFromImport(existing.copy(coverPath = dest.absolutePath))
+        dropPreviousCover(existing.coverPath, dest.absolutePath)
+        return 1
+    }
+
+    private suspend fun applyMovieCover(snapshot: MovieSnapshot, movieId: Long, assets: ImportAssets): Int {
+        val dest = copyCover(snapshot.movie.coverPath, assets) ?: return 0
+        val existing = movieRepository.findById(movieId) ?: return 0
+        movieRepository.updateFromImport(existing.copy(coverPath = dest.absolutePath))
+        dropPreviousCover(existing.coverPath, dest.absolutePath)
+        return 1
+    }
+
+    /**
+     * Файл обложки из архива → локальный файл.
+     *
+     * Та же воронка, что у обложки из галереи: 600px lossy WebP. Не
+     * декодируется — оставляем исходник, обложку терять нельзя.
+     */
+    private suspend fun copyCover(archiveName: String?, assets: ImportAssets): File? {
+        if (archiveName.isNullOrBlank()) return null
+        val src = assets.find(archiveName) ?: return null
+        val destDir = assets.coverOutputDir?.let { File(it, "covers").apply { mkdirs() } } ?: return null
         return try {
-            // Та же воронка, что у обложки из галереи: 600px lossy WebP.
-            // Не декодируется — оставляем исходник, обложку терять нельзя.
             val raw = src.readBytes()
             val webp = transcoder.toWebp(raw)
             val ext = if (webp != null) "webp" else src.extension.ifEmpty { "jpg" }
             val dest = File(destDir, "cover_${UUID.randomUUID()}.$ext")
             dest.writeBytes(webp ?: raw)
-            val existing = bookRepository.findById(bookId) ?: return 0
-            bookRepository.updateFromImport(existing.copy(coverPath = dest.absolutePath))
-            // Прежняя обложка больше не нужна: имя новое, и без удаления старый
-            // файл остался бы на диске навсегда.
-            existing.coverPath
-                ?.takeIf { it != dest.absolutePath }
-                ?.let { runCatching { File(it).delete() } }
-            1
+            dest
         } catch (e: CancellationException) {
             // Отмена импорта — не «плохая обложка»: пробрасываем дальше.
             throw e
         } catch (e: Exception) {
             // Плохая обложка не должна ронять импорт — как в остальных импортёрах.
-            Log.w(TAG, "cover copy failed for bookId=$bookId src=$src", e)
-            0
+            Log.w(TAG, "cover copy failed for src=$src", e)
+            null
         }
+    }
+
+    /**
+     * Прежняя обложка больше не нужна: имя новое, и без удаления старый файл
+     * остался бы на диске навсегда.
+     */
+    private fun dropPreviousCover(previous: String?, current: String) {
+        previous
+            ?.takeIf { it != current }
+            ?.let { runCatching { File(it).delete() } }
     }
 
     /**
@@ -123,15 +177,15 @@ class SnapshotApplier @Inject constructor(
      * на них ссылаются фото ([PhotoSnapshot.noteIndex]).
      */
     private suspend fun applyNotes(
-        snapshot: BookSnapshot,
+        notes: List<NoteSnapshot>,
         mediaId: Long,
         mediaType: MediaType,
         now: Long,
     ): NotesApplied {
         val existing = noteRepository.observeByMedia(mediaId, mediaType).first().toMutableList()
-        val ids = ArrayList<Long>(snapshot.notes.size)
+        val ids = ArrayList<Long>(notes.size)
         var added = 0
-        for (note in snapshot.notes) {
+        for (note in notes) {
             val match = existing.firstOrNull {
                 it.kind == note.kind && it.bodyMd == note.body && it.page == note.page
             }
@@ -156,13 +210,13 @@ class SnapshotApplier @Inject constructor(
         return NotesApplied(ids, added)
     }
 
-    /** Сессии: совпадение по времени начала. */
-    private suspend fun applySessions(snapshot: BookSnapshot, bookId: Long): Int {
+    /** Сессии: совпадение по времени начала. Только у книг. */
+    private suspend fun applySessions(sessions: List<SessionSnapshot>, bookId: Long): Int {
         val starts = sessionRepository.observeByBook(bookId).first()
             .map { it.startedAt }
             .toMutableSet()
         var added = 0
-        for (session in snapshot.sessions) {
+        for (session in sessions) {
             if (!starts.add(session.startedAt)) continue
             sessionRepository.insert(
                 ReadingSessionEntity(
@@ -180,10 +234,10 @@ class SnapshotApplier @Inject constructor(
         return added
     }
 
-    /** Теги: findOrCreate + attachToBook — кросс-ссылка уникальна, дублей нет. */
-    private suspend fun applyTags(snapshot: BookSnapshot, mediaId: Long, mediaType: MediaType): Int {
+    /** Теги: findOrCreate + привязка — кросс-ссылка уникальна, дублей нет. */
+    private suspend fun applyTags(tags: List<String>, mediaId: Long, mediaType: MediaType): Int {
         var added = 0
-        for (name in snapshot.tags) {
+        for (name in tags) {
             val tagId = tagRepository.findOrCreate(name)
             // findOrCreate отдаёт -1 на пустом имени — такого тега нет.
             if (tagId <= 0L) continue
@@ -194,12 +248,12 @@ class SnapshotApplier @Inject constructor(
     }
 
     /**
-     * Фото: файл из архива → локальный файл `{md5}_{bookId}.{ext}` → строка в БД.
+     * Фото: файл из архива → локальный файл `{md5}_{тип}_{id}.{ext}` → строка в БД.
      * Имя в архиве — MD5 от содержимого, поэтому повторный импорт узнаёт
      * уже сохранённое фото и не плодит дубли.
      */
     private suspend fun applyPhotos(
-        snapshot: BookSnapshot,
+        photos: List<PhotoSnapshot>,
         mediaId: Long,
         mediaType: MediaType,
         noteIds: List<Long>,
@@ -208,7 +262,7 @@ class SnapshotApplier @Inject constructor(
     ): Int {
         val paths = photoRepository.observeByMedia(mediaId, mediaType).first().map { it.path }.toMutableSet()
         var added = 0
-        for (photo in snapshot.photos) {
+        for (photo in photos) {
             val src = assets.find(photo.archivePath) ?: continue
             val archive = File(photo.archivePath)
             val ext = archive.extension.ifEmpty { "jpg" }

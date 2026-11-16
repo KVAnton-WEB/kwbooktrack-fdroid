@@ -21,6 +21,7 @@ import ru.antonkw.kwbooktrack.data.tagsOf
 import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
+import ru.antonkw.kwbooktrack.data.db.entity.MovieEntity
 import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.NoteRepository
@@ -32,6 +33,7 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.nio.file.Files
 import ru.antonkw.kwbooktrack.data.db.entity.MediaType
+import ru.antonkw.kwbooktrack.data.repository.MovieRepository
 
 /**
  * Семантика слияния снимка в БД: повторный импорт не плодит дубли,
@@ -60,6 +62,7 @@ class SnapshotApplierTest {
         tagRepository = TagRepository(db.tagDao())
         applier = SnapshotApplier(
             bookRepository = bookRepository,
+                movieRepository = MovieRepository(db.movieDao(), NoOpCoverStorage, photoRepository),
             noteRepository = noteRepository,
             sessionRepository = sessionRepository,
             tagRepository = tagRepository,
@@ -253,6 +256,7 @@ class SnapshotApplierTest {
         )
         val cancellingApplier = SnapshotApplier(
             bookRepository = cancelling,
+                movieRepository = MovieRepository(db.movieDao(), NoOpCoverStorage, photoRepository),
             noteRepository = noteRepository,
             sessionRepository = sessionRepository,
             tagRepository = tagRepository,
@@ -268,6 +272,85 @@ class SnapshotApplierTest {
 
         assertThat(error).isInstanceOf(CancellationException::class.java)
     }
+
+    @Test
+    fun applyMovieInsertsMovieAndItsNotes() = runTest {
+        val stats = applier.apply(movieSnapshot(), assets)
+
+        val movies = db.movieDao().observeAll().first()
+        assertThat(movies).hasSize(1)
+        assertThat(movies.single().title).isEqualTo("Малхолланд Драйв")
+        assertThat(movies.single().durationMin).isEqualTo(147)
+        assertThat(stats.movies).isEqualTo(1)
+
+        val notes = noteRepository.observeByMedia(movies.single().id, MediaType.MOVIES).first()
+        assertThat(notes).hasSize(2)
+        assertThat(notes.map { it.bodyMd }).containsExactly("Рецензия", "Заметка о фильме")
+        // Заметки фильма не должны попасть в заметки книг.
+        assertThat(noteRepository.observeByMedia(movies.single().id, MediaType.BOOKS).first()).isEmpty()
+    }
+
+    @Test
+    fun applyMovieAttachesTags() = runTest {
+        applier.apply(movieSnapshot(), assets)
+
+        val movie = db.movieDao().observeAll().first().single()
+        assertThat(db.tagDao().tagsForAllMedia().filter { it.mediaId == movie.id }).hasSize(1)
+    }
+
+    @Test
+    fun applyMovieDoesNotDuplicateOnSecondRun() = runTest {
+        applier.apply(movieSnapshot(), assets)
+        applier.apply(movieSnapshot(), assets)
+
+        assertThat(db.movieDao().count()).isEqualTo(1)
+        val movie = db.movieDao().observeAll().first().single()
+        assertThat(noteRepository.observeByMedia(movie.id, MediaType.MOVIES).first()).hasSize(2)
+    }
+
+    @Test
+    fun applyMovieMergesByTitleAndYear() = runTest {
+        applier.apply(movieSnapshot(), assets)
+        applier.apply(movieSnapshot(durationMin = 150), assets)
+
+        // Ключ слияния — название и год: второй импорт не добавляет фильм, а
+        // обновляет существующий. При этом заполненное поле из импорта
+        // побеждает — как у книг.
+        assertThat(db.movieDao().count()).isEqualTo(1)
+        assertThat(db.movieDao().observeAll().first().single().durationMin).isEqualTo(150)
+    }
+
+    @Test
+    fun applyMovieWritesCoverWithUuidName() = runTest {
+        File(staging, "cover.webp").writeBytes(pngBytes())
+
+        applier.apply(movieSnapshot(coverPath = "cover.webp"), assets)
+
+        val movie = db.movieDao().observeAll().first().single()
+        assertThat(movie.coverPath).isNotNull()
+        assertThat(File(movie.coverPath!!).name).startsWith("cover_")
+    }
+
+    private fun movieSnapshot(
+        coverPath: String? = null,
+        durationMin: Int? = 147,
+        notes: List<NoteSnapshot> = listOf(
+            NoteSnapshot(kind = NoteKind.REVIEW, body = "Рецензия"),
+            NoteSnapshot(kind = NoteKind.NOTE, body = "Заметка о фильме"),
+        ),
+        tags: List<String> = listOf("нуар"),
+    ) = MovieSnapshot(
+        movie = MovieEntity(
+            title = "Малхолланд Драйв",
+            year = 1999,
+            durationMin = durationMin,
+            coverPath = coverPath,
+            createdAt = 1_000L,
+            updatedAt = 1_000L,
+        ),
+        notes = notes,
+        tags = tags,
+    )
 
     private suspend fun bookId(): Long = db.bookDao().observeAll().first().single().id
 

@@ -25,6 +25,7 @@ import ru.antonkw.kwbooktrack.data.tellico.TellicoCsvReader
 import ru.antonkw.kwbooktrack.data.tellico.TellicoRecord
 import java.io.File
 import java.nio.file.Files
+import ru.antonkw.kwbooktrack.data.repository.MovieRepository
 
 /**
  * Импорт записей Tellico: предупреждения о потерянных обложках и отмена
@@ -148,6 +149,7 @@ class ImportTellicoUseCaseTest {
         photoRepository: PhotoRepository,
     ) = SnapshotApplier(
         bookRepository = bookRepository,
+                movieRepository = MovieRepository(db.movieDao(), NoOpCoverStorage, photoRepository),
         noteRepository = NoteRepository(db.noteDao(), NoOpPhotoStorage),
         sessionRepository = SessionRepository(db.readingSessionDao()),
         tagRepository = TagRepository(db.tagDao()),
