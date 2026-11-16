@@ -53,6 +53,8 @@ data class ExportCounts(
     val quotes: Int,
     val photos: Int,
     val tags: Int,
+    /** Сколько фильмов попало в архив. Значение по умолчанию — для старых бэкапов. */
+    val movies: Int = 0,
 )
 
 /**

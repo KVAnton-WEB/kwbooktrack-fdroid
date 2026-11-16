@@ -52,7 +52,9 @@ import java.time.LocalDate
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import javax.xml.parsers.DocumentBuilderFactory
+import ru.antonkw.kwbooktrack.data.db.entity.MediaTagCrossRef
 import ru.antonkw.kwbooktrack.data.db.entity.MediaType
+import ru.antonkw.kwbooktrack.data.db.entity.MovieEntity
 import ru.antonkw.kwbooktrack.data.repository.MovieRepository
 import ru.antonkw.kwbooktrack.data.importer.TellicoMovieMapper
 
@@ -73,6 +75,7 @@ class TellicoTcRoundTripTest {
     private lateinit var sourceSessions: SessionRepository
     private lateinit var sourceTags: TagRepository
     private lateinit var sourcePhotos: PhotoRepository
+    private lateinit var sourceMovies: MovieRepository
     private lateinit var tempDir: File
     private lateinit var outputDir: File
 
@@ -87,6 +90,7 @@ class TellicoTcRoundTripTest {
         sourceNotes = NoteRepository(sourceDb.noteDao(), NoOpPhotoStorage)
         sourceSessions = SessionRepository(sourceDb.readingSessionDao())
         sourceTags = TagRepository(sourceDb.tagDao())
+        sourceMovies = MovieRepository(sourceDb.movieDao(), NoOpCoverStorage, sourcePhotos)
 
         exportUseCase = exporterFor(sourceDb, sourceBooks)
         targetExportUseCase = exporterFor(
@@ -653,7 +657,148 @@ class TellicoTcRoundTripTest {
         return String(zipEntries(file).getValue("tellico.xml"), Charsets.UTF_8)
     }
 
+    /** `tellico.xml` уже выгруженного архива. */
+    private fun exportedXml(file: File): String =
+        String(zipEntries(file).getValue("tellico.xml"), Charsets.UTF_8)
+
     /** Экспортёр над указанной базой — нужен, чтобы переэкспортировать импортированное. */
+    @Test
+    fun exportOfMoviesWritesMovieCollection() = runTest {
+        seedMovies()
+
+        val file = File(tempDir, "movies.tc")
+        exportUseCase(file, MediaType.MOVIES)
+
+        val xml = exportedXml(file)
+        assertThat(xml).contains("<collection title=\"kwbooktrack\" type=\"3\">")
+        // В файле одна коллекция: Tellico держит одну и при двух взял бы
+        // последнюю, смешав записи.
+        assertThat(xml).doesNotContain("<collection title=\"kwbooktrack\" type=\"2\">")
+    }
+
+    @Test
+    fun exportOfMoviesDeclaresNotesTagsAndPhotos() = runTest {
+        // Без объявления наших полей Tellico молча выбросил бы значения
+        // заметок, тегов и фото при импорте нашей выгрузки.
+        seedMovies()
+
+        val xml = exportedXml(File(tempDir, "movies.tc").also { exportUseCase(it, MediaType.MOVIES) })
+
+        assertThat(xml).contains("name=\"цитаты\"")
+        assertThat(xml).contains("name=\"заметки\"")
+        assertThat(xml).contains("name=\"теги\"")
+        assertThat(xml).contains("name=\"фото-заметок\"")
+    }
+
+    @Test
+    fun exportOfMoviesWritesCastAsTellicoTable() = runTest {
+        seedMovies()
+
+        val xml = exportedXml(File(tempDir, "movies.tc").also { exportUseCase(it, MediaType.MOVIES) })
+
+        // У Tellico `cast` — таблица из двух колонок: актёр и роль лежат
+        // отдельными <column>.
+        assertThat(xml).contains("<cast><column>Уоттс, Наоми</column><column>Роль</column></cast>")
+    }
+
+    @Test
+    fun roundTripOfMovieKeepsFields() = runTest {
+        seedMovies()
+        val file = File(tempDir, "movies.tc")
+        exportUseCase(file, MediaType.MOVIES)
+
+        val result = importUseCase(file, ImportFormat.TELLICO_XML, outputDir)
+
+        assertThat(result.imported).isEqualTo(1)
+        assertThat(result.movies).isEqualTo(1)
+        val movie = targetDb.movieDao().observeAll().first().single()
+        assertThat(movie.title).isEqualTo("Малхолланд Драйв")
+        assertThat(movie.originalTitle).isEqualTo("Mulholland Dr")
+        assertThat(movie.year).isEqualTo(1999)
+        assertThat(movie.genre).isEqualTo("Триллер")
+        assertThat(movie.nationality).isEqualTo("США")
+        assertThat(movie.director).isEqualTo("Линч, Дэвид")
+        assertThat(movie.durationMin).isEqualTo(147)
+        assertThat(movie.rating).isEqualTo(5)
+        assertThat(movie.url).isEqualTo("https://www.kinopoisk.ru/film/466/")
+        assertThat(movie.isDownloaded).isTrue()
+        assertThat(movie.watchedAt).isEqualTo(day(2024, 2, 22))
+        assertThat(File(movie.coverPath!!).exists()).isTrue()
+    }
+
+    @Test
+    fun roundTripOfMovieKeepsCastReviewAndNotes() = runTest {
+        seedMovies()
+        val file = File(tempDir, "movies.tc")
+        exportUseCase(file, MediaType.MOVIES)
+
+        importUseCase(file, ImportFormat.TELLICO_XML, outputDir)
+
+        val movie = targetDb.movieDao().observeAll().first().single()
+        assertThat(movie.cast).isEqualTo("Уоттс, Наоми::Роль")
+        val notes = targetDb.noteDao().observeByMedia(movie.id, MediaType.MOVIES).first()
+        assertThat(notes.map { it.kind }.toSet()).containsExactly(NoteKind.REVIEW, NoteKind.NOTE)
+        assertThat(notes.single { it.kind == NoteKind.REVIEW }.bodyMd).isEqualTo("Отличный фильм.")
+        assertThat(targetDb.tagDao().tagsForAllMedia().filter { it.mediaId == movie.id }.map { it.name })
+            .containsExactly("нуар")
+    }
+
+    @Test
+    fun roundTripOfMovieDoesNotDuplicateOnSecondImport() = runTest {
+        seedMovies()
+        val file = File(tempDir, "movies.tc")
+        exportUseCase(file, MediaType.MOVIES)
+
+        importUseCase(file, ImportFormat.TELLICO_XML, outputDir)
+        importUseCase(file, ImportFormat.TELLICO_XML, outputDir)
+
+        assertThat(targetDb.movieDao().count()).isEqualTo(1)
+    }
+
+    private suspend fun seedMovies() {
+        val cover = File(tempDir, "movie-cover.png").apply { writeBytes(pngBytes()) }
+        val movieId = sourceMovies.insert(
+            MovieEntity(
+                title = "Малхолланд Драйв",
+                originalTitle = "Mulholland Dr",
+                year = 1999,
+                genre = "Триллер",
+                nationality = "США",
+                director = "Линч, Дэвид",
+                cast = "Уоттс, Наоми::Роль",
+                durationMin = 147,
+                rating = 5,
+                watchedAt = day(2024, 2, 22),
+                coverPath = cover.absolutePath,
+                plot = "Молодая актриса приезжает в Голливуд.",
+                url = "https://www.kinopoisk.ru/film/466/",
+                isDownloaded = true,
+                createdAt = day(2024, 1, 1),
+                updatedAt = day(2024, 2, 22),
+            ),
+        )
+        sourceNotes.insert(
+            NoteEntity(
+                mediaId = movieId, mediaType = MediaType.MOVIES,
+                bodyMd = "Отличный фильм.",
+                kind = NoteKind.REVIEW,
+                createdAt = day(2024, 2, 23),
+                updatedAt = day(2024, 2, 23),
+            ),
+        )
+        sourceNotes.insert(
+            NoteEntity(
+                mediaId = movieId, mediaType = MediaType.MOVIES,
+                bodyMd = "Пересмотреть весной.",
+                kind = NoteKind.NOTE,
+                createdAt = day(2024, 2, 23),
+                updatedAt = day(2024, 2, 23),
+            ),
+        )
+        val tagId = sourceDb.tagDao().findOrCreate("нуар")
+        sourceDb.tagDao().insertCrossRef(MediaTagCrossRef(mediaId = movieId, mediaType = MediaType.MOVIES, tagId = tagId))
+    }
+
     private fun exporterFor(db: KwBooktrackDatabase, books: BookRepository): ExportTellicoTcUseCase =
         ExportTellicoTcUseCase(
             snapshotBuilder = SnapshotBuilder(

@@ -4,6 +4,7 @@ import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
 import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
 import ru.antonkw.kwbooktrack.data.snapshot.BookSnapshot
+import ru.antonkw.kwbooktrack.data.snapshot.MovieSnapshot
 import ru.antonkw.kwbooktrack.data.snapshot.ExtraField
 import ru.antonkw.kwbooktrack.data.snapshot.NoteSnapshot
 import ru.antonkw.kwbooktrack.data.snapshot.PhotoSnapshot
@@ -21,6 +22,13 @@ data class TcEntry(
     fun textPrice(): String? =
         snapshot.extraFields["pur_price"]?.value?.takeIf { snapshot.book.purchasePrice == null }
 }
+
+/** Запись фильма для экспорта. */
+data class TcMovieEntry(
+    val snapshot: MovieSnapshot,
+    /** Имя файла обложки в архиве (`{md5}.{ext}`) — без пути `images/`. */
+    val coverArchiveName: String? = null,
+)
 
 /**
  * Сборщик `tellico.xml` — родного формата Tellico (DTD v12).
@@ -41,19 +49,42 @@ object TellicoXmlWriter {
     /** Собрать содержимое tellico.xml по записям. */
     fun write(entries: List<TcEntry>): String {
         val xml = StringBuilder()
+        header(xml)
+        xml.append(" <collection title=\"kwbooktrack\" type=\"2\">\n")
+        writeFields(xml, entries)
+        entries.forEachIndexed { index, entry -> writeEntry(xml, entry, index + 1) }
+        writeImages(xml, entries.map { it.coverArchiveName })
+        xml.append(" </collection>\n")
+        xml.append("</tellico>\n")
+        return xml.toString()
+    }
+
+    /**
+     * Коллекция фильмов — `type="3"`.
+     *
+     * Отдельная коллекция, а не вторая в том же файле: Tellico держит в файле
+     * **одну** коллекцию — при двух он взял бы последнюю и смешал записи.
+     */
+    fun writeMovies(entries: List<TcMovieEntry>): String {
+        val xml = StringBuilder()
+        header(xml)
+        xml.append(" <collection title=\"kwbooktrack\" type=\"3\">\n")
+        writeMovieFields(xml, entries)
+        entries.forEachIndexed { index, entry -> writeMovieEntry(xml, entry, index + 1) }
+        writeImages(xml, entries.map { it.coverArchiveName })
+        xml.append(" </collection>\n")
+        xml.append("</tellico>\n")
+        return xml.toString()
+    }
+
+    /** Заголовок документа: XML-пролог, DTD и корневой элемент. */
+    private fun header(xml: StringBuilder) {
         xml.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
         xml.append(
             "<!DOCTYPE tellico PUBLIC '-//Robby Stephenson/DTD Tellico V12.0//EN' " +
                 "'http://periapsis.org/tellico/dtd/v12/tellico.dtd'>\n",
         )
         xml.append("<tellico xmlns=\"http://periapsis.org/tellico/\" syntaxVersion=\"12\">\n")
-        xml.append(" <collection title=\"kwbooktrack\" type=\"2\">\n")
-        writeFields(xml, entries)
-        entries.forEachIndexed { index, entry -> writeEntry(xml, entry, index + 1) }
-        writeImages(xml, entries)
-        xml.append(" </collection>\n")
-        xml.append("</tellico>\n")
-        return xml.toString()
     }
 
     /**
@@ -82,20 +113,23 @@ object TellicoXmlWriter {
                 ),
             )
         }
-        foreignFields(entries).forEach { (name, extra) ->
+        foreignFields(entries.map { it.snapshot.extraFields }).forEach { (name, extra) ->
             writeField(xml, FieldDef(name = name, title = extra.title, type = 1, category = "Общее"))
         }
         xml.append("  </fields>\n")
     }
 
-    /** Чужие поля всех книг: имя → поле (по первому попавшемуся). */
-    private fun foreignFields(entries: List<TcEntry>): Map<String, ExtraField> {
+    /** Чужие поля всех записей: имя → поле (по первому попавшемуся). */
+    private fun foreignFields(
+        allExtra: List<Map<String, ExtraField>>,
+        known: Set<String> = TellicoFields.KNOWN,
+    ): Map<String, ExtraField> {
         val result = linkedMapOf<String, ExtraField>()
-        for (entry in entries) {
-            for ((name, extra) in entry.snapshot.extraFields) {
+        for (extraFields in allExtra) {
+            for ((name, extra) in extraFields) {
                 if (!isSafeName(name)) continue
                 // Поле, которое Tellico знает сам, объявлять нельзя — будет дубликат.
-                if (name in TellicoFields.KNOWN) continue
+                if (name in known) continue
                 if (name in TellicoFields.TELLICO_BUILTIN) continue
                 result.putIfAbsent(name, extra)
             }
@@ -181,7 +215,7 @@ object TellicoXmlWriter {
         // Чужие поля: имя элемента нельзя экранировать (экранирование даёт
         // невалидное XML), поэтому поле с небезопасным именем пропускаем.
         snapshot.extraFields.forEach { (name, extra) ->
-            writeExtra(xml, name, extra, book)
+            writeExtra(xml, name, extra, TellicoFields.TEXT_PRICE, book.purchasePrice)
         }
 
         xml.append("  </entry>\n")
@@ -196,16 +230,27 @@ object TellicoXmlWriter {
      * идёт в отдельное поле ([TellicoFields.TEXT_PRICE]), а флаг — как
      * `true`/`false`.
      */
-    private fun writeExtra(xml: StringBuilder, name: String, extra: ExtraField, book: BookEntity) {
+    private fun writeExtra(
+        xml: StringBuilder,
+        name: String,
+        extra: ExtraField,
+        /**
+         * Куда писать нечисловую цену. У книг `pur_price` Tellico числовой
+         * (`type="6"`) — текст в нём он не покажет, и цена живёт в отдельном
+         * поле. У фильмов `pur_price` текстовый, и отдельного поля не нужно.
+         */
+        textPriceField: String,
+        /** Числовая цена уже записана своей колонкой — значит, текст не нужен. */
+        purchasePrice: Double?,
+    ) {
         when {
             !isSafeName(name) -> Unit
             name == "keyword" -> container(xml, "keyword", extra.value.split("; ").filter { it.isNotEmpty() })
             // «Редактор» у Tellico многозначный: `<editors><editor>…</editor></editors>`.
             name == "editor" -> container(xml, "editor", extra.value.split("; ").filter { it.isNotEmpty() })
             // Числовая цена важнее текстовой: два `<pur_price>` — последний победил бы.
-            name == "pur_price" && book.purchasePrice != null -> Unit
-            // `pur_price` у Tellico число (`type="6"`) — текст в нём он не покажет.
-            name == "pur_price" -> element(xml, TellicoFields.TEXT_PRICE, extra.value)
+            name == "pur_price" && purchasePrice != null -> Unit
+            name == "pur_price" -> element(xml, textPriceField, extra.value)
             // Флаг Tellico: `true`/`false` — так пишет сам Tellico.
             name == "signed" -> element(xml, name, boolText(extra.value))
             else -> element(xml, name, extra.value)
@@ -216,9 +261,87 @@ object TellicoXmlWriter {
     private fun boolText(value: String): String =
         if (value.trim().lowercase() in TellicoFields.TRUE_VALUES) "true" else "false"
 
+    /**
+     * `<fields>` коллекции фильмов: поля Tellico для видео плюс наши
+     * собственные (иначе Tellico молча выбросил бы заметки, теги и фото).
+     */
+    private fun writeMovieFields(xml: StringBuilder, entries: List<TcMovieEntry>) {
+        xml.append("  <fields>\n")
+        movieFields.forEach { writeField(xml, it) }
+        ownMovieFields.forEach { writeField(xml, it) }
+        foreignFields(
+            entries.map { it.snapshot.extraFields },
+            TellicoFields.KNOWN + TellicoFields.MOVIE_KNOWN,
+        ).forEach { (name, extra) ->
+            writeField(xml, FieldDef(name = name, title = extra.title, type = 1, category = "Общее"))
+        }
+        xml.append("  </fields>\n")
+    }
+
+    /** Запись фильма в коллекции `type="3"`. */
+    private fun writeMovieEntry(xml: StringBuilder, entry: TcMovieEntry, id: Int) {
+        val snapshot = entry.snapshot
+        val movie = snapshot.movie
+        xml.append("  <entry id=\"$id\">\n")
+
+        element(xml, "title", movie.title)
+        movie.originalTitle?.let { element(xml, "оригинальное-название", it) }
+        movie.year?.let { element(xml, "year", it.toString()) }
+        container(xml, "genre", splitValues(movie.genre))
+        container(xml, "nationality", splitValues(movie.nationality))
+        container(xml, "director", splitValues(movie.director))
+        castTable(xml, splitRows(movie.cast))
+        movie.durationMin?.let { element(xml, "running-time", it.toString()) }
+        // У Tellico рейтинг 1..5 — значение вне диапазона в файл не пишем.
+        movie.rating?.takeIf { it in 1..5 }?.let { element(xml, "rating", it.toString()) }
+        entry.coverArchiveName?.let { element(xml, "cover", it) }
+        movie.plot?.let { element(xml, "plot", it) }
+        movie.comments?.let { element(xml, "comments", it) }
+        movie.watchedAt?.let { date(xml, "дата-просмотра", it) }
+        movie.url?.let { element(xml, "кинопоиск", it) }
+        if (movie.isDownloaded) element(xml, "скачан", "true")
+        date(xml, "cdate", movie.createdAt)
+        date(xml, "mdate", movie.updatedAt)
+
+        container(xml, "теги", snapshot.tags)
+        table(xml, "цитаты", quoteRows(snapshot.notes))
+        table(xml, "заметки", noteRows(snapshot.notes))
+        table(xml, "фото-заметок", photoRows(snapshot.photos))
+        reviewText(snapshot.notes)?.let { element(xml, "рецензия", it) }
+
+        snapshot.extraFields.forEach { (name, extra) ->
+            // `pur_price` у фильмов текстовое — пишем в своё же поле.
+            writeExtra(xml, name, extra, "pur_price", null)
+        }
+
+        xml.append("  </entry>\n")
+    }
+
+    /**
+     * Таблица `cast` — родным для Tellico способом.
+     *
+     * У Tellico `cast` — таблица из двух колонок, и актёр с ролью лежат
+     * отдельными элементами `<column>`. Обычная табличная запись (одна строка
+     * через `::`) для него не годится: он прочитал бы её как один столбец.
+     */
+    private fun castTable(xml: StringBuilder, rows: List<String>) {
+        if (rows.isEmpty()) return
+        xml.append("   <casts>\n")
+        for (row in rows) {
+            xml.append("    <cast>")
+            row.split("::").forEach { cell -> xml.append("<column>${escape(cell)}</column>") }
+            xml.append("</cast>\n")
+        }
+        xml.append("   </casts>\n")
+    }
+
+    /** Строки табличного значения: перевод строки между ними. */
+    private fun splitRows(value: String?): List<String> =
+        value?.split("\n")?.map { it.trim() }?.filter { it.isNotEmpty() } ?: emptyList()
+
     /** `<images>` — по одному `<image>` на обложку; без обложек блока нет вовсе. */
-    private fun writeImages(xml: StringBuilder, entries: List<TcEntry>) {
-        val names = entries.mapNotNull { it.coverArchiveName }.distinct()
+    private fun writeImages(xml: StringBuilder, coverNames: List<String?>) {
+        val names = coverNames.filterNotNull().distinct()
         if (names.isEmpty()) return
         xml.append("  <images>\n")
         for (name in names) {
@@ -435,7 +558,99 @@ object TellicoXmlWriter {
         std("mdate", type = 12, format = 3, flags = 16, category = "Личное"),
     )
 
-    /** Стандартное поле Tellico: заголовок — из словаря полей. */
+    /**
+     * Поля коллекции фильмов Tellico.
+     *
+     * Типы, форматы, флаги и категории — как в живой коллекции видео
+     * (`movi.tc`), чтобы выгрузка читалась Tellico как родная:
+     * `type` — вид поля (1 текст, 2 многострочный, 3 список, 4 флаг, 6 число,
+     * 7 ссылка, 8 таблица, 10 картинка, 12 дата, 14 рейтинг), `format` —
+     * оформление (0 как есть, 1 заголовок, 2 имя, 3 дата, 4 в списке),
+     * `flags` — биты (1 несколько значений, 2 группировка, 4 подсказка,
+     * 8 заголовок, 16 не править).
+     */
+    private val movieFields: List<FieldDef> = listOf(
+        movieStd("title", type = 1, format = 1, flags = 8, category = "Общее"),
+        movieStd("medium", type = 3, flags = 2, category = "Общее"),
+        movieStd("year", type = 6, flags = 2, category = "Общее"),
+        movieStd("certification", type = 3, flags = 2, category = "Общее"),
+        movieStd("genre", type = 1, flags = 7, format = 0, category = "Общее"),
+        movieStd("region", type = 3, flags = 2, category = "Общее"),
+        movieStd("nationality", type = 1, flags = 7, format = 0, category = "Общее"),
+        movieStd("format", type = 3, flags = 2, category = "Общее"),
+        movieStd(
+            "cast", type = 8, flags = 3, format = 2, category = "В ролях",
+            columns = 2, columnTitles = listOf("Актёр/актриса", "Роль"),
+        ),
+        movieStd("director", type = 1, flags = 7, format = 2, category = "Other People"),
+        movieStd("producer", type = 1, flags = 7, format = 2, category = "Other People"),
+        movieStd("writer", type = 1, flags = 7, format = 2, category = "Other People"),
+        movieStd("composer", type = 1, flags = 7, format = 2, category = "Other People"),
+        movieStd("studio", type = 1, flags = 7, format = 0, category = "Other People"),
+        movieStd("language", type = 1, flags = 7, format = 0, category = "Features"),
+        movieStd("subtitle", type = 1, flags = 7, format = 0, category = "Features"),
+        movieStd("audio-track", type = 1, flags = 7, format = 0, category = "Features"),
+        movieStd("running-time", type = 6, category = "Features"),
+        movieStd("aspect-ratio", type = 1, flags = 7, category = "Features"),
+        movieStd("widescreen", type = 4, category = "Features"),
+        movieStd("color", type = 3, flags = 2, category = "Features"),
+        movieStd("directors-cut", type = 4, category = "Features"),
+        movieStd("plot", type = 2, category = "Сюжет"),
+        movieStd("rating", type = 14, flags = 2, category = "Личное"),
+        movieStd("pur_date", type = 1, format = 3, category = "Личное"),
+        movieStd("gift", type = 4, category = "Личное"),
+        movieStd("pur_price", type = 1, category = "Личное"),
+        movieStd("loaned", type = 4, category = "Личное"),
+        movieStd("keyword", type = 1, flags = 7, category = "Личное"),
+        movieStd("cover", type = 10, category = "Обложка"),
+        movieStd("comments", type = 2, category = "Комментарии"),
+        movieStd("cdate", type = 12, format = 3, flags = 16, category = "Личное"),
+        movieStd("mdate", type = 12, format = 3, flags = 16, category = "Личное"),
+        movieStd("дата-просмотра", type = 12, format = 3, flags = 2, category = "Личное"),
+        movieStd("оригинальное-название", type = 1, category = "Общее"),
+        movieStd("кинопоиск", type = 7, category = "Общее"),
+        movieStd("скачан", type = 4, flags = 2, category = "Личное"),
+        movieStd("рецензия", type = 2, category = "Рецензия"),
+    )
+
+    /** Наши поля в коллекции фильмов — те же, что у книг. */
+    private val ownMovieFields: List<FieldDef> = listOf(
+        ownField(
+            "цитаты", type = 2, flags = 1, category = "Цитаты",
+            columns = 2, columnTitles = listOf("страница", "Цитата"),
+        ),
+        ownField(
+            "заметки", type = 2, flags = 1, category = "Личное",
+            columns = 3, columnTitles = listOf("страница", "Текст", "Дата"),
+        ),
+        ownField("теги", type = 1, flags = 1, category = "Классификация"),
+        ownField(
+            "фото-заметок", type = 2, flags = 1, category = "Личное", columns = 3,
+            columnTitles = listOf("файл", "индекс заметки", "дата"),
+        ),
+    )
+
+    /** Поле Tellico для видео: заголовок — из словаря полей коллекции фильмов. */
+    private fun movieStd(
+        name: String,
+        type: Int,
+        format: Int = 4,
+        flags: Int = 0,
+        category: String,
+        columns: Int? = null,
+        columnTitles: List<String> = emptyList(),
+    ) = FieldDef(
+        name = name,
+        title = TellicoFields.MOVIE_TITLES.getValue(name),
+        type = type,
+        category = category,
+        flags = flags,
+        format = format,
+        columns = columns,
+        columnTitles = columnTitles,
+    )
+
+    /** Стандартное поле Tellico для видео. */
     private fun std(
         name: String,
         type: Int,
