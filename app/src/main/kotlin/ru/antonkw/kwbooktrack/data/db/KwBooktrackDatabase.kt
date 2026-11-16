@@ -6,12 +6,14 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import ru.antonkw.kwbooktrack.data.db.converter.Converters
 import ru.antonkw.kwbooktrack.data.db.dao.BookDao
+import ru.antonkw.kwbooktrack.data.db.dao.MovieDao
 import ru.antonkw.kwbooktrack.data.db.dao.NoteDao
 import ru.antonkw.kwbooktrack.data.db.dao.PhotoDao
 import ru.antonkw.kwbooktrack.data.db.dao.ReadingSessionDao
 import ru.antonkw.kwbooktrack.data.db.dao.TagDao
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
 import ru.antonkw.kwbooktrack.data.db.entity.MediaTagCrossRef
+import ru.antonkw.kwbooktrack.data.db.entity.MovieEntity
 import ru.antonkw.kwbooktrack.data.db.entity.NoteEntity
 import ru.antonkw.kwbooktrack.data.db.entity.PhotoEntity
 import ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity
@@ -26,8 +28,9 @@ import ru.antonkw.kwbooktrack.data.db.migration.Migrate1To2
         PhotoEntity::class,
         TagEntity::class,
         MediaTagCrossRef::class,
+        MovieEntity::class,
     ],
-    version = 10,
+    version = 11,
     // Schema export is disabled: all transitions are explicit Migrations
     // wired into DatabaseModule via .addMigrations(...), so Room doesn't
     // need a checked-in json file per step. The previous
@@ -44,6 +47,7 @@ abstract class KwBooktrackDatabase : RoomDatabase() {
     abstract fun noteDao(): NoteDao
     abstract fun photoDao(): PhotoDao
     abstract fun tagDao(): TagDao
+    abstract fun movieDao(): MovieDao
 
     companion object {
         const val NAME = "kwbooktrack.db"
