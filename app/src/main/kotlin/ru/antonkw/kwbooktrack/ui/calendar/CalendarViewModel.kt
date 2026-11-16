@@ -8,12 +8,16 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
-import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
-import ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity
+import ru.antonkw.kwbooktrack.data.db.entity.MediaType
+import ru.antonkw.kwbooktrack.data.db.entity.MovieEntity
+import ru.antonkw.kwbooktrack.data.media.MediaTypeStore
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
+import ru.antonkw.kwbooktrack.data.repository.MovieRepository
 import ru.antonkw.kwbooktrack.data.repository.SessionRepository
 import ru.antonkw.kwbooktrack.data.stats.StatsCalculator
 import ru.antonkw.kwbooktrack.data.time.toEpochMs
@@ -31,38 +35,50 @@ data class CalendarBook(
 data class CalendarDay(
     val date: LocalDate,
     val books: List<CalendarBook>,
-    // Сколько страниц прочитано за этот день (сумма по всем книгам).
+    /** Прочитанные страницы — для книг. */
     val pages: Int = 0,
+    /** Минуты просмотра — для фильмов. */
+    val minutes: Int = 0,
 )
 
-enum class CalendarMode {
-    // Обложки книг, которые читались в этот день.
-    BOOKS,
-    // Суммарное количество прочитанных страниц за день.
-    PAGES,
-}
+/**
+ * Режим ячейки календаря.
+ *
+ * Первый — обложки (книг или фильмов), второй — величина: страницы у книг,
+ * минуты просмотра у фильмов.
+ */
+enum class CalendarMode { COVERS, VALUE }
 
 data class CalendarUiState(
     val month: YearMonth,
     val days: List<CalendarDay?>,
 )
 
+/**
+ * Календарь: что и сколько прочитали (или посмотрели) в каждый день.
+ *
+ * Тип носителя общий для всего приложения: в режиме фильмов показываются
+ * фильмы и минуты просмотра, в режиме книг — книги и страницы.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class CalendarViewModel @Inject constructor(
     private val bookRepository: BookRepository,
+    private val movieRepository: MovieRepository,
     private val sessionRepository: SessionRepository,
+    private val mediaTypeStore: MediaTypeStore,
 ) : ViewModel() {
 
     private val _month = MutableStateFlow(YearMonth.now())
     val month: StateFlow<YearMonth> = _month
 
-    // Что показывает ячейка календаря: обложки книг или число страниц.
-    private val _mode = MutableStateFlow(CalendarMode.BOOKS)
+    private val _mode = MutableStateFlow(CalendarMode.COVERS)
     val mode: StateFlow<CalendarMode> = _mode
 
-    val uiState: StateFlow<CalendarUiState> = _month
-        .flatMapLatest { ym -> buildStateForMonth(ym) }
+    /** Текущий тип носителя — общий для списка, календаря и статистики. */
+    val mediaType: StateFlow<MediaType> = mediaTypeStore.type
+
+    val uiState: StateFlow<CalendarUiState> = _month.flatMapLatest { buildStateForMonth(it) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyState(_month.value))
 
     fun setMode(mode: CalendarMode) {
@@ -75,80 +91,94 @@ class CalendarViewModel @Inject constructor(
 
     fun goToNextMonth() {
         val next = _month.value.plusMonths(1)
-        val now = java.time.LocalDate.now()
-        if (next <= java.time.YearMonth.of(now.year, now.month)) {
-            _month.value = next
+        val max = YearMonth.now()
+        if (next <= max) _month.value = next
+    }
+
+    fun goToMonth(month: YearMonth) {
+        if (month <= YearMonth.now()) _month.value = month
+    }
+
+    private fun buildStateForMonth(month: YearMonth) =
+        mediaTypeStore.type.flatMapLatest { type ->
+            if (type == MediaType.MOVIES) {
+                movieRepository.observeAll().map { movies -> buildMonth(month, movies) }
+            } else {
+                combine(bookRepository.observeAll(), sessionRepository.observeAll()) { books, sessions ->
+                    buildMonth(month, books, sessions)
+                }
+            }
         }
-    }
 
-    fun goToMonth(target: java.time.YearMonth) {
-        _month.value = target
-    }
-
-    private fun buildStateForMonth(ym: YearMonth) = combine(
-        bookRepository.observeAll(),
-        sessionRepository.observeAll(),
-    ) { books, sessions ->
-        val booksById = books.associateBy { it.id }
-        // Прочитанные книги попадают в календарь по дате прочтения, даже если
-        // по ним нет ни одной сессии чтения.
-        val finishedByDate = books
-            .mapNotNull { book -> book.finishedAt?.let { book to it.toLocalDate() } }
-            .groupBy({ it.second }, { it.first })
+    /** Книжный месяц: дни чтения, дочитанные книги и страницы. */
+    private fun buildMonth(
+        month: YearMonth,
+        books: List<ru.antonkw.kwbooktrack.data.db.entity.BookEntity>,
+        sessions: List<ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity>,
+    ): CalendarUiState {
+        val finishedByDate = books.mapNotNull { book -> book.finishedAt?.let { book to it } }
+            .groupBy({ it.second.toLocalDate() }, { it.first })
         val pagesByDate = StatsCalculator.aggregateDailyPages(sessions).associate { it.date to it.pages }
-        val firstOfMonth = ym.atDay(1)
-        val daysInMonth = ym.lengthOfMonth()
-        val firstDow = (firstOfMonth.dayOfWeek.value + 6) % 7 // Mon=0 ... Sun=6
-        val totalCells = firstDow + daysInMonth
-        val weeks = (totalCells + 6) / 7
-
-        val cells = ArrayList<CalendarDay?>(weeks * 7)
-        repeat(firstDow) { cells.add(null) }
-        for (day in 1..daysInMonth) {
-            val date = ym.atDay(day)
+        val booksById = books.associateBy { it.id }
+        return monthGrid(month) { date ->
             val booksForDay = (
                 sessionsForDate(date, sessions, booksById) +
                     finishedByDate[date].orEmpty().map { it.toCalendarBook() }
                 ).distinctBy { it.title }
-            cells.add(CalendarDay(date, booksForDay, pagesByDate[date] ?: 0))
+            CalendarDay(date = date, books = booksForDay, pages = pagesByDate[date] ?: 0)
         }
-        while (cells.size < weeks * 7) cells.add(null)
+    }
 
-        CalendarUiState(
-            month = ym,
-            days = cells,
-        )
+    /** Месяц фильмов: дни просмотра и минуты. */
+    private fun buildMonth(month: YearMonth, movies: List<MovieEntity>): CalendarUiState {
+        val watchedByDate = movies.mapNotNull { movie -> movie.watchedAt?.let { movie to it } }
+            .groupBy({ it.second.toLocalDate() }, { it.first })
+        return monthGrid(month) { date ->
+            val watched = watchedByDate[date].orEmpty()
+            CalendarDay(
+                date = date,
+                books = watched.map { it.toCalendarBook() },
+                minutes = watched.sumOf { it.durationMin ?: 0 },
+            )
+        }
+    }
+
+    /**
+     * Сетка месяца: пустые ячейки до первого числа, дни, пустые ячейки после
+     * последнего — до полной недели.
+     */
+    private inline fun monthGrid(
+        month: YearMonth,
+        day: (LocalDate) -> CalendarDay,
+    ): CalendarUiState {
+        val firstDow = (month.atDay(1).dayOfWeek.value + 6) % 7
+        val totalCells = firstDow + month.lengthOfMonth()
+        val weeks = (totalCells + 6) / 7
+        val cells = MutableList<CalendarDay?>(weeks * 7) { null }
+        for (dayOfMonth in 1..month.lengthOfMonth()) {
+            val date = month.atDay(dayOfMonth)
+            cells[firstDow + dayOfMonth - 1] = day(date)
+        }
+        return CalendarUiState(month = month, days = cells)
     }
 
     private fun sessionsForDate(
         date: LocalDate,
-        sessions: List<ReadingSessionEntity>,
-        booksById: Map<Long, BookEntity>,
+        sessions: List<ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity>,
+        booksById: Map<Long, ru.antonkw.kwbooktrack.data.db.entity.BookEntity>,
     ): List<CalendarBook> {
-        val startMs = date.toEpochMs()
-        val endMs = date.plusDays(1).toEpochMs()
-        return sessions
-            .filter { it.startedAt in startMs until endMs }
-            .mapNotNull { session ->
-                val book = booksById[session.bookId] ?: return@mapNotNull null
-                book.toCalendarBook()
-            }
-            .distinctBy { it.title }
+        val start = date.toEpochMs()
+        val end = date.plusDays(1).toEpochMs()
+        return sessions.filter { it.startedAt in start until end }
+            .mapNotNull { session -> booksById[session.bookId]?.toCalendarBook() }
     }
 
-    private fun BookEntity.toCalendarBook() = CalendarBook(
-        title = title,
-        coverPath = coverPath,
-        rating = rating,
-    )
+    private fun ru.antonkw.kwbooktrack.data.db.entity.BookEntity.toCalendarBook() =
+        CalendarBook(title = title, coverPath = coverPath, rating = rating)
 
-    private fun emptyState(ym: YearMonth): CalendarUiState {
-        val firstOfMonth = ym.atDay(1)
-        val firstDow = (firstOfMonth.dayOfWeek.value + 6) % 7
-        val daysInMonth = ym.lengthOfMonth()
-        val cells = ArrayList<CalendarDay?>(firstDow + daysInMonth)
-        repeat(firstDow) { cells.add(null) }
-        for (day in 1..daysInMonth) cells.add(CalendarDay(ym.atDay(day), emptyList()))
-        return CalendarUiState(month = ym, days = cells)
-    }
+    private fun MovieEntity.toCalendarBook() =
+        CalendarBook(title = title, coverPath = coverPath, rating = rating)
+
+    private fun emptyState(month: YearMonth): CalendarUiState =
+        CalendarUiState(month = month, days = monthGrid(month) { CalendarDay(it, emptyList()) }.days)
 }

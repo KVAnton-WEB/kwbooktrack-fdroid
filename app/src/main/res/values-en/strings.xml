@@ -370,4 +370,14 @@
     <string name="photos_section">Photos</string>
     <string name="action_remove_cover">Remove cover</string>
     <string name="label_rating">Rating</string>
+    <string name="stats_movies_watched">Movies: %1$d</string>
+    <string name="stats_minutes_watched">Minutes: %1$d</string>
+    <string name="stats_chart_movies_by_month">Movies watched by month: %1$s</string>
+    <string name="stats_chart_movies_by_year">Movies watched by year</string>
+    <string name="stats_chart_minutes_by_month">Minutes watched by month: %1$s</string>
+    <string name="stats_chart_minutes_by_year">Minutes watched by year</string>
+    <string name="calendar_mode_covers">Covers</string>
+    <string name="calendar_mode_minutes">Minutes</string>
+    <string name="about_total_movies">Total movies: %1$d</string>
+    <string name="export_collection_label">Collection for Tellico export</string>
 </resources>

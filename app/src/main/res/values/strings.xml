@@ -373,4 +373,14 @@
     <string name="photos_section">Фото</string>
     <string name="action_remove_cover">Убрать обложку</string>
     <string name="label_rating">Рейтинг</string>
+    <string name="stats_movies_watched">Фильмов: %1$d</string>
+    <string name="stats_minutes_watched">Минут: %1$d</string>
+    <string name="stats_chart_movies_by_month">Просмотрено фильмов по месяцам: %1$s</string>
+    <string name="stats_chart_movies_by_year">Просмотрено фильмов по годам</string>
+    <string name="stats_chart_minutes_by_month">Минут просмотра по месяцам: %1$s</string>
+    <string name="stats_chart_minutes_by_year">Минут просмотра по годам</string>
+    <string name="calendar_mode_covers">Обложки</string>
+    <string name="calendar_mode_minutes">Минуты</string>
+    <string name="about_total_movies">Всего фильмов: %1$d</string>
+    <string name="export_collection_label">Коллекция для экспорта в Tellico</string>
 </resources>

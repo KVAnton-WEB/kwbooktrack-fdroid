@@ -5,22 +5,29 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import ru.antonkw.kwbooktrack.R
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
+import ru.antonkw.kwbooktrack.data.db.entity.MediaType
+import ru.antonkw.kwbooktrack.data.media.MediaTypeStore
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
+import ru.antonkw.kwbooktrack.data.repository.MovieRepository
 import ru.antonkw.kwbooktrack.data.repository.SessionRepository
+import ru.antonkw.kwbooktrack.data.stats.MovieStats
+import ru.antonkw.kwbooktrack.data.stats.MovieStatsCalculator
 import ru.antonkw.kwbooktrack.data.stats.ReadingStats
 import ru.antonkw.kwbooktrack.data.stats.StatsCalculator
 import java.time.LocalDate
 import javax.inject.Inject
 
-enum class ChartMetric { PAGES, BOOKS }
 enum class ChartMode { BY_MONTH, BY_YEAR }
 
 data class ChartSelection(
@@ -42,46 +49,49 @@ data class ChartSelection(
         }
 }
 
+/**
+ * Агрегаты статистики — по текущему типу носителя.
+ *
+ * Книга считается в страницах и сессиях, фильм — в минутах просмотра и
+ * количестве фильмов.
+ */
+sealed interface StatisticsData {
+    data class Books(val stats: ReadingStats) : StatisticsData
+    data class Movies(val stats: MovieStats) : StatisticsData
+}
+
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class StatisticsViewModel @Inject constructor(
     bookRepository: BookRepository,
+    movieRepository: MovieRepository,
     sessionRepository: SessionRepository,
+    mediaTypeStore: MediaTypeStore,
 ) : ViewModel() {
 
     private val _selection = MutableStateFlow(ChartSelection())
     val selection: StateFlow<ChartSelection> = _selection
 
-    val stats: StateFlow<ReadingStats> = combine(
-        bookRepository.observeAll(),
-        sessionRepository.observeAll(),
-    ) { books, sessions ->
-        val finishedDates = books.filter { it.status == BookStatus.FINISHED && it.finishedAt != null }
-            .mapNotNull { it.finishedAt }
-        StatsCalculator.compute(sessions, finishedDates, books)
+    /** Текущий тип носителя — общий для списка, календаря и статистики. */
+    val mediaType: StateFlow<MediaType> = mediaTypeStore.type
+
+    val stats: StateFlow<StatisticsData> = mediaTypeStore.type.flatMapLatest { type ->
+        if (type == MediaType.MOVIES) {
+            movieRepository.observeAll()
+                .map { movies -> StatisticsData.Movies(MovieStatsCalculator.compute(movies)) }
+        } else {
+            combine(bookRepository.observeAll(), sessionRepository.observeAll()) { books, sessions ->
+                val finishedDates = books.filter { it.status == BookStatus.FINISHED && it.finishedAt != null }
+                    .mapNotNull { it.finishedAt }
+                StatisticsData.Books(StatsCalculator.compute(sessions, finishedDates, books))
+            }
+        }
     }
         // StatsCalculator walks every session twice (Instant/LocalDate per row),
         // so keep it off the main thread — it re-runs on every book/session
         // write anywhere in the app, not just when this screen is visible.
         .flowOn(Dispatchers.Default)
-        .stateIn(
-        viewModelScope,
-        SharingStarted.Eagerly,
-        ReadingStats(
-            totalSessions = 0,
-            totalPages = 0,
-            dailyPages = emptyList(),
-            monthlyCompleted = emptyList(),
-            monthlyPages = emptyList(),
-            monthlyPurchased = emptyList(),
-            monthlySpend = emptyList(),
-            yearlyCompleted = emptyList(),
-            yearlyPages = emptyList(),
-            yearlyPurchased = emptyList(),
-            yearlySpend = emptyList(),
-            minYear = 0,
-            maxYear = 0,
-        ),
-    )
+        .stateIn(viewModelScope, SharingStarted.Eagerly, StatisticsData.Books(ReadingStats()))
 
     fun setMode(mode: ChartMode) {
         _selection.value = _selection.value.copy(mode = mode)
@@ -103,7 +113,10 @@ class StatisticsViewModel @Inject constructor(
 
     private fun bounds(): Bounds {
         val today = LocalDate.now().year
-        val min = stats.value.minYear.takeIf { it > 0 } ?: today
+        val min = when (val data = stats.value) {
+            is StatisticsData.Books -> data.stats.minYear.takeIf { it > 0 } ?: today
+            is StatisticsData.Movies -> data.stats.minYear.takeIf { it > 0 } ?: today
+        }
         return Bounds(min, maxOf(min, today))
     }
 }

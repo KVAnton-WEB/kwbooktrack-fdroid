@@ -53,6 +53,7 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import ru.antonkw.kwbooktrack.R
+import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,6 +65,7 @@ fun CalendarScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val month by viewModel.month.collectAsStateWithLifecycle()
     val mode by viewModel.mode.collectAsStateWithLifecycle()
+    val mediaType by viewModel.mediaType.collectAsStateWithLifecycle()
     // Locale of the app (may be overridden per-app), not of the device:
     // a hardcoded locale here printed "ноября" in an English UI.
     val locale = LocalContext.current.resources.configuration.locales.get(0)
@@ -93,7 +95,11 @@ fun CalendarScreen(
                 style = MaterialTheme.typography.bodyMedium,
             )
 
-            CalendarModeSelector(mode = mode, onModeChange = viewModel::setMode)
+            CalendarModeSelector(
+                mode = mode,
+                isMovies = mediaType == MediaType.MOVIES,
+                onModeChange = viewModel::setMode,
+            )
 
             Row(
                 modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
@@ -163,7 +169,7 @@ fun CalendarScreen(
                     key = { idx -> uiState.days[idx]?.date?.toString() ?: "pad_$idx" },
                 ) { idx ->
                     val day = uiState.days[idx]
-                    DayCell(day = day, mode = mode)
+                    DayCell(day = day, mode = mode, isMovies = mediaType == MediaType.MOVIES)
                 }
             }
         }
@@ -184,11 +190,15 @@ fun CalendarScreen(
 
 // Режимы ячейки календаря — список создаётся один раз на процесс, а не на
 // каждой рекомпозиции.
-private val CALENDAR_MODES = listOf(CalendarMode.BOOKS, CalendarMode.PAGES)
+private val CALENDAR_MODES = listOf(CalendarMode.COVERS, CalendarMode.VALUE)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CalendarModeSelector(mode: CalendarMode, onModeChange: (CalendarMode) -> Unit) {
+private fun CalendarModeSelector(
+    mode: CalendarMode,
+    isMovies: Boolean,
+    onModeChange: (CalendarMode) -> Unit,
+) {
     SingleChoiceSegmentedButtonRow(
         modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
     ) {
@@ -202,8 +212,13 @@ private fun CalendarModeSelector(mode: CalendarMode, onModeChange: (CalendarMode
                 Text(
                     text = stringResource(
                         when (m) {
-                            CalendarMode.BOOKS -> R.string.calendar_mode_books
-                            CalendarMode.PAGES -> R.string.calendar_mode_pages
+                            CalendarMode.COVERS -> R.string.calendar_mode_covers
+                            // Второй режим — величина: страницы у книг, минуты у фильмов.
+                            CalendarMode.VALUE -> if (isMovies) {
+                                R.string.calendar_mode_minutes
+                            } else {
+                                R.string.calendar_mode_pages
+                            }
                         }
                     ),
                 )
@@ -213,7 +228,7 @@ private fun CalendarModeSelector(mode: CalendarMode, onModeChange: (CalendarMode
 }
 
 @Composable
-private fun DayCell(day: CalendarDay?, mode: CalendarMode) {
+private fun DayCell(day: CalendarDay?, mode: CalendarMode, isMovies: Boolean) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -231,8 +246,10 @@ private fun DayCell(day: CalendarDay?, mode: CalendarMode) {
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.padding(2.dp),
             )
-            if (mode == CalendarMode.PAGES) {
-                if (day.pages > 0) {
+            if (mode == CalendarMode.VALUE) {
+                // Второй режим — величина: страницы у книг, минуты у фильмов.
+                val value = if (isMovies) day.minutes else day.pages
+                if (value > 0) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -240,7 +257,7 @@ private fun DayCell(day: CalendarDay?, mode: CalendarMode) {
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
-                            text = day.pages.toString(),
+                            text = value.toString(),
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.primary,
                         )

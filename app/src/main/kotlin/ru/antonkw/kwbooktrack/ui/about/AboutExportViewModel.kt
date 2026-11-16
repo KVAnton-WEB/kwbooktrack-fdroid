@@ -13,6 +13,7 @@ import kotlinx.coroutines.launch
 import ru.antonkw.kwbooktrack.data.exporter.ExportManifest
 import ru.antonkw.kwbooktrack.data.exporter.ExportTellicoTcUseCase
 import ru.antonkw.kwbooktrack.data.exporter.ExportZipUseCase
+import ru.antonkw.kwbooktrack.data.media.MediaTypeStore
 import java.io.OutputStream
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -35,6 +36,7 @@ class AboutExportViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val exportZipUseCase: ExportZipUseCase,
     private val exportTellicoUseCase: ExportTellicoTcUseCase,
+    private val mediaTypeStore: MediaTypeStore,
 ) : ViewModel() {
     private val _state = MutableStateFlow(AboutExportState())
     val state: StateFlow<AboutExportState> = _state.asStateFlow()
@@ -42,8 +44,13 @@ class AboutExportViewModel @Inject constructor(
     /** Свой zip-бэкап приложения. */
     fun exportToUri(uri: Uri) = export(uri) { exportZipUseCase(it) }
 
-    /** Родной формат Tellico: `.tc` (zip с `tellico.xml`). */
-    fun exportTellicoToUri(uri: Uri) = export(uri) { exportTellicoUseCase(it) }
+    /**
+     * Родный формат Tellico: `.tc` (zip с `tellico.xml`).
+     *
+     * В файле одна коллекция — того типа, что выбран сейчас: Tellico держит
+     * одну коллекцию на файл и при двух смешал бы записи.
+     */
+    fun exportTellicoToUri(uri: Uri) = export(uri) { exportTellicoUseCase(it, mediaTypeStore.type.value) }
 
     private fun export(uri: Uri, write: suspend (OutputStream) -> ExportManifest) {
         if (_state.value.inProgress) return

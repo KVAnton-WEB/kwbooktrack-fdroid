@@ -25,6 +25,7 @@ import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
 import ru.antonkw.kwbooktrack.data.exporter.AppVersionProvider
 import ru.antonkw.kwbooktrack.data.exporter.ExportTellicoTcUseCase
+import ru.antonkw.kwbooktrack.data.media.MediaTypeStore
 import ru.antonkw.kwbooktrack.data.exporter.ExportZipUseCase
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
@@ -80,6 +81,7 @@ class AboutExportViewModelTest {
                 database = db,
                 versionProvider = versionProvider,
             ),
+            mediaTypeStore = MediaTypeStore(),
         )
         TestViewModels.track(vm)
     }

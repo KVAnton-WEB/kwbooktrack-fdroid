@@ -15,12 +15,14 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import ru.antonkw.kwbooktrack.data.NoOpCoverStorage
 import ru.antonkw.kwbooktrack.data.TestDb
 import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
 import ru.antonkw.kwbooktrack.data.exporter.AppVersionProvider
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
+import ru.antonkw.kwbooktrack.data.repository.MovieRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -28,6 +30,7 @@ import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
 class AboutViewModelTest {
     private lateinit var db: KwBooktrackDatabase
     private lateinit var bookRepository: BookRepository
+    private lateinit var movieRepository: MovieRepository
     private val dispatcher = StandardTestDispatcher()
     private val versionProvider = object : AppVersionProvider {
         override val appVersion: String = "9.9.9-test"
@@ -37,6 +40,11 @@ class AboutViewModelTest {
     fun setUp() {
         Dispatchers.setMain(dispatcher)
         db = TestDb.createInMemory(ApplicationProvider.getApplicationContext())
+        movieRepository = MovieRepository(
+            db.movieDao(),
+            ru.antonkw.kwbooktrack.data.NoOpCoverStorage,
+            PhotoRepository(db.photoDao(), ru.antonkw.kwbooktrack.data.NoOpPhotoStorage),
+        )
         bookRepository = BookRepository(
             db.bookDao(),
             db.tagDao(),
@@ -53,7 +61,7 @@ class AboutViewModelTest {
 
     @Test
     fun initialInfoUsesProviderVersionAndZeroCounters() = runTest(dispatcher) {
-        val vm = AboutViewModel(bookRepository, versionProvider)
+        val vm = AboutViewModel(bookRepository, movieRepository, versionProvider)
         advanceUntilIdle()
         val info = vm.info.first { it.totalBooks == 0 }
         assertThat(info.version).isEqualTo("9.9.9-test")
@@ -63,7 +71,7 @@ class AboutViewModelTest {
 
     @Test
     fun countsAggregatesAcrossStatuses() = runTest(dispatcher) {
-        val vm = AboutViewModel(bookRepository, versionProvider)
+        val vm = AboutViewModel(bookRepository, movieRepository, versionProvider)
         advanceUntilIdle()
 
         repeat(3) {
@@ -84,7 +92,7 @@ class AboutViewModelTest {
 
     @Test
     fun reactiveUpdateOnBookInsertion() = runTest(dispatcher) {
-        val vm = AboutViewModel(bookRepository, versionProvider)
+        val vm = AboutViewModel(bookRepository, movieRepository, versionProvider)
         advanceUntilIdle()
 
         bookRepository.insert(sampleBook(status = BookStatus.FINISHED))

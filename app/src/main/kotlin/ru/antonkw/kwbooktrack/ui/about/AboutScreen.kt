@@ -40,12 +40,14 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
 import ru.antonkw.kwbooktrack.data.exporter.AppVersionProvider
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
+import ru.antonkw.kwbooktrack.data.repository.MovieRepository
 import ru.antonkw.kwbooktrack.R
 import javax.inject.Inject
 
@@ -53,22 +55,25 @@ data class AboutInfo(
     val version: String,
     val totalBooks: Int,
     val finishedBooks: Int,
+    val totalMovies: Int,
 )
 
 @HiltViewModel
 class AboutViewModel @Inject constructor(
     private val bookRepository: BookRepository,
+    private val movieRepository: MovieRepository,
     private val appVersionProvider: AppVersionProvider,
 ) : ViewModel() {
-    private val _info = MutableStateFlow(AboutInfo(appVersionProvider.appVersion, 0, 0))
+    private val _info = MutableStateFlow(AboutInfo(appVersionProvider.appVersion, 0, 0, 0))
     val info: StateFlow<AboutInfo> = _info.asStateFlow()
 
     init {
         viewModelScope.launch {
-            bookRepository.observeAll().collect { books ->
+            combine(bookRepository.observeAll(), movieRepository.observeAll()) { books, movies -> books to movies }
+                .collect { (books, movies) ->
                 val total = books.size
                 val finished = books.count { it.status == BookStatus.FINISHED }
-                _info.value = AboutInfo(appVersionProvider.appVersion, total, finished)
+                _info.value = AboutInfo(appVersionProvider.appVersion, total, finished, movies.size)
             }
         }
     }
@@ -153,6 +158,7 @@ fun AboutScreen(
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(stringResource(R.string.about_library), style = MaterialTheme.typography.titleMedium)
                     Text(stringResource(R.string.about_total_books, info.totalBooks), style = MaterialTheme.typography.bodyLarge)
+                    Text(stringResource(R.string.about_total_movies, info.totalMovies), style = MaterialTheme.typography.bodyLarge)
                     val percent = if (info.totalBooks > 0) (info.finishedBooks * 100 / info.totalBooks) else 0
                     Text(
                         stringResource(R.string.about_finished_books, info.finishedBooks, info.totalBooks, percent),

@@ -22,19 +22,19 @@ data class MonthlySpend(val year: Int, val month: Int, val amount: Int)
 data class YearlySpend(val year: Int, val amount: Int)
 
 data class ReadingStats(
-    val totalSessions: Int,
-    val totalPages: Int,
-    val dailyPages: List<DailyPages>,
-    val monthlyCompleted: List<MonthlyBooks>,
-    val monthlyPages: List<MonthlyPages>,
-    val monthlyPurchased: List<MonthlyBooks>,
-    val monthlySpend: List<MonthlySpend>,
-    val yearlyCompleted: List<YearlyBooks>,
-    val yearlyPages: List<YearlyPages>,
-    val yearlyPurchased: List<YearlyBooks>,
-    val yearlySpend: List<YearlySpend>,
-    val minYear: Int,
-    val maxYear: Int,
+    val totalSessions: Int = 0,
+    val totalPages: Int = 0,
+    val dailyPages: List<DailyPages> = emptyList(),
+    val monthlyCompleted: List<MonthlyBooks> = emptyList(),
+    val monthlyPages: List<MonthlyPages> = emptyList(),
+    val monthlyPurchased: List<MonthlyBooks> = emptyList(),
+    val monthlySpend: List<MonthlySpend> = emptyList(),
+    val yearlyCompleted: List<YearlyBooks> = emptyList(),
+    val yearlyPages: List<YearlyPages> = emptyList(),
+    val yearlyPurchased: List<YearlyBooks> = emptyList(),
+    val yearlySpend: List<YearlySpend> = emptyList(),
+    val minYear: Int = 0,
+    val maxYear: Int = 0,
 )
 
 object StatsCalculator {

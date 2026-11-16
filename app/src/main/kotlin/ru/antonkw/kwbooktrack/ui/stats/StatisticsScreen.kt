@@ -40,6 +40,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.antonkw.kwbooktrack.data.stats.MonthlyBooks
+import ru.antonkw.kwbooktrack.data.stats.MonthlyPages
+import ru.antonkw.kwbooktrack.data.stats.MovieStats
 import ru.antonkw.kwbooktrack.data.stats.ReadingStats
 import ru.antonkw.kwbooktrack.data.stats.StatsCalculator
 import kotlin.math.max
@@ -52,7 +54,7 @@ fun StatisticsScreen(
     modifier: Modifier = Modifier,
     viewModel: StatisticsViewModel = hiltViewModel(),
 ) {
-    val stats by viewModel.stats.collectAsStateWithLifecycle()
+    val data by viewModel.stats.collectAsStateWithLifecycle()
     val selection by viewModel.selection.collectAsStateWithLifecycle()
 
     Scaffold(
@@ -84,8 +86,16 @@ fun StatisticsScreen(
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(stringResource(R.string.stats_sessions, stats.totalSessions))
-                    Text(stringResource(R.string.stats_pages, stats.totalPages))
+                    when (val d = data) {
+                        is StatisticsData.Books -> {
+                            Text(stringResource(R.string.stats_sessions, d.stats.totalSessions))
+                            Text(stringResource(R.string.stats_pages, d.stats.totalPages))
+                        }
+                        is StatisticsData.Movies -> {
+                            Text(stringResource(R.string.stats_movies_watched, d.stats.totalMovies))
+                            Text(stringResource(R.string.stats_minutes_watched, d.stats.totalMinutes))
+                        }
+                    }
                 }
             }
 
@@ -108,61 +118,109 @@ fun StatisticsScreen(
                 ) { Text(stringResource(R.string.stats_tab_years)) }
             }
 
-            val periodLabel = periodLabel(selection)
-            val chartLabels = when (selection.mode) {
-                ChartMode.BY_MONTH -> monthLabels()
-                ChartMode.BY_YEAR -> StatsCalculator.yearRange(stats.minYear, stats.maxYear).map { it.toString() }
+            when (val d = data) {
+                is StatisticsData.Books -> BookCharts(d.stats, selection)
+                is StatisticsData.Movies -> MovieCharts(d.stats, selection)
             }
-
-            ChartCard(
-                title = when (selection.mode) {
-                    ChartMode.BY_MONTH -> stringResource(R.string.stats_chart_finished_by_month, periodLabel)
-                    ChartMode.BY_YEAR -> stringResource(R.string.stats_chart_finished_by_year)
-                },
-                labels = chartLabels,
-                values = when (selection.mode) {
-                    ChartMode.BY_MONTH -> monthlyCountsChartValues(stats.monthlyCompleted, selection.year)
-                    ChartMode.BY_YEAR -> stats.yearlyCompleted.associate { it.year to it.count }
-                },
-            )
-
-            ChartCard(
-                title = when (selection.mode) {
-                    ChartMode.BY_MONTH -> stringResource(R.string.stats_chart_pages_by_month, periodLabel)
-                    ChartMode.BY_YEAR -> stringResource(R.string.stats_chart_pages_by_year)
-                },
-                labels = chartLabels,
-                values = when (selection.mode) {
-                    ChartMode.BY_MONTH -> monthlyChartValues(stats, selection.year)
-                    ChartMode.BY_YEAR -> stats.yearlyPages.associate { it.year to it.pages }
-                },
-            )
-
-            ChartCard(
-                title = when (selection.mode) {
-                    ChartMode.BY_MONTH -> stringResource(R.string.stats_chart_purchased_by_month, periodLabel)
-                    ChartMode.BY_YEAR -> stringResource(R.string.stats_chart_purchased_by_year)
-                },
-                labels = chartLabels,
-                values = when (selection.mode) {
-                    ChartMode.BY_MONTH -> monthlyCountsChartValues(stats.monthlyPurchased, selection.year)
-                    ChartMode.BY_YEAR -> stats.yearlyPurchased.associate { it.year to it.count }
-                },
-            )
-
-            ChartCard(
-                title = when (selection.mode) {
-                    ChartMode.BY_MONTH -> stringResource(R.string.stats_chart_spent_by_month, periodLabel)
-                    ChartMode.BY_YEAR -> stringResource(R.string.stats_chart_spent_by_year)
-                },
-                labels = chartLabels,
-                values = when (selection.mode) {
-                    ChartMode.BY_MONTH -> monthlySpendChartValues(stats, selection.year)
-                    ChartMode.BY_YEAR -> stats.yearlySpend.associate { it.year to it.amount }
-                },
-            )
         }
     }
+}
+
+/** Графики книг: прочитано, страниц, куплено, потрачено. */
+@Composable
+private fun BookCharts(stats: ReadingStats, selection: ChartSelection) {
+    val periodLabel = periodLabel(selection)
+    val chartLabels = when (selection.mode) {
+        ChartMode.BY_MONTH -> monthLabels()
+        ChartMode.BY_YEAR -> StatsCalculator.yearRange(stats.minYear, stats.maxYear).map { it.toString() }
+    }
+
+    ChartCard(
+        title = when (selection.mode) {
+            ChartMode.BY_MONTH -> stringResource(R.string.stats_chart_finished_by_month, periodLabel)
+            ChartMode.BY_YEAR -> stringResource(R.string.stats_chart_finished_by_year)
+        },
+        labels = chartLabels,
+        values = when (selection.mode) {
+            ChartMode.BY_MONTH -> monthlyCountsChartValues(stats.monthlyCompleted, selection.year)
+            ChartMode.BY_YEAR -> stats.yearlyCompleted.associate { it.year to it.count }
+        },
+    )
+
+    ChartCard(
+        title = when (selection.mode) {
+            ChartMode.BY_MONTH -> stringResource(R.string.stats_chart_pages_by_month, periodLabel)
+            ChartMode.BY_YEAR -> stringResource(R.string.stats_chart_pages_by_year)
+        },
+        labels = chartLabels,
+        values = when (selection.mode) {
+            ChartMode.BY_MONTH -> monthlyChartValues(stats, selection.year)
+            ChartMode.BY_YEAR -> stats.yearlyPages.associate { it.year to it.pages }
+        },
+    )
+
+    ChartCard(
+        title = when (selection.mode) {
+            ChartMode.BY_MONTH -> stringResource(R.string.stats_chart_purchased_by_month, periodLabel)
+            ChartMode.BY_YEAR -> stringResource(R.string.stats_chart_purchased_by_year)
+        },
+        labels = chartLabels,
+        values = when (selection.mode) {
+            ChartMode.BY_MONTH -> monthlyCountsChartValues(stats.monthlyPurchased, selection.year)
+            ChartMode.BY_YEAR -> stats.yearlyPurchased.associate { it.year to it.count }
+        },
+    )
+
+    ChartCard(
+        title = when (selection.mode) {
+            ChartMode.BY_MONTH -> stringResource(R.string.stats_chart_spent_by_month, periodLabel)
+            ChartMode.BY_YEAR -> stringResource(R.string.stats_chart_spent_by_year)
+        },
+        labels = chartLabels,
+        values = when (selection.mode) {
+            ChartMode.BY_MONTH -> monthlySpendChartValues(stats, selection.year)
+            ChartMode.BY_YEAR -> stats.yearlySpend.associate { it.year to it.amount }
+        },
+    )
+}
+
+/**
+ * Графики фильмов: просмотрено фильмов и минут просмотра.
+ *
+ * Графиков «куплено» и «потрачено» у фильмов нет: в коллекции Tellico для
+ * видео есть цена, но нет даты покупки — агрегировать нечего.
+ */
+@Composable
+private fun MovieCharts(stats: MovieStats, selection: ChartSelection) {
+    val periodLabel = periodLabel(selection)
+    val chartLabels = when (selection.mode) {
+        ChartMode.BY_MONTH -> monthLabels()
+        ChartMode.BY_YEAR -> StatsCalculator.yearRange(stats.minYear, stats.maxYear).map { it.toString() }
+    }
+
+    ChartCard(
+        title = when (selection.mode) {
+            ChartMode.BY_MONTH -> stringResource(R.string.stats_chart_movies_by_month, periodLabel)
+            ChartMode.BY_YEAR -> stringResource(R.string.stats_chart_movies_by_year)
+        },
+        labels = chartLabels,
+        values = when (selection.mode) {
+            ChartMode.BY_MONTH -> monthlyCountsChartValues(stats.monthlyWatched, selection.year)
+            ChartMode.BY_YEAR -> stats.yearlyWatched.associate { it.year to it.count }
+        },
+    )
+
+    ChartCard(
+        title = when (selection.mode) {
+            ChartMode.BY_MONTH -> stringResource(R.string.stats_chart_minutes_by_month, periodLabel)
+            ChartMode.BY_YEAR -> stringResource(R.string.stats_chart_minutes_by_year)
+        },
+        labels = chartLabels,
+        values = when (selection.mode) {
+            ChartMode.BY_MONTH -> monthlyMinutesChartValues(stats.monthlyMinutes, selection.year)
+            ChartMode.BY_YEAR -> stats.yearlyMinutes.associate { it.year to it.pages }
+        },
+    )
 }
 
 @Composable
@@ -180,6 +238,14 @@ private fun ChartCard(
             BarChartWithLabels(labels = labels, values = values)
         }
     }
+}
+
+/** Минуты просмотра по месяцам выбранного года. */
+private fun monthlyMinutesChartValues(
+    monthly: List<MonthlyPages>,
+    year: Int,
+): Map<Int, Int> = (1..12).associateWith { month ->
+    monthly.firstOrNull { it.year == year && it.month == month }?.pages ?: 0
 }
 
 @Composable

@@ -24,6 +24,8 @@ import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
 import ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
+import ru.antonkw.kwbooktrack.data.media.MediaTypeStore
+import ru.antonkw.kwbooktrack.data.repository.MovieRepository
 import ru.antonkw.kwbooktrack.data.repository.SessionRepository
 import ru.antonkw.kwbooktrack.data.time.toEpochMs
 import java.time.LocalDate
@@ -34,6 +36,8 @@ class StatisticsViewModelTest {
     private lateinit var db: KwBooktrackDatabase
     private lateinit var bookRepository: BookRepository
     private lateinit var sessionRepository: SessionRepository
+    private lateinit var movieRepository: MovieRepository
+    private lateinit var mediaTypeStore: MediaTypeStore
     private val dispatcher = StandardTestDispatcher()
 
     @Before
@@ -48,6 +52,8 @@ class StatisticsViewModelTest {
             photoRepository,
         )
         sessionRepository = SessionRepository(db.readingSessionDao())
+        movieRepository = MovieRepository(db.movieDao(), NoOpCoverStorage, photoRepository)
+        mediaTypeStore = MediaTypeStore()
     }
 
     @After
@@ -58,9 +64,10 @@ class StatisticsViewModelTest {
 
     @Test
     fun emptyInputsYieldZeroStats() = runTest(dispatcher) {
-        val vm = StatisticsViewModel(bookRepository, sessionRepository)
+        val vm = StatisticsViewModel(bookRepository, movieRepository, sessionRepository, mediaTypeStore)
         advanceUntilIdle()
-        val stats = vm.stats.first { it.totalSessions == 0 }
+        val stats = vm.stats.first { it is StatisticsData.Books && it.stats.totalSessions == 0 }
+            .let { (it as StatisticsData.Books).stats }
         assertThat(stats.totalSessions).isEqualTo(0)
         assertThat(stats.totalPages).isEqualTo(0)
     }
@@ -82,16 +89,17 @@ class StatisticsViewModelTest {
             ReadingSessionEntity(bookId = 1L, startedAt = today, endPage = 100, durationSec = 600L),
         )
 
-        val vm = StatisticsViewModel(bookRepository, sessionRepository)
+        val vm = StatisticsViewModel(bookRepository, movieRepository, sessionRepository, mediaTypeStore)
         advanceUntilIdle()
-        val stats = vm.stats.first { it.totalSessions == 1 }
+        val stats = vm.stats.first { it is StatisticsData.Books && it.stats.totalSessions == 1 }
+            .let { (it as StatisticsData.Books).stats }
         assertThat(stats.totalSessions).isEqualTo(1)
         assertThat(stats.monthlyCompleted).isNotEmpty()
     }
 
     @Test
     fun setModeAndStepYearRoundTrip() = runTest(dispatcher) {
-        val vm = StatisticsViewModel(bookRepository, sessionRepository)
+        val vm = StatisticsViewModel(bookRepository, movieRepository, sessionRepository, mediaTypeStore)
         advanceUntilIdle()
 
         vm.setMode(ChartMode.BY_YEAR)
