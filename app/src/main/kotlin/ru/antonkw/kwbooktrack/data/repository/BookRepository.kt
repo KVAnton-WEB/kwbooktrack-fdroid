@@ -3,6 +3,7 @@ package ru.antonkw.kwbooktrack.data.repository
 import androidx.sqlite.db.SimpleSQLiteQuery
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import ru.antonkw.kwbooktrack.data.db.dao.BookCounts
 import ru.antonkw.kwbooktrack.data.db.dao.BookDao
 import ru.antonkw.kwbooktrack.data.db.dao.TagDao
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
@@ -75,8 +76,14 @@ class BookRepository @Inject constructor(
     suspend fun upsertByIsbn(book: BookEntity): Long =
         bookDao.upsertByIsbn(withSearchKeys(book))
 
-    suspend fun upsertFromImport(book: BookEntity): Long =
-        bookDao.upsertFromImport(withSearchKeys(book))
+    /**
+     * Вставка или обновление книги из импорта.
+     *
+     * @param snapshotId id строки в архиве (свой zip-бэкап): по нему запись
+     *   обновляется точно, а не по совпадению названия и автора.
+     */
+    suspend fun upsertFromImport(book: BookEntity, snapshotId: Long = 0L): Long =
+        bookDao.upsertFromImport(withSearchKeys(book), snapshotId)
 
     suspend fun update(book: BookEntity): Int =
         bookDao.update(withSearchKeys(book.copy(updatedAt = System.currentTimeMillis())))
@@ -132,4 +139,7 @@ class BookRepository @Inject constructor(
     }
 
     suspend fun count(): Int = bookDao.count()
+
+    /** Счётчики книг потоком — без загрузки строк. */
+    fun observeCounts(): Flow<BookCounts> = bookDao.observeCounts(BookStatus.FINISHED)
 }

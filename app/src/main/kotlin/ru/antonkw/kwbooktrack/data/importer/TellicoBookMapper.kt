@@ -9,8 +9,8 @@ import ru.antonkw.kwbooktrack.data.snapshot.SessionSnapshot
 import ru.antonkw.kwbooktrack.data.text.HtmlToMarkdown
 import ru.antonkw.kwbooktrack.data.tellico.TellicoFields
 import ru.antonkw.kwbooktrack.data.tellico.TellicoRecord
+import ru.antonkw.kwbooktrack.data.text.Isbn
 import ru.antonkw.kwbooktrack.data.text.parseDecimal
-import ru.antonkw.kwbooktrack.data.time.toEpochMs
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -38,7 +38,9 @@ class TellicoBookMapper @Inject constructor() {
             title = title.ifEmpty { "(без названия)" },
             subtitle = TellicoCommon.f(record, "subtitle"),
             author = author.ifEmpty { "(автор неизвестен)" },
-            isbn13 = normalizeIsbn(TellicoCommon.f(record, "isbn")),
+            // ISBN приводится к 13 цифрам: десятизначный из Tellico иначе лежал
+            // бы рядом с тем же тринадцатизначным номером, введённым вручную.
+            isbn13 = Isbn.normalize(TellicoCommon.f(record, "isbn")),
             pageCount = TellicoCommon.f(record, "pages")?.toIntOrNull(),
             language = normalizeLanguage(TellicoCommon.f(record, "language")),
             genre = TellicoCommon.f(record, "genre"),
@@ -49,8 +51,8 @@ class TellicoBookMapper @Inject constructor() {
             status = status(record),
             startedAt = TellicoCommon.parseDate(TellicoCommon.f(record, "дата-начала")),
             finishedAt = TellicoCommon.parseDate(TellicoCommon.f(record, "дата-прочтения")),
-            createdAt = TellicoCommon.parseDate(TellicoCommon.f(record, "cdate")) ?: now,
-            updatedAt = TellicoCommon.parseDate(TellicoCommon.f(record, "mdate")) ?: now,
+            createdAt = TellicoCommon.parseInstant(TellicoCommon.f(record, "cdate")) ?: now,
+            updatedAt = TellicoCommon.parseInstant(TellicoCommon.f(record, "mdate")) ?: now,
             source = MediaSource.TELLICO,
             purchaseDate = TellicoCommon.parseDate(TellicoCommon.f(record, "pur_date")),
             purchasePrice = parsePrice(TellicoCommon.f(record, "pur_price")),
@@ -118,24 +120,6 @@ class TellicoBookMapper @Inject constructor() {
                 durationSec = parts.getOrNull(4)?.trim()?.toLongOrNull(),
                 note = parts.getOrNull(5)?.trim()?.takeUnless { it.isEmpty() },
             )
-        }
-    }
-
-    /**
-     * ISBN: 13 цифр (ISBN-13) или 10 знаков (ISBN-10, последний может быть «X»).
-     *
-     * Десятизначный ISBN — половина реальных книг: отбрасывать его нельзя.
-     */
-    private fun normalizeIsbn(raw: String?): String? {
-        if (raw.isNullOrBlank()) return null
-        val text = raw.trim().uppercase()
-        val digits = text.filter { it.isDigit() }
-        val hasX = 'X' in text
-        return when {
-            digits.length == 13 && !hasX -> digits
-            digits.length == 10 && !hasX -> digits
-            digits.length == 9 && hasX -> digits + "X"
-            else -> null
         }
     }
 

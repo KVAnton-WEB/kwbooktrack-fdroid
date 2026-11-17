@@ -54,35 +54,63 @@ object HtmlToMarkdown {
         rx("""<[^>]*>""") to literal(""),
     )
 
-    private val ENTITY_PASSES: List<Pair<Regex, (MatchResult) -> String>> = listOf(
-        rx("""&nbsp;|&#160;|&#xa0;""") to literal(" "),
-        rx("""&amp;""") to literal("&"),
-        rx("""&lt;""") to literal("<"),
-        rx("""&gt;""") to literal(">"),
-        rx("""&quot;""") to literal("\""),
-        rx("""&apos;|&#39;""") to literal("'"),
-        rx("""&laquo;""") to literal("«"),
-        rx("""&raquo;""") to literal("»"),
-        rx("""&ldquo;""") to literal("“"),
-        rx("""&rdquo;""") to literal("”"),
-        rx("""&lsquo;""") to literal("‘"),
-        rx("""&rsquo;""") to literal("’"),
-        rx("""&mdash;""") to literal("—"),
-        rx("""&ndash;""") to literal("–"),
-        rx("""&hellip;""") to literal("…"),
-        rx("""&#x([0-9a-f]+);""") to { m -> charOf(m.groupValues[1], 16) },
-        rx("""&#(\d+);""") to { m -> charOf(m.groupValues[1], 10) },
+    /**
+     * Сущности — **одним** проходом.
+     *
+     * Раньше их раскрывали отдельные проходы, и `&amp;` раскрывался раньше
+     * `&lt;`: из `&amp;lt;script&amp;gt;` получался `<script>` — текст
+     * превращался в разметку, а цепочка «импорт → экспорт» переставала быть
+     * идемпотентной. Один проход раскрывает ровно один уровень, как и делает
+     * любой HTML-парсер.
+     */
+    private val ENTITY = Regex(
+        """&(nbsp|amp|lt|gt|quot|apos|laquo|raquo|ldquo|rdquo|lsquo|rsquo|mdash|ndash|hellip);""" +
+            """|&#x([0-9a-fA-F]+);|&#(\d+);""",
+        RegexOption.IGNORE_CASE,
     )
+
+    private val NAMED_ENTITIES: Map<String, String> = mapOf(
+        "nbsp" to " ",
+        "amp" to "&",
+        "lt" to "<",
+        "gt" to ">",
+        "quot" to "\"",
+        "apos" to "'",
+        "laquo" to "«",
+        "raquo" to "»",
+        "ldquo" to "“",
+        "rdquo" to "”",
+        "lsquo" to "‘",
+        "rsquo" to "’",
+        "mdash" to "—",
+        "ndash" to "–",
+        "hellip" to "…",
+    )
+
+    private fun unescapeEntity(match: MatchResult): String {
+        val named = match.groupValues[1]
+        if (named.isNotEmpty()) return NAMED_ENTITIES[named.lowercase()] ?: ""
+        val hex = match.groupValues[2]
+        if (hex.isNotEmpty()) return charOf(hex, 16)
+        return charOf(match.groupValues[3], 10)
+    }
 
     private fun charOf(digits: String, radix: Int): String {
         val code = digits.toIntOrNull(radix) ?: return ""
         if (code !in 1..0x10FFFF) return ""
-        return runCatching { code.toChar().toString() }.getOrDefault("")
+        // Символы за пределами BMP — эмодзи — это **пара** UTF-16: одиночный
+        // `toChar()` давал битый суррогат.
+        return if (code <= 0xFFFF) {
+            code.toChar().toString()
+        } else {
+            Character.toChars(code).concatToString()
+        }
     }
 
     fun convert(raw: String): String {
         var out = raw
-        for ((regex, replacement) in TAG_PASSES + ENTITY_PASSES) out = out.replace(regex, replacement)
+        for ((regex, replacement) in TAG_PASSES) out = out.replace(regex, replacement)
+        out = out.replace(ENTITY) { unescapeEntity(it) }
         return out
             .replace(Regex("""[ \t]{2,}"""), " ")
             .replace(Regex("""[ \t]+\n"""), "\n")

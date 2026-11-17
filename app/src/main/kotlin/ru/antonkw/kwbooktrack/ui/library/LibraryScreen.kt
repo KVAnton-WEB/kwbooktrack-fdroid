@@ -72,7 +72,8 @@ import coil.compose.AsyncImage
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import ru.antonkw.kwbooktrack.R
-import ru.antonkw.kwbooktrack.data.time.toLocalDate
+import ru.antonkw.kwbooktrack.data.text.Isbn
+import ru.antonkw.kwbooktrack.data.time.toDayDate
 import ru.antonkw.kwbooktrack.ui.common.CoverImage
 import ru.antonkw.kwbooktrack.ui.common.formatDuration
 import ru.antonkw.kwbooktrack.ui.common.FilterDropdown
@@ -115,9 +116,11 @@ fun LibraryScreen(
     var showDatePicker by remember { mutableStateOf(false) }
 
     val scanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
-        val isbn = result?.contents?.filter { it.isDigit() }
-        if (!isbn.isNullOrBlank()) {
-            viewModel.setQuery(isbn.take(13))
+        // ISBN приводится к 13 цифрам: по сохранённому номеру в базе найдётся
+        // и книга, введённая десятизначным номером.
+        val isbn = Isbn.normalize(result?.contents)
+        if (isbn != null) {
+            viewModel.setQuery(isbn)
         }
     }
 
@@ -400,7 +403,7 @@ fun LibraryScreen(
         val today = LocalDate.now()
         val max = YearMonth.of(today.year, today.month)
         val min = YearMonth.of(today.year - 5, 1)
-        val initial = period.startMillis?.let { it.toLocalDate() }
+        val initial = period.startMillis?.let { it.toDayDate() }
             ?.let { YearMonth.of(it.year, it.monthValue) } ?: max
         MonthYearPickerDialog(
             initial = initial,

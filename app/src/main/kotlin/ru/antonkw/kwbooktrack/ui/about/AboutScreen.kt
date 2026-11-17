@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.FileDownload
@@ -132,12 +133,14 @@ class AboutViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            combine(bookRepository.observeAll(), movieRepository.observeAll()) { books, movies -> books to movies }
-                .collect { (books, movies) ->
-                val total = books.size
-                val finished = books.count { it.status == BookStatus.FINISHED }
-                _info.value = AboutInfo(appVersionProvider.appVersion, total, finished, movies.size)
-            }
+            // Счётчики из БД, а не вся библиотека в памяти: экран показывает
+            // три числа, а грузить ради них тысячи строк незачем.
+            combine(
+                bookRepository.observeCounts(),
+                movieRepository.observeCount(),
+            ) { books, movies ->
+                AboutInfo(appVersionProvider.appVersion, books.total, books.finished, movies)
+            }.collect { _info.value = it }
         }
     }
 }
@@ -223,7 +226,11 @@ fun AboutScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp),
+                .padding(16.dp)
+                // Экран не влезает в телефон: карточки с настройками и
+                // экспортом длиннее экрана, а добраться до кнопок экспорта
+                // иначе нельзя.
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Card(modifier = Modifier.fillMaxWidth()) {

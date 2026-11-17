@@ -20,7 +20,7 @@ import ru.antonkw.kwbooktrack.data.db.entity.PhotoEntity
 import ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity
 import ru.antonkw.kwbooktrack.data.media.mediaDates
 import ru.antonkw.kwbooktrack.data.progress.ReadingProgress
-import ru.antonkw.kwbooktrack.data.time.toEpochMs
+import ru.antonkw.kwbooktrack.data.time.toDayMs
 import java.time.LocalDate
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.NoteRepository
@@ -114,7 +114,8 @@ class BookDetailViewModel @Inject constructor(
             bookRepository.update(
                 book.copy(
                     status = ru.antonkw.kwbooktrack.data.db.entity.BookStatus.READING,
-                    startedAt = book.startedAt ?: now,
+                    // Дата начала чтения — дата, а не момент времени.
+                    startedAt = book.startedAt ?: LocalDate.now().toDayMs(),
                     updatedAt = now,
                 ),
             )
@@ -131,7 +132,7 @@ class BookDetailViewModel @Inject constructor(
         // Дата — полночь по местному времени (как в остальных колонках с
         // датами), иначе «два прочтения» в один день не отличались бы от
         // одного.
-        val today = LocalDate.now().toEpochMs()
+        val today = LocalDate.now().toDayMs()
         // Прежние даты перечитывания не теряются: «отметить прочитанным»
         // добавляет дату, а не заменяет список.
         val dates = (listOfNotNull(book.finishedAt) + extra + today).distinct().sorted()

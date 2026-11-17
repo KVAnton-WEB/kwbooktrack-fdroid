@@ -82,8 +82,14 @@ class MovieRepository @Inject constructor(
      */
     suspend fun updateFromImport(movie: MovieEntity): Int = movieDao.update(withSearchKeys(movie))
 
-    suspend fun upsertFromImport(movie: MovieEntity): Long =
-        movieDao.upsertFromImport(withSearchKeys(movie))
+    /**
+     * Вставка или обновление фильма из импорта.
+     *
+     * @param snapshotId id строки в архиве (свой zip-бэкап): по нему запись
+     *   обновляется точно, а не по совпадению названия и года.
+     */
+    suspend fun upsertFromImport(movie: MovieEntity, snapshotId: Long = 0L): Long =
+        movieDao.upsertFromImport(withSearchKeys(movie), snapshotId)
 
     suspend fun delete(movie: MovieEntity): Int {
         // Пути файлов фото читаем ДО удаления строк: после их уже не узнать.
@@ -108,6 +114,9 @@ class MovieRepository @Inject constructor(
     }
 
     suspend fun count(): Int = movieDao.count()
+
+    /** Счётчик фильмов потоком — без загрузки строк. */
+    fun observeCount(): Flow<Int> = movieDao.observeCount()
 
     private fun withSearchKeys(movie: MovieEntity): MovieEntity = movie.copy(
         titleSearch = listOfNotNull(movie.title, movie.originalTitle)

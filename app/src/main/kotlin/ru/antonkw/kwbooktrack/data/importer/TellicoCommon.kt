@@ -7,7 +7,8 @@ import ru.antonkw.kwbooktrack.data.snapshot.PhotoSnapshot
 import ru.antonkw.kwbooktrack.data.tellico.TellicoFields
 import ru.antonkw.kwbooktrack.data.tellico.TellicoRecord
 import ru.antonkw.kwbooktrack.data.text.HtmlToMarkdown
-import ru.antonkw.kwbooktrack.data.time.toEpochMs
+import ru.antonkw.kwbooktrack.data.time.toDayMs
+import ru.antonkw.kwbooktrack.data.time.toLocalDayStartMs
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoField
@@ -30,11 +31,20 @@ internal object TellicoCommon {
     /**
      * Флаги Tellico: «true», «yes», «да», «1», «y» — и слово самого поля
      * («Скачан»): в выгрузке Tellico значение флага — его заголовок.
+     *
+     * Заголовок и значение сравниваются нормализованно: в CSV-выгрузке
+     * Tellico флаг приходит как «Продано?» или «Прочитал часть», а в XML — как
+     * «прочитал-часть». Без нормализации такие флаги всегда читались как
+     * false.
      */
     fun isTrue(raw: String?, vararg words: String): Boolean {
-        val value = raw?.lowercase() ?: return false
-        return value in TRUE_VALUES || words.any { it == value }
+        val value = normalizeFlag(raw) ?: return false
+        return value in TRUE_VALUES || words.any { normalizeFlag(it) == value }
     }
+
+    /** «Продано?» → «продано», «Прочитал часть» → «прочитал-часть». */
+    private fun normalizeFlag(raw: String?): String? =
+        raw?.trim()?.lowercase()?.removeSuffix("?")?.replace(' ', '-')?.takeIf { it.isNotEmpty() }
 
     /**
      * Даты Tellico: `yyyy-MM-dd`, `yyyy-MM`, `yyyy` и `dd.MM.yyyy`.
@@ -53,9 +63,20 @@ internal object TellicoCommon {
                     if (parsed.isSupported(ChronoField.DAY_OF_MONTH)) parsed.get(ChronoField.DAY_OF_MONTH) else 1,
                 )
             }.getOrNull() ?: continue
-            return date.toEpochMs()
+            return date.toDayMs()
         }
         return null
+    }
+
+    /**
+     * Момент времени из даты Tellico: полночь **локальной** зоны.
+     *
+     * Для колонок, которые хранят настоящий момент времени (`created_at`,
+     * `updated_at`): момент в зоне устройства — как было и раньше.
+     */
+    fun parseInstant(raw: String?): Long? {
+        val day = parseDate(raw) ?: return null
+        return LocalDate.ofEpochDay(Math.floorDiv(day, 86_400_000L)).toLocalDayStartMs()
     }
 
     /** Теги — многозначное поле Tellico, значения склеены `"; "`. */
@@ -106,13 +127,21 @@ internal object TellicoCommon {
         }
     }
 
-    /** Рецензия — одна заметка REVIEW. */
+    /**
+     * Рецензии — по одной заметке REVIEW на строку.
+     *
+     * Экспорт склеивает все рецензии книги через перевод строки (переводы
+     * строк внутри самого текста экранированы) — так их можно разобрать
+     * обратно и не потерять ни одной. Раньше читалась только первая, а фото
+     * прикреплялось не к той заметке.
+     */
     fun reviewNote(record: TellicoRecord): List<NoteSnapshot> {
-        val body = f(record, "рецензия")
-            ?.let { HtmlToMarkdown.convert(it) }
-            ?.takeUnless { it.isBlank() }
-            ?: return emptyList()
-        return listOf(NoteSnapshot(kind = NoteKind.REVIEW, body = body))
+        val raw = f(record, "рецензия") ?: return emptyList()
+        return HtmlToMarkdown.convert(raw)
+            .split('\n')
+            .map { unescape(it).trim() }
+            .filter { it.isNotEmpty() }
+            .map { NoteSnapshot(kind = NoteKind.REVIEW, body = it) }
     }
 
     /**
@@ -177,7 +206,7 @@ internal object TellicoCommon {
     private fun parseNoteDate(raw: String): Long? {
         val text = raw.trim()
         if (text.isEmpty()) return null
-        return runCatching { LocalDate.parse(text, DateTimeFormatter.ISO_LOCAL_DATE).toEpochMs() }.getOrNull()
+        return runCatching { LocalDate.parse(text, DateTimeFormatter.ISO_LOCAL_DATE).toLocalDayStartMs() }.getOrNull()
     }
 
     /** Разворачивает экранирование Tellico: `\\` → `\`, `\n` → перевод строки, `\r` → CR. */

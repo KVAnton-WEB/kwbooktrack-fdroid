@@ -2,7 +2,7 @@ package ru.antonkw.kwbooktrack.ui.common
 
 import androidx.annotation.StringRes
 import ru.antonkw.kwbooktrack.R
-import ru.antonkw.kwbooktrack.data.time.toEpochMs
+import ru.antonkw.kwbooktrack.data.time.toDayMs
 import java.time.LocalDate
 import java.time.YearMonth
 
@@ -46,8 +46,8 @@ data class PeriodOption(
         fun allTime() = PeriodOption(labelRes = R.string.period_all)
 
         fun year(year: Int): PeriodOption {
-            val start = LocalDate.of(year, 1, 1).toEpochMs()
-            val end = LocalDate.of(year + 1, 1, 1).toEpochMs()
+            val start = LocalDate.of(year, 1, 1).toDayMs()
+            val end = LocalDate.of(year + 1, 1, 1).toDayMs()
             return PeriodOption(
                 labelRes = R.string.period_year,
                 formatArg = year.toString(),
@@ -58,8 +58,8 @@ data class PeriodOption(
         }
 
         fun month(year: Int, month: Int, @StringRes monthNameRes: Int): PeriodOption {
-            val start = LocalDate.of(year, month, 1).toEpochMs()
-            val end = YearMonth.of(year, month).plusMonths(1).atDay(1).toEpochMs()
+            val start = LocalDate.of(year, month, 1).toDayMs()
+            val end = YearMonth.of(year, month).plusMonths(1).atDay(1).toDayMs()
             return PeriodOption(
                 labelRes = R.string.period_year_month,
                 formatArg = "$year|$monthNameRes",

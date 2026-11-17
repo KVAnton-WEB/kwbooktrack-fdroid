@@ -7,6 +7,7 @@ import ru.antonkw.kwbooktrack.data.snapshot.ExtraField
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.InputStream
+import java.io.StringReader
 import javax.inject.Inject
 import javax.inject.Singleton
 import javax.xml.parsers.SAXParserFactory
@@ -109,7 +110,7 @@ class TellicoXmlReader @Inject constructor() {
         val extra = mutableMapOf<String, ExtraField>()
         for (element in entry.children) {
             if (element.name == "id") continue // служебный номер записи Tellico
-            val (name, values) = element.fieldValues()
+            val (name, values) = element.fieldValues(known)
             val declaration = declarations[name]
             val separator = if ((declaration?.columns ?: 0) > 1) "\n" else "; "
             val value = values.joinToString(separator)
@@ -124,7 +125,7 @@ class TellicoXmlReader @Inject constructor() {
     }
 
     /** Имя поля и его значения: контейнер многозначного поля, дата или обычный текст. */
-    private fun XmlNode.fieldValues(): Pair<String, List<String>> {
+    private fun XmlNode.fieldValues(known: Set<String>): Pair<String, List<String>> {
         if (attributes.containsKey("calendar")) return name to listOf(dateValue())
         val children = children
         if (children.isNotEmpty()) {
@@ -133,6 +134,13 @@ class TellicoXmlReader @Inject constructor() {
             val isContainer = children.all { it.name == childName } && name == childName + "s"
             if (isContainer) {
                 return childName to children.map { it.cellValues() }.filter { it.isNotEmpty() }
+            }
+            // Контейнер со смешанными детьми (`<authors><author/><editor/></authors>`):
+            // имя поля — имя контейнера без `s`. Иначе поле ушло бы в «чужие», и
+            // автор книги потерялся бы.
+            val fieldName = name.removeSuffix("s")
+            if (fieldName in known && fieldName != name) {
+                return fieldName to children.map { it.cellValues() }.filter { it.isNotEmpty() }
             }
         }
         return name to listOf(textContent().trim())
@@ -217,6 +225,17 @@ private class XmlNode(
 
 /** Собирает дерево элементов из потока SAX-событий. */
 private class TreeHandler : DefaultHandler() {
+
+    /**
+     * Внешние сущности не читаем — ни DTD, ни `file://`.
+     *
+     * `setFeature` в [factory] может не сработать (парсер не поддерживает
+     * фичу), а тогда файл из чужого источника увёл бы приложение в сеть или
+     * прочитал локальный файл. Свой резолвер работает на любом парсере:
+     * парсер зовёт его сам.
+     */
+    override fun resolveEntity(publicId: String?, systemId: String?): InputSource =
+        InputSource(StringReader(""))
 
     private val stack = ArrayDeque<XmlNode>()
 

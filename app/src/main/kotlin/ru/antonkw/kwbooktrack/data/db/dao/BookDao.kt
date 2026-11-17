@@ -1,6 +1,5 @@
 package ru.antonkw.kwbooktrack.data.db.dao
 
-import androidx.paging.PagingSource
 import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Insert
@@ -31,15 +30,6 @@ interface BookDao {
      */
     @Query("SELECT * FROM books ORDER BY updated_at DESC")
     suspend fun getAll(): List<BookEntity>
-
-    /**
-     * Paging-friendly version of [observeAll] for libraries that exceed the
-     * memory budget for a one-shot load (≥10k books). Current screens still
-     * use [observeAll]; this is here so the call site is ready when the
-     * BookListScreen is migrated.
-     */
-    @Query("SELECT * FROM books ORDER BY updated_at DESC")
-    fun pagingSource(): PagingSource<Int, BookEntity>
 
     @Query("SELECT * FROM books WHERE id = :id LIMIT 1")
     suspend fun findById(id: Long): BookEntity?
@@ -77,6 +67,21 @@ interface BookDao {
     suspend fun count(): Int
 
     /**
+     * Счётчики книг потоком — экран «О приложении» считает, а не грузит.
+     *
+     * Оба числа в одном запросе: раздельные счётчики обновлялись бы в разные
+     * моменты, и экран показывал бы «6 книг, 0 прочитано» вместо «6 и 1».
+     */
+    @Query(
+        """
+        SELECT COUNT(*) AS total,
+            COALESCE(SUM(CASE WHEN status = :status THEN 1 ELSE 0 END), 0) AS finished
+        FROM books
+        """,
+    )
+    fun observeCounts(status: BookStatus): Flow<BookCounts>
+
+    /**
      * Upsert by ISBN, merging non-null fields so manual user data
      * (purchaseDate, custom genre, rating) is not wiped by an import.
      * Wrapped in @Transaction to prevent two concurrent calls both
@@ -95,19 +100,43 @@ interface BookDao {
     }
 
     /**
-     * Upsert by ISBN first, then by title+author. Same merge rules and
-     * @Transaction guarantee as [upsertByIsbn].
+     * Upsert by ISBN first, then by title+author.
+     *
+     * @param snapshotId id строки в архиве (свой zip-бэкап). По нему запись
+     *   обновляется точно: две книги с одинаковым названием и автором (два
+     *   экземпляра без ISBN) остаются двумя книгами, а не схлопываются.
      */
     @Transaction
-    suspend fun upsertFromImport(book: BookEntity): Long {
+    suspend fun upsertFromImport(book: BookEntity, snapshotId: Long = 0L): Long {
+        // Точное совпадение по id архива: та же самая строка, её надо обновить.
+        if (snapshotId > 0L) {
+            val byId = findById(snapshotId)
+            if (byId != null && byId.title == book.title) {
+                update(book.mergeWith(byId))
+                return byId.id
+            }
+        }
         val byIsbn = book.isbn13?.let { findByIsbn(it) }
-        val existing = byIsbn ?: findByTitleAndAuthor(book.title, book.author)
+        if (byIsbn != null) {
+            // Сильный ключ — ISBN: это тот же товар, импорт обновляет поля.
+            update(book.mergeWith(byIsbn))
+            return byIsbn.id
+        }
+        // Слабый ключ — название и автор: так совпадают и две разные книги
+        // (два экземпляра без ISBN). Заполненные поля существующей строки не
+        // трогаем — иначе вторая книга затирала бы первую.
+        val existing = findByTitleAndAuthor(book.title, book.author)
         return if (existing != null) {
-            val merged = book.mergeWith(existing)
-            update(merged)
+            update(book.mergeIntoExisting(existing))
             existing.id
         } else {
-            insert(book)
+            // Новая строка: id из архива сохраняем, если он свободен — тогда
+            // следующий импорт найдёт эту книгу точно, а не по названию.
+            insert(if (snapshotId > 0L && findById(snapshotId) == null) {
+                book.copy(id = snapshotId)
+            } else {
+                book
+            })
         }
     }
 
@@ -144,6 +173,16 @@ interface BookDao {
     @Query("DELETE FROM media_dates WHERE media_id = :bookId AND media_type = 'BOOKS'")
     suspend fun deleteDates(bookId: Long): Int
 }
+
+/**
+ * Проекция счётчиков: сколько книг всего и сколько прочитано.
+ *
+ * Не сущность: результат одного запроса `SELECT COUNT(*) …`.
+ */
+data class BookCounts(
+    val total: Int,
+    val finished: Int,
+)
 
 /**
  * Merge for imports: keep the existing row's non-null fields when the
@@ -195,5 +234,57 @@ private fun BookEntity.mergeWith(existing: BookEntity): BookEntity = copy(
     isSold = isSold.takeIf { it } ?: existing.isSold,
     // Чужие поля Tellico: импорт побеждает по ключу, а ключи, которых в
     // импорте нет, остаются (пустой импорт не стирает данные).
+    extraFields = existing.extraFields + extraFields,
+)
+
+/**
+ * Слияние по слабому ключу (название и автор): заполненные поля существующей
+ * строки не трогаем.
+ *
+ * Название и автор — не уникальный ключ: так совпадают и две разные книги
+ * (два экземпляра без ISBN). Раньше вторая запись затирала рейтинг, даты и
+ * число страниц первой, а заметки и фото обеих склеивались в одну книгу.
+ *
+ * Пустые места заполняются данными импорта, флаги объединяются «или».
+ */
+private fun BookEntity.mergeIntoExisting(existing: BookEntity): BookEntity = existing.copy(
+    // Метка «изменено» — из источника (`mdate` в Tellico, `updated_at` в
+    // zip-бэкапе), а не «сейчас»: книгу изменили не сейчас, а когда её
+    // редактировали в источнике.
+    updatedAt = updatedAt.takeIf { it > 0L } ?: existing.updatedAt,
+    isbn13 = isbn13 ?: existing.isbn13,
+    subtitle = existing.subtitle ?: subtitle,
+    pageCount = existing.pageCount ?: pageCount,
+    language = language.takeIf { it.isNotBlank() && it != "ru" } ?: existing.language,
+    genre = existing.genre ?: genre,
+    publisher = existing.publisher ?: publisher,
+    year = existing.year ?: year,
+    coverPath = existing.coverPath ?: coverPath,
+    rating = existing.rating ?: rating,
+    // Статус улучшаем только из «в wishlist» — уменьшать его нельзя.
+    status = if (existing.status == BookStatus.WISHLIST && status != BookStatus.WISHLIST) {
+        status
+    } else {
+        existing.status
+    },
+    startedAt = existing.startedAt ?: startedAt,
+    finishedAt = existing.finishedAt ?: finishedAt,
+    source = existing.source,
+    purchaseDate = existing.purchaseDate ?: purchaseDate,
+    purchasePrice = existing.purchasePrice ?: purchasePrice,
+    binding = existing.binding ?: binding,
+    purchasePlace = existing.purchasePlace ?: purchasePlace,
+    series = existing.series ?: series,
+    seriesNumber = existing.seriesNumber ?: seriesNumber,
+    condition = existing.condition ?: condition,
+    translator = existing.translator ?: translator,
+    printYear = existing.printYear ?: printYear,
+    printPages = existing.printPages ?: printPages,
+    originalLanguage = existing.originalLanguage ?: originalLanguage,
+    originalTitle = existing.originalTitle ?: originalTitle,
+    annotation = existing.annotation ?: annotation,
+    isGift = existing.isGift || isGift,
+    isLent = existing.isLent || isLent,
+    isSold = existing.isSold || isSold,
     extraFields = existing.extraFields + extraFields,
 )

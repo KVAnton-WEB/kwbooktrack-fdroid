@@ -126,6 +126,29 @@ class TellicoCsvReaderTest {
         assertThat(record.fields["comments"]).isEqualTo("Он сказал \"привет\"")
     }
 
+    @Test
+    fun bomInFirstHeaderDoesNotLoseTheTitle() {
+        // Excel и часть выгрузок пишут BOM в начало файла: заголовок приходит
+        // как «\uFEFFЗаголовок», не совпадал ни с одним полем Tellico — и
+        // книга приезжала без названия.
+        val csv = "\uFEFFЗаголовок;Автор\nДюна;Герберт\n"
+        val record = TellicoCsvReader().read(StringReader(csv)).single()
+
+        assertThat(record.fields["title"]).isEqualTo("Дюна")
+        assertThat(record.fields["author"]).isEqualTo("Герберт")
+    }
+
+    @Test
+    fun soldFlagFromCsvHeaderIsRead() {
+        // Значение флага в CSV-выгрузке Tellico — заголовок колонки: «Продано?».
+        // Раньше такое значение не совпадало ни с одним словом, и флаг всегда
+        // читался как false.
+        val csv = "Заголовок;Продано?\nДюна;Продано?\n"
+        val record = TellicoCsvReader().read(StringReader(csv)).single()
+
+        assertThat(record.fields["продано-new"]).isEqualTo("Продано?")
+    }
+
     private fun record(vararg pairs: Pair<String, String>): TellicoRecord {
         val headers = pairs.map { it.first }
         val values = pairs.map { (_, v) -> csvValue(v) }

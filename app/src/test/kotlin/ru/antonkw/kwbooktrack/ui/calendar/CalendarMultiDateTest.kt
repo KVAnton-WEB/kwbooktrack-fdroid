@@ -27,7 +27,7 @@ import ru.antonkw.kwbooktrack.data.repository.MediaDateRepository
 import ru.antonkw.kwbooktrack.data.repository.MovieRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
 import ru.antonkw.kwbooktrack.data.repository.SessionRepository
-import ru.antonkw.kwbooktrack.data.time.toEpochMs
+import ru.antonkw.kwbooktrack.data.time.toDayMs
 import java.time.LocalDate
 
 /**
@@ -67,8 +67,8 @@ class CalendarMultiDateTest {
 
     @Test
     fun rewatchedMovieStandsInBothDates() = runTest(dispatcher) {
-        val first = LocalDate.of(2024, 2, 10).toEpochMs()
-        val second = LocalDate.of(2024, 3, 15).toEpochMs()
+        val first = LocalDate.of(2024, 2, 10).toDayMs()
+        val second = LocalDate.of(2024, 3, 15).toDayMs()
         val id = movies.insert(
             MovieEntity(
                 title = "Малхолланд Драйв",

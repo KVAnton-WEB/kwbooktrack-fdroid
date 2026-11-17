@@ -3,7 +3,7 @@ package ru.antonkw.kwbooktrack.data.stats
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 import ru.antonkw.kwbooktrack.data.db.entity.MovieEntity
-import ru.antonkw.kwbooktrack.data.time.toEpochMs
+import ru.antonkw.kwbooktrack.data.time.toDayMs
 import java.time.LocalDate
 
 class MovieStatsCalculatorTest {
@@ -82,7 +82,7 @@ class MovieStatsCalculatorTest {
         title = title,
         year = date?.year,
         durationMin = duration,
-        watchedAt = date?.toEpochMs(),
+        watchedAt = date?.toDayMs(),
         createdAt = 0L,
         updatedAt = 0L,
     )

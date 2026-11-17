@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.graphics.Color
 import android.text.Spannable
+import android.text.method.LinkMovementMethod
 import android.text.style.ClickableSpan
 import android.text.style.ForegroundColorSpan
 import com.google.common.truth.Truth.assertThat
@@ -31,6 +32,10 @@ class MarkdownTextLinkTest {
             .getSpans(0, view.text.length, ClickableSpan::class.java)
             .firstOrNull()
         assertThat(span).isNotNull()
+
+        // Без LinkMovementMethod клик по ссылке не доходит до span'а:
+        // setTextIsSelectable ставит ArrowKeyMovementMethod, и ссылка мертва.
+        assertThat(view.movementMethod).isInstanceOf(LinkMovementMethod::class.java)
 
         span!!.onClick(view)
 

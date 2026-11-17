@@ -2,7 +2,8 @@ package ru.antonkw.kwbooktrack.data.stats
 
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
 import ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity
-import ru.antonkw.kwbooktrack.data.time.toLocalDate
+import ru.antonkw.kwbooktrack.data.time.toDayDate
+import ru.antonkw.kwbooktrack.data.time.toLocalDay
 import java.time.LocalDate
 import java.time.YearMonth
 import kotlin.math.roundToInt
@@ -99,7 +100,7 @@ object StatsCalculator {
     /** Сколько книг приходится на каждый месяц — по дате (прочтения или покупки). */
     private fun monthlyCounts(dates: List<Long>): List<MonthlyBooks> =
         dates.map { ts ->
-            val date = ts.toLocalDate()
+            val date = ts.toDayDate()
             MonthlyBooks(date.year, date.monthValue, 0)
         }.groupingBy { it.year to it.month }
             .eachCount()
@@ -108,7 +109,7 @@ object StatsCalculator {
 
     /** Сумма покупок по месяцам — цены книг, купленных в этом месяце. */
     private fun monthlySums(purchases: List<Pair<Long, Double>>): List<MonthlySpend> =
-        purchases.groupBy { YearMonth.from(it.first.toLocalDate()) }
+        purchases.groupBy { YearMonth.from(it.first.toDayDate()) }
             .map { (ym, list) ->
                 MonthlySpend(ym.year, ym.monthValue, list.sumOf { it.second }.roundToInt())
             }
@@ -147,7 +148,7 @@ object StatsCalculator {
     private fun pageDeltas(sessions: List<ReadingSessionEntity>): List<Pair<LocalDate, Int>> {
         return deltaPairs(sessions).mapNotNull { (s, pages) ->
             if (pages <= 0) null
-            else s.startedAt.toLocalDate() to pages
+            else s.startedAt.toLocalDay() to pages
         }
     }
 

@@ -17,7 +17,12 @@ class TellicoCsvReader @Inject constructor() {
      */
     fun read(reader: Reader): List<TellicoRecord> =
         CSVParser(reader, FORMAT).use { parser ->
-            val headers = parser.headerNames
+            val headers = parser.headerNames.mapIndexed { index, name ->
+                // BOM в начале файла (Excel, часть выгрузок) — с ним не совпал бы
+                // заголовок, и поле ушло бы в «чужие»: книга приехала бы без
+                // названия.
+                if (index == 0) name.removePrefix("\uFEFF") else name
+            }
             parser.records.map { record -> record.toTellicoRecord(headers) }
         }
 

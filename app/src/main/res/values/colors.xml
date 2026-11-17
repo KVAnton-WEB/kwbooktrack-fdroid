@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Фон окна до первой отрисовки интерфейса (заставка при запуске).
+         В тёмной теме фон приложения чисто чёрный (AMOLED), в светлой —
+         светло-зелёный, как у Compose-темы. -->
+    <color name="window_background">#FBFDF6</color>
+</resources>

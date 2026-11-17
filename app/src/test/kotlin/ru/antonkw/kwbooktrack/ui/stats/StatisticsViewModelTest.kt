@@ -28,7 +28,7 @@ import ru.antonkw.kwbooktrack.data.media.MediaTypeStore
 import ru.antonkw.kwbooktrack.data.repository.MediaDateRepository
 import ru.antonkw.kwbooktrack.data.repository.MovieRepository
 import ru.antonkw.kwbooktrack.data.repository.SessionRepository
-import ru.antonkw.kwbooktrack.data.time.toEpochMs
+import ru.antonkw.kwbooktrack.data.time.toDayMs
 import java.time.LocalDate
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -77,7 +77,7 @@ class StatisticsViewModelTest {
 
     @Test
     fun statsReflectInsertedBooksAndSessions() = runTest(dispatcher) {
-        val today = LocalDate.now().toEpochMs()
+        val today = LocalDate.now().toDayMs()
         bookRepository.insert(
             BookEntity(
                 title = "Dune",

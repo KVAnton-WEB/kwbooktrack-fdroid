@@ -29,7 +29,7 @@ import ru.antonkw.kwbooktrack.data.repository.MediaDateRepository
 import ru.antonkw.kwbooktrack.data.repository.MovieRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
 import ru.antonkw.kwbooktrack.data.repository.SessionRepository
-import ru.antonkw.kwbooktrack.data.time.toEpochMs
+import ru.antonkw.kwbooktrack.data.time.toDayMs
 import ru.antonkw.kwbooktrack.ui.common.PeriodOption
 import java.time.LocalDate
 
@@ -133,19 +133,19 @@ class LibraryViewModelTest {
     fun savedStateRestoresPeriod() = runTest(dispatcher) {
         val viewModel = viewModel(
             androidx.lifecycle.SavedStateHandle(
-                mapOf("periodStart" to LocalDate.of(2026, 3, 1).toEpochMs(), "periodWholeYear" to false),
+                mapOf("periodStart" to LocalDate.of(2026, 3, 1).toDayMs(), "periodWholeYear" to false),
             ),
         )
         val period = viewModel.currentPeriod.value
         assertThat(period.wholeYear).isFalse()
-        assertThat(period.startMillis).isEqualTo(LocalDate.of(2026, 3, 1).toEpochMs())
+        assertThat(period.startMillis).isEqualTo(LocalDate.of(2026, 3, 1).toDayMs())
     }
 
     @Test
     fun savedStateRestoresWholeYearPeriod() = runTest(dispatcher) {
         val viewModel = viewModel(
             androidx.lifecycle.SavedStateHandle(
-                mapOf("periodStart" to LocalDate.of(2026, 1, 1).toEpochMs(), "periodWholeYear" to true),
+                mapOf("periodStart" to LocalDate.of(2026, 1, 1).toDayMs(), "periodWholeYear" to true),
             ),
         )
         assertThat(viewModel.currentPeriod.value.wholeYear).isTrue()
@@ -258,7 +258,7 @@ class LibraryViewModelTest {
         author = "Author",
         createdAt = 0L,
         updatedAt = 0L,
-        purchaseDate = date.toEpochMs(),
+        purchaseDate = date.toDayMs(),
     )
 
     private fun watched(title: String, date: LocalDate?) = MovieEntity(
@@ -266,6 +266,6 @@ class LibraryViewModelTest {
         year = 2026,
         createdAt = 0L,
         updatedAt = 0L,
-        watchedAt = date?.toEpochMs(),
+        watchedAt = date?.toDayMs(),
     )
 }

@@ -43,8 +43,8 @@ class TellicoMovieMapper @Inject constructor() {
             comments = TellicoCommon.f(record, "comments")?.let { HtmlToMarkdown.convert(it) }?.takeUnless { it.isBlank() },
             url = TellicoCommon.f(record, "кинопоиск"),
             isDownloaded = TellicoCommon.isTrue(TellicoCommon.f(record, "скачан"), "скачан"),
-            createdAt = TellicoCommon.parseDate(TellicoCommon.f(record, "cdate")) ?: now,
-            updatedAt = TellicoCommon.parseDate(TellicoCommon.f(record, "mdate")) ?: now,
+            createdAt = TellicoCommon.parseInstant(TellicoCommon.f(record, "cdate")) ?: now,
+            updatedAt = TellicoCommon.parseInstant(TellicoCommon.f(record, "mdate")) ?: now,
             source = MediaSource.TELLICO,
         )
         return MovieSnapshot(

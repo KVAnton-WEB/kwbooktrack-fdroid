@@ -16,8 +16,8 @@ android {
         applicationId = "ru.antonkw.kwbooktrack"
         minSdk = 31
         targetSdk = 34
-        versionCode = 86
-        versionName = "0.7.15"
+        versionCode = 87
+        versionName = "0.8.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -110,14 +110,12 @@ dependencies {
 
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
-    implementation(libs.room.paging)
     ksp(libs.room.compiler)
 
     implementation(libs.commons.csv)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.coil.compose)
     implementation(libs.zxing.android.embedded)
-    implementation(libs.androidx.paging.common)
     implementation(libs.markwon.core)
 
     debugImplementation(libs.compose.ui.tooling)

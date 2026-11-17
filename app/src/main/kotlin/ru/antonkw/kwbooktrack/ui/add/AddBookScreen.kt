@@ -67,6 +67,7 @@ import coil.compose.AsyncImage
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import ru.antonkw.kwbooktrack.R
+import ru.antonkw.kwbooktrack.data.text.Isbn
 import ru.antonkw.kwbooktrack.ui.common.DatePickerField
 import java.io.File
 
@@ -90,7 +91,6 @@ fun AddBookScreen(
     val activity = context as? Activity
 
     var showDiscardDialog by remember { mutableStateOf(false) }
-    var pendingBack by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
 
     // A new book with even a single keystroke in title/author/etc. is worth
@@ -129,9 +129,11 @@ fun AddBookScreen(
     BackHandler(enabled = true) { handleBack() }
 
     val scanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
-        val isbn = result?.contents?.filter { it.isDigit() }
-        if (!isbn.isNullOrBlank()) {
-            viewModel.setIsbn(isbn.take(13))
+        // Штрихкод ISBN-10 заканчивается на «X» — фильтр «только цифры» резал
+        // номер до девяти знаков, и такой книгу нельзя было найти по ISBN.
+        val isbn = Isbn.normalize(result?.contents)
+        if (isbn != null) {
+            viewModel.setIsbn(isbn)
         }
     }
 
@@ -187,6 +189,7 @@ fun AddBookScreen(
     // Строку читаем до эффекта: stringResource нельзя звать из LaunchedEffect.
     val errorMessage = when (state.error) {
         AddBookError.DUPLICATE_ISBN -> stringResource(R.string.error_duplicate_isbn)
+        AddBookError.INVALID_DATE -> stringResource(R.string.error_invalid_date)
         null -> null
     }
     LaunchedEffect(state.error) {

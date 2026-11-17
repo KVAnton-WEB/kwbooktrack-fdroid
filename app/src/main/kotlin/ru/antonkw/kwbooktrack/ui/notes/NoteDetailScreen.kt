@@ -1,7 +1,6 @@
 package ru.antonkw.kwbooktrack.ui.notes
 
 import android.content.Intent
-import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -63,7 +62,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import coil.compose.AsyncImage
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -89,7 +87,8 @@ sealed interface NoteDetailUiState {
     data object Loading : NoteDetailUiState
     data class Loaded(
         val note: NoteEntity,
-        val mediaTitle: String,
+        /** null — владельца удалили, заголовок подставит экран. */
+        val mediaTitle: String?,
         val mediaSubtitle: String,
         val coverPath: String?,
         val photos: List<PhotoEntity>,
@@ -97,9 +96,22 @@ sealed interface NoteDetailUiState {
     data object NotFound : NoteDetailUiState
 }
 
+/**
+ * Заголовок владельца заметки. Владельца удалили — подпись «книга удалена»
+ * на языке интерфейса (строки ресурсов, а не текст из ViewModel).
+ */
+@Composable
+private fun NoteDetailUiState.Loaded.titleOrFallback(): String =
+    mediaTitle ?: stringResource(
+        if (note.mediaType == MediaType.MOVIES) {
+            R.string.about_movie_deleted_fallback
+        } else {
+            R.string.about_book_deleted_fallback
+        },
+    )
+
 @HiltViewModel
 class NoteDetailViewModel @Inject constructor(
-    @ApplicationContext private val context: Context,
     private val noteRepository: NoteRepository,
     private val bookRepository: BookRepository,
     private val movieRepository: MovieRepository,
@@ -122,15 +134,9 @@ class NoteDetailViewModel @Inject constructor(
                 _state.value = NoteDetailUiState.NotFound
                 return@launch
             }
-            // Подстановка «владелец удалён» — по типу носителя: у фильма
-            // это не «книга удалена».
-            val deletedFallback = context.getString(
-                if (note.mediaType == ru.antonkw.kwbooktrack.data.db.entity.MediaType.MOVIES) {
-                    R.string.about_movie_deleted_fallback
-                } else {
-                    R.string.about_book_deleted_fallback
-                },
-            )
+            // Владелец удалён — заголовок подставляет экран: в ViewModel живут
+            // строки ресурсов, а не зашитый русский текст (иначе подпись была
+            // бы на языке системы, а интерфейс — на выбранном).
             combine(
                 bookRepository.observeById(note.mediaId),
                 movieRepository.observeById(note.mediaId),
@@ -138,15 +144,15 @@ class NoteDetailViewModel @Inject constructor(
             ) { book, movie, photos ->
                 // Владелец — книга или фильм: id у них считаются независимо,
                 // поэтому ищем по паре (id, тип).
-                val title: String
+                val title: String?
                 val subtitle: String
                 val cover: String?
                 if (note.mediaType == MediaType.MOVIES) {
-                    title = movie?.title ?: deletedFallback
+                    title = movie?.title
                     subtitle = movie?.director.orEmpty()
                     cover = movie?.coverPath
                 } else {
-                    title = book?.title ?: deletedFallback
+                    title = book?.title
                     subtitle = book?.author.orEmpty()
                     cover = book?.coverPath
                 }
@@ -238,6 +244,7 @@ fun NoteDetailScreen(
                 actions = {
                     val loaded = state as? NoteDetailUiState.Loaded
                     if (loaded != null) {
+                        val title = loaded.titleOrFallback()
                         val pageLine = loaded.note.page?.let { stringResource(R.string.note_page_label, it) }
                         IconButton(onClick = {
                             clipboard.setText(AnnotatedString(loaded.note.bodyMd))
@@ -248,8 +255,8 @@ fun NoteDetailScreen(
                         IconButton(onClick = {
                             val send = Intent(Intent.ACTION_SEND).apply {
                                 type = "text/plain"
-                                putExtra(Intent.EXTRA_SUBJECT, loaded.mediaTitle)
-                                putExtra(Intent.EXTRA_TEXT, buildShareText(loaded, pageLine))
+                                putExtra(Intent.EXTRA_SUBJECT, title)
+                                putExtra(Intent.EXTRA_TEXT, buildShareText(title, loaded, pageLine))
                             }
                             context.startActivity(Intent.createChooser(send, context.getString(R.string.action_share)))
                         }) {
@@ -288,6 +295,7 @@ fun NoteDetailScreen(
 
 @Composable
 private fun NoteDetailContent(state: NoteDetailUiState.Loaded, onOpenMedia: (MediaType, Long) -> Unit) {
+    val title = state.titleOrFallback()
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -306,7 +314,7 @@ private fun NoteDetailContent(state: NoteDetailUiState.Loaded, onOpenMedia: (Med
             if (!state.coverPath.isNullOrBlank()) {
                 AsyncImage(
                     model = java.io.File(state.coverPath),
-                    contentDescription = state.mediaTitle,
+                    contentDescription = title,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.size(width = 96.dp, height = 144.dp),
                 )
@@ -322,7 +330,7 @@ private fun NoteDetailContent(state: NoteDetailUiState.Loaded, onOpenMedia: (Med
                 )
             }
             Text(
-                text = state.mediaTitle,
+                text = title,
                 style = MaterialTheme.typography.titleMedium,
             )
             if (state.mediaSubtitle.isNotBlank()) {
@@ -397,9 +405,9 @@ private fun NoteDetailContent(state: NoteDetailUiState.Loaded, onOpenMedia: (Med
     }
 }
 
-private fun buildShareText(state: NoteDetailUiState.Loaded, pageLine: String?): String {
+private fun buildShareText(title: String, state: NoteDetailUiState.Loaded, pageLine: String?): String {
     val header = buildString {
-        append(state.mediaTitle)
+        append(title)
         if (state.mediaSubtitle.isNotBlank()) {
             append(" — ")
             append(state.mediaSubtitle)

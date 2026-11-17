@@ -235,6 +235,7 @@
     <string name="dialog_unsaved_message">Сохранить изменения или выйти без сохранения?</string>
     <string name="error_no_camera">Нет доступа к камере</string>
     <string name="error_duplicate_isbn">Книга с таким ISBN уже есть в библиотеке</string>
+    <string name="error_invalid_date">Не удалось разобрать дату — проверьте формат</string>
 
     <!-- Notes -->
     <string name="empty_notes_detailed">Нет заметок. Добавьте цитаты или мысли в детальном экране книги.</string>

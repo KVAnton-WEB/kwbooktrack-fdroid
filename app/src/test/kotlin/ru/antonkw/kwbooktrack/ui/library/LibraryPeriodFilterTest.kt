@@ -28,7 +28,7 @@ import ru.antonkw.kwbooktrack.data.repository.MediaDateRepository
 import ru.antonkw.kwbooktrack.data.repository.MovieRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
 import ru.antonkw.kwbooktrack.data.repository.SessionRepository
-import ru.antonkw.kwbooktrack.data.time.toEpochMs
+import ru.antonkw.kwbooktrack.data.time.toDayMs
 import ru.antonkw.kwbooktrack.ui.common.PeriodOption
 import java.time.LocalDate
 import java.time.YearMonth
@@ -71,8 +71,8 @@ class LibraryPeriodFilterTest {
 
     @Test
     fun rewatchedMovieIsFoundByTheLaterDate() = runTest(dispatcher) {
-        val march = LocalDate.of(2024, 3, 10).toEpochMs()
-        val may = LocalDate.of(2024, 5, 15).toEpochMs()
+        val march = LocalDate.of(2024, 3, 10).toDayMs()
+        val may = LocalDate.of(2024, 5, 15).toDayMs()
         val id = movies.insert(
             MovieEntity(
                 title = "Малхолланд Драйв",

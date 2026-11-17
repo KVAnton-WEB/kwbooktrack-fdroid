@@ -65,6 +65,7 @@ import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
 import ru.antonkw.kwbooktrack.data.db.entity.NoteEntity
 import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
 import ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity
+import ru.antonkw.kwbooktrack.ui.common.ExtraFieldsSection
 import ru.antonkw.kwbooktrack.ui.common.PhotoGalleryDialog
 import ru.antonkw.kwbooktrack.ui.common.PhotoSource
 import ru.antonkw.kwbooktrack.ui.common.labelRes
@@ -72,7 +73,10 @@ import ru.antonkw.kwbooktrack.ui.common.rememberScrollbarController
 import ru.antonkw.kwbooktrack.ui.common.scrollbarGestures
 import ru.antonkw.kwbooktrack.ui.common.seriesLabel
 import java.time.Instant
-import ru.antonkw.kwbooktrack.data.time.toLocalDate
+import ru.antonkw.kwbooktrack.data.time.toDayDate
+import ru.antonkw.kwbooktrack.data.time.toLocalDateTime
+import ru.antonkw.kwbooktrack.data.time.toLocalDay
+import ru.antonkw.kwbooktrack.data.time.toDayDate
 import ru.antonkw.kwbooktrack.data.time.toLocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -290,7 +294,7 @@ fun BookDetailScreen(
             // некуда спрятать: в диалоге «все поля» их не было.
             if (book.extraFields.isNotEmpty()) {
                 item {
-                    ru.antonkw.kwbooktrack.ui.common.ExtraFieldsSection(book.extraFields)
+                    ExtraFieldsSection(book.extraFields)
                 }
             }
 
@@ -580,7 +584,7 @@ private fun NoteRow(note: NoteEntity, photoPath: String?, onOpen: (Long) -> Unit
             modifier = Modifier.padding(top = 2.dp),
         )
         Text(
-            text = formatDate(note.createdAt),
+            text = formatNoteDate(note.createdAt),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 2.dp),
@@ -667,5 +671,10 @@ private fun SessionRow(session: ReadingSessionEntity, delta: Int?) {
 private val SESSION_FMT: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm", Locale("ru"))
 private val DATE_FMT: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy", Locale("ru"))
 
+/** Дата (прочитал, купил) — хранится в полнонь UTC. */
 private fun formatDate(epochMs: Long): String =
-    DATE_FMT.format(epochMs.toLocalDate())
+    DATE_FMT.format(epochMs.toDayDate())
+
+/** Момент времени (когда создана заметка) — в зоне устройства. */
+private fun formatNoteDate(epochMs: Long): String =
+    DATE_FMT.format(epochMs.toLocalDay())

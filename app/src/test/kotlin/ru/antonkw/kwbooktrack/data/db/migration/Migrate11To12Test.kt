@@ -44,7 +44,7 @@ class Migrate11To12Test {
         createV11Database()
 
         val db = Room.databaseBuilder(ctx, KwBooktrackDatabase::class.java, dbName)
-            .addMigrations(Migrate9To10, Migrate10To11, Migrate11To12)
+            .addMigrations(Migrate9To10, Migrate10To11, Migrate11To12, Migrate12To13)
             .build()
         try {
             // Первый запрос открывает базу: Room проверяет схему и, если не

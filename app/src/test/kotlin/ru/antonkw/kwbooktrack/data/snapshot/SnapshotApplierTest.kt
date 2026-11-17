@@ -62,6 +62,8 @@ class SnapshotApplierTest {
         sessionRepository = SessionRepository(db.readingSessionDao())
         tagRepository = TagRepository(db.tagDao())
         applier = SnapshotApplier(
+        database = db,
+        coverStorage = NoOpCoverStorage,
             bookRepository = bookRepository,
                 movieRepository = MovieRepository(db.movieDao(), NoOpCoverStorage, photoRepository),
             noteRepository = noteRepository,
@@ -257,6 +259,8 @@ class SnapshotApplierTest {
             photoRepository,
         )
         val cancellingApplier = SnapshotApplier(
+        database = db,
+        coverStorage = NoOpCoverStorage,
             bookRepository = cancelling,
                 movieRepository = MovieRepository(db.movieDao(), NoOpCoverStorage, photoRepository),
             noteRepository = noteRepository,
@@ -316,11 +320,12 @@ class SnapshotApplierTest {
         applier.apply(movieSnapshot(), assets)
         applier.apply(movieSnapshot(durationMin = 150), assets)
 
-        // Ключ слияния — название и год: второй импорт не добавляет фильм, а
-        // обновляет существующий. При этом заполненное поле из импорта
-        // побеждает — как у книг.
+        // Ключ слияния — название и год: второй импорт не добавляет фильм.
+        // Заполненные поля существующего фильма при этом не затираются:
+        // название и год — не уникальный ключ (так совпадают и два разных
+        // фильма), и вторая запись не должна портить первую.
         assertThat(db.movieDao().count()).isEqualTo(1)
-        assertThat(db.movieDao().observeAll().first().single().durationMin).isEqualTo(150)
+        assertThat(db.movieDao().observeAll().first().single().durationMin).isEqualTo(147)
     }
 
     @Test

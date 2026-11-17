@@ -80,6 +80,21 @@ class HtmlToMarkdownTest {
     }
 
     @Test
+    fun entitiesAreDecodedOnlyOnce() {
+        // `&amp;lt;` — это текст про «&lt;», а не готовый «<»: сущности
+        // раскрываются одним проходом, как у любого HTML-парсера. Раньше
+        // `&amp;` раскрывался раньше `&lt;`, и текст превращался в разметку.
+        assertThat(HtmlToMarkdown.convert("&amp;lt;script&amp;gt;")).isEqualTo("&lt;script&gt;")
+        assertThat(HtmlToMarkdown.convert("&amp;nbsp;")).isEqualTo("&nbsp;")
+    }
+
+    @Test
+    fun surrogatePairEntitiesBecomeWholeCharacters() {
+        // Эмодзи — пара UTF-16: одиночный `toChar()` давал битый суррогат.
+        assertThat(HtmlToMarkdown.convert("&#128512;")).isEqualTo("😀")
+    }
+
+    @Test
     fun unknownTagsAreStripped() {
         assertThat(HtmlToMarkdown.convert("""<font size="3" color="red">текст</font><span class="x">ещё</span>"""))
             .isEqualTo("текстещё")

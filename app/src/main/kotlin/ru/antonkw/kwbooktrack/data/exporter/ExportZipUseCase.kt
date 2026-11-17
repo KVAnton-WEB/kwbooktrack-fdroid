@@ -22,7 +22,7 @@ import ru.antonkw.kwbooktrack.data.snapshot.PhotoSnapshot
 import ru.antonkw.kwbooktrack.data.snapshot.SessionJson
 import ru.antonkw.kwbooktrack.data.snapshot.SnapshotBuilder
 import ru.antonkw.kwbooktrack.data.text.formatDecimal
-import ru.antonkw.kwbooktrack.data.time.toLocalDate
+import ru.antonkw.kwbooktrack.data.time.toDayDate
 import java.io.BufferedOutputStream
 import java.io.File
 import java.io.FileNotFoundException
@@ -60,6 +60,17 @@ data class ExportCounts(
     val tags: Int,
     /** Сколько фильмов попало в архив. Значение по умолчанию — для старых бэкапов. */
     val movies: Int = 0,
+    /** Сколько обложек попало в архив. */
+    val covers: Int = 0,
+    /**
+     * Сколько обложек потерялось: в строке ссылка есть, а файла на диске нет.
+     *
+     * Раньше обложки не считались вообще, и потерянная обложка была видна
+     * только тем, что картинка не грузилась. Теперь это видно в счётчиках.
+     */
+    val coversMissing: Int = 0,
+    /** Сколько рецензий попало в архив. */
+    val reviews: Int = 0,
 )
 
 /**
@@ -111,12 +122,12 @@ class ExportZipUseCase @Inject constructor(
                 zip.closeEntry()
                 // books.csv (UTF-8 без BOM, разделитель `;`)
                 zip.putNextEntry(ZipEntry("books.csv"))
-                writeCsv(zip, prepared.books.map { it.book })
+                writeCsv(zip, prepared.books.map { it.book }, prepared.covers.keys)
                 zip.closeEntry()
 
                 // movies.csv — те же правила, что у books.csv.
                 zip.putNextEntry(ZipEntry("movies.csv"))
-                writeMoviesCsv(zip, prepared.movies.map { it.movie })
+                writeMoviesCsv(zip, prepared.movies.map { it.movie }, prepared.covers.keys)
                 zip.closeEntry()
 
                 // extra.json — заметки, сессии, теги, фото и чужие поля по id
@@ -142,7 +153,7 @@ class ExportZipUseCase @Inject constructor(
     }
 
     /** `books.csv`: заголовок + строка на книгу. */
-    private fun writeCsv(zip: ZipOutputStream, books: List<BookEntity>) {
+    private fun writeCsv(zip: ZipOutputStream, books: List<BookEntity>, coverNames: Set<String>) {
         zip.write(BOOKS_HEADER.toByteArray(StandardCharsets.UTF_8))
         zip.write("\n".toByteArray(StandardCharsets.UTF_8))
         books.forEach { book ->
@@ -156,7 +167,10 @@ class ExportZipUseCase @Inject constructor(
                 csvField(book.genre.orEmpty()),
                 csvField(book.publisher.orEmpty()),
                 csvField(book.year?.toString().orEmpty()),
-                csvField(book.coverPath?.substringAfterLast('/').orEmpty()),
+                // Обложка ссылается на файл в архиве: если файла нет (потерян
+                // с диска), ссылку не пишем — иначе импорт искал бы несуществующий
+                // файл, а счётчик обложек врал бы.
+                csvField(book.coverPath?.substringAfterLast('/')?.takeIf { it in coverNames }.orEmpty()),
                 csvField(book.rating?.toString().orEmpty()),
                 csvField(book.status.name),
                 csvField(epochToDate(book.startedAt)),
@@ -194,7 +208,7 @@ class ExportZipUseCase @Inject constructor(
      * правилу, даты ISO, пустое значение — пустая строка. Заметки, теги, фото
      * и чужие поля фильма — в `extra.json`.
      */
-    private fun writeMoviesCsv(zip: ZipOutputStream, movies: List<MovieEntity>) {
+    private fun writeMoviesCsv(zip: ZipOutputStream, movies: List<MovieEntity>, coverNames: Set<String>) {
         zip.write(MOVIES_HEADER.toByteArray(StandardCharsets.UTF_8))
         zip.write("\n".toByteArray(StandardCharsets.UTF_8))
         movies.forEach { movie ->
@@ -209,7 +223,7 @@ class ExportZipUseCase @Inject constructor(
                 csvField(movie.durationMin?.toString().orEmpty()),
                 csvField(movie.rating?.toString().orEmpty()),
                 csvField(epochToDate(movie.watchedAt)),
-                csvField(movie.coverPath?.substringAfterLast('/').orEmpty()),
+                csvField(movie.coverPath?.substringAfterLast('/')?.takeIf { it in coverNames }.orEmpty()),
                 csvField(movie.plot.orEmpty()),
                 csvField(movie.comments.orEmpty()),
                 csvField(movie.url.orEmpty()),
@@ -235,15 +249,21 @@ class ExportZipUseCase @Inject constructor(
         var sessions = 0
         var notes = 0
         var quotes = 0
+        var reviews = 0
         var tags = 0
         var photoCount = 0
+        var missingCovers = 0
 
         for (snapshot in snapshots) {
             val withFiles = collectFiles(snapshot.book.coverPath, snapshot.photos, covers, photos)
+            if (!snapshot.book.coverPath.isNullOrBlank() && !File(snapshot.book.coverPath).isFile) {
+                missingCovers++
+            }
             books += snapshot.copy(photos = withFiles)
             sessions += snapshot.sessions.size
             notes += snapshot.notes.count { it.kind == NoteKind.NOTE }
             quotes += snapshot.notes.count { it.kind == NoteKind.QUOTE }
+            reviews += snapshot.notes.count { it.kind == NoteKind.REVIEW }
             tags += snapshot.tags.size
             photoCount += withFiles.size
         }
@@ -251,9 +271,13 @@ class ExportZipUseCase @Inject constructor(
         // Фильмы — как книги: обложка рядом с книжными, заметки и теги — общие.
         for (snapshot in movieSnapshots) {
             val withFiles = collectFiles(snapshot.movie.coverPath, snapshot.photos, covers, photos)
+            if (!snapshot.movie.coverPath.isNullOrBlank() && !File(snapshot.movie.coverPath).isFile) {
+                missingCovers++
+            }
             movies += snapshot.copy(photos = withFiles)
             notes += snapshot.notes.count { it.kind == NoteKind.NOTE }
             quotes += snapshot.notes.count { it.kind == NoteKind.QUOTE }
+            reviews += snapshot.notes.count { it.kind == NoteKind.REVIEW }
             tags += snapshot.tags.size
             photoCount += withFiles.size
         }
@@ -266,6 +290,9 @@ class ExportZipUseCase @Inject constructor(
             photos = photoCount,
             tags = tags,
             movies = movies.size,
+            covers = covers.size,
+            coversMissing = missingCovers,
+            reviews = reviews,
         )
         return Prepared(books, movies, covers, photos, counts)
     }
@@ -380,12 +407,16 @@ class ExportZipUseCase @Inject constructor(
 
     private fun csvField(value: String): String {
         val escaped = value.replace("\"", "\"\"")
-        return if (escaped.contains(';') || escaped.contains('"') || escaped.contains('\n')) "\"$escaped\"" else escaped
+        // `\r` — тоже конец записи для commons-csv: без кавычек строка рвалась
+        // и следующая читалась как отдельная запись.
+        return if (escaped.contains(';') || escaped.contains('"') ||
+            escaped.contains('\n') || escaped.contains('\r')
+        ) "\"$escaped\"" else escaped
     }
 
     private fun epochToDate(epoch: Long?): String {
         if (epoch == null) return ""
-        return DateTimeFormatter.ISO_LOCAL_DATE.format(epoch.toLocalDate())
+        return DateTimeFormatter.ISO_LOCAL_DATE.format(epoch.toDayDate())
     }
 
     companion object {

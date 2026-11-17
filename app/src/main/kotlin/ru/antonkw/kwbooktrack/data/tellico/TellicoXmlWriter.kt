@@ -10,7 +10,9 @@ import ru.antonkw.kwbooktrack.data.snapshot.NoteSnapshot
 import ru.antonkw.kwbooktrack.data.snapshot.PhotoSnapshot
 import ru.antonkw.kwbooktrack.data.snapshot.SessionSnapshot
 import ru.antonkw.kwbooktrack.data.text.formatDecimal
-import ru.antonkw.kwbooktrack.data.time.toLocalDate
+import ru.antonkw.kwbooktrack.data.time.toDayDate
+import ru.antonkw.kwbooktrack.data.time.toLocalDay
+import java.time.LocalDate
 
 /** Одна запись каталога для экспорта. */
 data class TcEntry(
@@ -45,6 +47,13 @@ data class TcMovieEntry(
  *  - `<image>` — ровно `id` и `format`: без `width`/`height` обложка не показывается.
  */
 object TellicoXmlWriter {
+
+    /**
+     * Символы, запрещённые в XML 1.0: Control-ы, кроме табуляции, перевода
+     * строки и возврата каретки. Один такой символ в тексте делает невалидным
+     * весь документ — Tellico и SAX отвергнут файл целиком.
+     */
+    private val ILLEGAL_XML_CHARS = Regex("[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F]")
 
     /** Собрать содержимое tellico.xml по записям. */
     fun write(entries: List<TcEntry>): String {
@@ -173,18 +182,20 @@ object TellicoXmlWriter {
         book.seriesNumber?.let { element(xml, "series_num", it) }
         book.condition?.let { element(xml, "condition", it) }
         book.binding?.let { element(xml, "binding", it) }
-        book.purchasePrice?.let { element(xml, "pur_price", formatDecimal(it)) }
-        book.purchaseDate?.let { date(xml, "pur_date", it) }
+        // `pur_price` у Tellico — числовое поле: запятая обрезала бы дробную
+        // часть у того, кто читает файл.
+        book.purchasePrice?.let { element(xml, "pur_price", formatDecimal(it).replace(',', '.')) }
+        book.purchaseDate?.let { date(xml, "pur_date", it.toDayDate()) }
         // У Tellico рейтинг 1..5 — значение вне диапазона в файл не пишем.
         book.rating?.takeIf { it in 1..5 }?.let { element(xml, "rating", it.toString()) }
         entry.coverArchiveName?.let { element(xml, "cover", it) }
         book.annotation?.let { element(xml, "comments", it) }
-        date(xml, "cdate", book.createdAt)
-        date(xml, "mdate", book.updatedAt)
+        dateTime(xml, "cdate", book.createdAt)
+        dateTime(xml, "mdate", book.updatedAt)
 
         // Свои поля.
-        book.startedAt?.let { date(xml, "дата-начала", it) }
-        book.finishedAt?.let { date(xml, "дата-прочтения", it) }
+        book.startedAt?.let { date(xml, "дата-начала", it.toDayDate()) }
+        book.finishedAt?.let { date(xml, "дата-прочтения", it.toDayDate()) }
         book.purchasePlace?.let { element(xml, "место-покупки", it) }
         book.printPages?.let { element(xml, "усл.-печ.-л.", formatDecimal(it)) }
         book.originalLanguage?.let { element(xml, "язык-оригинала", it) }
@@ -210,7 +221,7 @@ object TellicoXmlWriter {
         if (book.status == BookStatus.ABANDONED) element(xml, "брошено", "true")
         if (book.status == BookStatus.READING) element(xml, "прочитал-часть", "true")
 
-        // Рецензия — первая заметка REVIEW по createdAt.
+        // Рецензии — все, по одной на строку (см. `reviewText`).
         reviewText(snapshot.notes)?.let { element(xml, "рецензия", it) }
 
         // Чужие поля: имя элемента нельзя экранировать (экранирование даёт
@@ -304,11 +315,11 @@ object TellicoXmlWriter {
         entry.coverArchiveName?.let { element(xml, "cover", it) }
         movie.plot?.let { element(xml, "plot", it) }
         movie.comments?.let { element(xml, "comments", it) }
-        movie.watchedAt?.let { date(xml, "дата-просмотра", it) }
+        movie.watchedAt?.let { date(xml, "дата-просмотра", it.toDayDate()) }
         movie.url?.let { element(xml, "кинопоиск", it) }
         if (movie.isDownloaded) element(xml, "скачан", "true")
-        date(xml, "cdate", movie.createdAt)
-        date(xml, "mdate", movie.updatedAt)
+        dateTime(xml, "cdate", movie.createdAt)
+        dateTime(xml, "mdate", movie.updatedAt)
 
         container(xml, "теги", snapshot.tags)
         table(xml, "цитаты", quoteRows(snapshot.notes))
@@ -369,9 +380,12 @@ object TellicoXmlWriter {
         xml.append("   <$name>${escape(value)}</$name>\n")
     }
 
+    /** Момент времени Tellico — дата в зоне устройства. */
+    private fun dateTime(xml: StringBuilder, name: String, epochMillis: Long) =
+        date(xml, name, epochMillis.toLocalDay())
+
     /** Дата Tellico: `<поле calendar="gregorian">` с двузначными месяцем и днём. */
-    private fun date(xml: StringBuilder, name: String, epochMillis: Long) {
-        val date = epochMillis.toLocalDate()
+    private fun date(xml: StringBuilder, name: String, date: LocalDate) {
         val month = date.monthValue.toString().padStart(2, '0')
         val day = date.dayOfMonth.toString().padStart(2, '0')
         xml.append("   <$name calendar=\"gregorian\"><year>${date.year}</year>")
@@ -420,7 +434,7 @@ object TellicoXmlWriter {
                     listOf(
                         it.page?.toString().orEmpty(),
                         it.body,
-                        it.createdAt?.let { millis -> millis.toLocalDate().toString() }.orEmpty(),
+                        it.createdAt?.let { millis -> millis.toLocalDay().toString() }.orEmpty(),
                     ),
                 )
             }
@@ -452,12 +466,22 @@ object TellicoXmlWriter {
             )
         }
 
-    /** Рецензия — текст первой заметки REVIEW по `createdAt`. */
+    /**
+     * Рецензии — все, по времени создания.
+     *
+     * Раньше писалась только первая, а остальные молча терялись — и вместе с
+     * ними «съезжала» привязка фото: индекс фото считался по полному списку
+     * заметок, а в файле рецензия была одна. Теперь каждая рецензия — своя
+     * строка, переводы строк внутри текста экранированы (`cell`), так что
+     * импорт разбирает файл обратно без потерь.
+     */
     private fun reviewText(notes: List<NoteSnapshot>): String? =
         notes.filter { it.kind == NoteKind.REVIEW }
-            .minByOrNull { it.createdAt ?: Long.MAX_VALUE }
-            ?.body
-            ?.takeIf { it.isNotBlank() }
+            .sortedBy { it.createdAt ?: Long.MAX_VALUE }
+            .map { it.body }
+            .filter { it.isNotBlank() }
+            .takeIf { it.isNotEmpty() }
+            ?.joinToString("\n") { cell(it) }
 
     /** Строка таблицы: колонки через `::`. */
     private fun row(cells: List<String>): String = cells.joinToString("::") { cell(it) }
@@ -475,6 +499,10 @@ object TellicoXmlWriter {
 
     /** Экранирование XML. */
     private fun escape(value: String): String = value
+        // Символы, запрещённые в XML 1.0 (кроме табуляции и переводов строк),
+        // делают невалидным весь документ — а не одно поле. Один такой символ
+        // в заметке убивал бы весь экспорт.
+        .replace(ILLEGAL_XML_CHARS, "")
         .replace("&", "&amp;")
         .replace("<", "&lt;")
         .replace(">", "&gt;")

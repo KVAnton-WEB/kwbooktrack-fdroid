@@ -26,7 +26,7 @@ import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.MediaDateRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
 import ru.antonkw.kwbooktrack.data.repository.SessionRepository
-import ru.antonkw.kwbooktrack.data.time.toEpochMs
+import ru.antonkw.kwbooktrack.data.time.toDayMs
 import java.time.LocalDate
 
 /**
@@ -66,25 +66,25 @@ class BookDetailMultiDateTest {
             BookEntity(
                 title = "Дюна",
                 author = "Герберт",
-                finishedAt = LocalDate.of(2023, 2, 1).toEpochMs(),
+                finishedAt = LocalDate.of(2023, 2, 1).toDayMs(),
                 createdAt = 1L,
                 updatedAt = 1L,
             ),
         )
-        mediaDates.replaceFor(id, MediaType.BOOKS, listOf(LocalDate.of(2024, 5, 10).toEpochMs()))
+        mediaDates.replaceFor(id, MediaType.BOOKS, listOf(LocalDate.of(2024, 5, 10).toDayMs()))
 
         val vm = viewModelFor(id)
         val state = vm.uiState.first { it.dates.size == 2 }
 
         assertThat(state.dates).containsExactly(
-            LocalDate.of(2023, 2, 1).toEpochMs(),
-            LocalDate.of(2024, 5, 10).toEpochMs(),
+            LocalDate.of(2023, 2, 1).toDayMs(),
+            LocalDate.of(2024, 5, 10).toDayMs(),
         ).inOrder()
     }
 
     @Test
     fun markingAsReadAddsADateAndKeepsTheEarlierOne() = runTest(dispatcher) {
-        val january = LocalDate.of(2023, 2, 1).toEpochMs()
+        val january = LocalDate.of(2023, 2, 1).toDayMs()
         val id = bookRepository.insert(
             BookEntity(
                 title = "Дюна",
@@ -109,8 +109,8 @@ class BookDetailMultiDateTest {
     fun markingAsReadKeepsEarlierRereadDates() = runTest(dispatcher) {
         // Книга прочитана в январе и перечитана в марте. «Отметить прочитанным»
         // не должен затирать дату перечитывания.
-        val january = LocalDate.of(2023, 2, 1).toEpochMs()
-        val march = LocalDate.of(2023, 3, 5).toEpochMs()
+        val january = LocalDate.of(2023, 2, 1).toDayMs()
+        val march = LocalDate.of(2023, 3, 5).toDayMs()
         val id = bookRepository.insert(
             BookEntity(
                 title = "Дюна",

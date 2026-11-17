@@ -22,6 +22,7 @@ import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.db.entity.MediaSource
 import ru.antonkw.kwbooktrack.data.db.entity.MovieEntity
 import ru.antonkw.kwbooktrack.data.repository.MediaDateRepository
+import ru.antonkw.kwbooktrack.data.repository.SaveMovieUseCase
 import ru.antonkw.kwbooktrack.data.repository.MovieRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
 import ru.antonkw.kwbooktrack.data.snapshot.ExtraField
@@ -111,6 +112,7 @@ class MovieEditViewModelTest {
         SavedStateHandle(mapOf("movieId" to movieId)),
         movies,
         mediaDates,
+        SaveMovieUseCase(db, movies, mediaDates),
         ApplicationProvider.getApplicationContext(),
         NoOpCoverStorage,
     )
@@ -119,6 +121,7 @@ class MovieEditViewModelTest {
         SavedStateHandle(),
         movies,
         mediaDates,
+        SaveMovieUseCase(db, movies, mediaDates),
         ApplicationProvider.getApplicationContext(),
         NoOpCoverStorage,
     )

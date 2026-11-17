@@ -20,10 +20,14 @@ class TagRepository @Inject constructor(
         return tagDao.findOrCreate(normalized)
     }
 
-    /** Привязать тег к владельцу — книге или фильму. */
-    suspend fun attachToMedia(mediaId: Long, mediaType: MediaType, tagId: Long) {
-        tagDao.insertCrossRef(MediaTagCrossRef(mediaId = mediaId, mediaType = mediaType, tagId = tagId))
-    }
+    /**
+     * Привязать тег к владельцу — книге или фильму.
+     *
+     * @return true, если привязка появилась; false, если она уже была —
+     *   повторный импорт не должен показывать «добавлено», чего не добавили.
+     */
+    suspend fun attachToMedia(mediaId: Long, mediaType: MediaType, tagId: Long): Boolean =
+        tagDao.insertCrossRef(MediaTagCrossRef(mediaId = mediaId, mediaType = mediaType, tagId = tagId)) != -1L
 
     /** Теги владельца — книга или фильм. */
     suspend fun tagsOfMedia(mediaId: Long, mediaType: MediaType): List<String> =

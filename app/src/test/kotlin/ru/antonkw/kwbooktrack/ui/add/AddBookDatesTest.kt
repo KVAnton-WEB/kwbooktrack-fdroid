@@ -21,8 +21,9 @@ import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.MediaDateRepository
+import ru.antonkw.kwbooktrack.data.repository.SaveBookUseCase
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
-import ru.antonkw.kwbooktrack.data.time.toEpochMs
+import ru.antonkw.kwbooktrack.data.time.toDayMs
 import java.time.LocalDate
 
 /**
@@ -63,9 +64,9 @@ class AddBookDatesTest {
         vm.save()?.join()
 
         val book = books.findById(books.observeAll().first().single().id)!!
-        assertThat(book.finishedAt).isEqualTo(LocalDate.of(2023, 2, 1).toEpochMs())
+        assertThat(book.finishedAt).isEqualTo(LocalDate.of(2023, 2, 1).toDayMs())
         assertThat(mediaDates.getFor(book.id, MediaType.BOOKS))
-            .containsExactly(LocalDate.of(2024, 5, 10).toEpochMs())
+            .containsExactly(LocalDate.of(2024, 5, 10).toDayMs())
     }
 
     @Test
@@ -86,6 +87,7 @@ class AddBookDatesTest {
         SavedStateHandle(),
         books,
         mediaDates,
+        SaveBookUseCase(db, books, mediaDates),
         ApplicationProvider.getApplicationContext(),
         NoOpCoverStorage,
     )

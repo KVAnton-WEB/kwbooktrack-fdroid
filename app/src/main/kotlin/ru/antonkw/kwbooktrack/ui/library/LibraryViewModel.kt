@@ -26,13 +26,14 @@ import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 import ru.antonkw.kwbooktrack.data.db.entity.MovieEntity
 import ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity
 import ru.antonkw.kwbooktrack.data.media.MediaTypeStore
+import ru.antonkw.kwbooktrack.data.media.extrasOfType
 import ru.antonkw.kwbooktrack.data.media.mediaDates
 import ru.antonkw.kwbooktrack.data.progress.ReadingProgress
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.MediaDateRepository
 import ru.antonkw.kwbooktrack.data.repository.MovieRepository
 import ru.antonkw.kwbooktrack.data.repository.SessionRepository
-import ru.antonkw.kwbooktrack.data.time.toLocalDate
+import ru.antonkw.kwbooktrack.data.time.toDayDate
 import ru.antonkw.kwbooktrack.ui.common.PeriodOption
 import ru.antonkw.kwbooktrack.ui.common.PeriodOptions
 import javax.inject.Inject
@@ -145,7 +146,7 @@ class LibraryViewModel @Inject constructor(
     private fun readPeriod(): PeriodOption {
         val start = savedStateHandle.get<Long>(KEY_PERIOD_START) ?: 0L
         if (start <= 0L) return PeriodOption.allTime()
-        val date = start.toLocalDate()
+        val date = start.toDayDate()
         return if (savedStateHandle.get<Boolean>(KEY_PERIOD_WHOLE_YEAR) == true) {
             PeriodOption.year(date.year)
         } else {
@@ -319,8 +320,7 @@ class LibraryViewModel @Inject constructor(
     private fun extraDatesOf(
         dates: List<ru.antonkw.kwbooktrack.data.db.entity.MediaDateEntity>,
         mediaType: MediaType,
-    ): Map<Long, List<Long>> =
-        dates.filter { it.mediaType == mediaType }.groupBy({ it.mediaId }, { it.date })
+    ): Map<Long, List<Long>> = extrasOfType(dates, mediaType)
 
     /** Даты прочтения книги: основная плюс дополнительные. */
     private fun readDates(book: BookEntity, extraDates: Map<Long, List<Long>>): List<Long> =

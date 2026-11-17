@@ -2,6 +2,7 @@ package ru.antonkw.kwbooktrack.data.importer
 
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
+import ru.antonkw.kwbooktrack.data.time.toDayDate
 import ru.antonkw.kwbooktrack.data.db.entity.MediaSource
 import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
 import ru.antonkw.kwbooktrack.data.tellico.TellicoFields
@@ -45,7 +46,7 @@ class TellicoMovieMapperTest {
         val snapshot = mapper.map(record("title" to "Фильм", "дата-просмотра" to "2024-02-22"))!!
 
         assertThat(snapshot.movie.watchedAt).isNotNull()
-        assertThat(java.time.Instant.ofEpochMilli(snapshot.movie.watchedAt!!).atZone(java.time.ZoneId.systemDefault()).toLocalDate().toString())
+        assertThat(snapshot.movie.watchedAt!!.toDayDate().toString())
             .isEqualTo("2024-02-22")
     }
 
@@ -57,7 +58,7 @@ class TellicoMovieMapperTest {
         val snapshot = mapper.map(record("title" to "Фильм", "дата-просмотра" to "2024"))!!
 
         assertThat(snapshot.movie.watchedAt).isNotNull()
-        assertThat(java.time.Instant.ofEpochMilli(snapshot.movie.watchedAt!!).atZone(java.time.ZoneId.systemDefault()).toLocalDate().toString())
+        assertThat(snapshot.movie.watchedAt!!.toDayDate().toString())
             .isEqualTo("2024-01-01")
     }
 

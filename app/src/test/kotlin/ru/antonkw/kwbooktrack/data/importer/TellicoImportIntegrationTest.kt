@@ -65,6 +65,8 @@ class TellicoImportIntegrationTest {
             mapper = TellicoBookMapper(),
                 movieMapper = TellicoMovieMapper(),
             applier = SnapshotApplier(
+    database = db,
+    coverStorage = NoOpCoverStorage,
                 bookRepository = repo,
                 movieRepository = MovieRepository(db.movieDao(), NoOpCoverStorage, photoRepository),
                 noteRepository = NoteRepository(db.noteDao(), NoOpPhotoStorage),

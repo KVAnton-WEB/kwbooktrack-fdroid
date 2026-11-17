@@ -19,9 +19,10 @@ import ru.antonkw.kwbooktrack.data.TestDb
 import ru.antonkw.kwbooktrack.data.NoOpCoverStorage
 import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 import ru.antonkw.kwbooktrack.data.repository.MediaDateRepository
+import ru.antonkw.kwbooktrack.data.repository.SaveMovieUseCase
 import ru.antonkw.kwbooktrack.data.repository.MovieRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
-import ru.antonkw.kwbooktrack.data.time.toEpochMs
+import ru.antonkw.kwbooktrack.data.time.toDayMs
 import java.time.LocalDate
 
 /**
@@ -67,9 +68,9 @@ class MovieEditDatesTest {
 
         val movie = movies.getAll().single()
         // Основная дата — самая ранняя: из неё Tellico берёт первую дату.
-        assertThat(movie.watchedAt).isEqualTo(LocalDate.of(2023, 2, 1).toEpochMs())
+        assertThat(movie.watchedAt).isEqualTo(LocalDate.of(2023, 2, 1).toDayMs())
         assertThat(mediaDates.getFor(movie.id, MediaType.MOVIES))
-            .containsExactly(LocalDate.of(2024, 5, 10).toEpochMs())
+            .containsExactly(LocalDate.of(2024, 5, 10).toDayMs())
     }
 
     @Test
@@ -81,7 +82,7 @@ class MovieEditDatesTest {
         vm.state.first { it.saved }
 
         val movie = movies.getAll().single()
-        assertThat(movie.watchedAt).isEqualTo(LocalDate.of(2024, 5, 10).toEpochMs())
+        assertThat(movie.watchedAt).isEqualTo(LocalDate.of(2024, 5, 10).toDayMs())
         assertThat(mediaDates.getFor(movie.id, MediaType.MOVIES)).isEmpty()
     }
 
@@ -90,7 +91,7 @@ class MovieEditDatesTest {
         val id = movies.insert(
             ru.antonkw.kwbooktrack.data.db.entity.MovieEntity(
                 title = "Малхолланд Драйв",
-                watchedAt = LocalDate.of(2023, 2, 1).toEpochMs(),
+                watchedAt = LocalDate.of(2023, 2, 1).toDayMs(),
                 createdAt = 1L,
                 updatedAt = 1L,
             ),
@@ -98,7 +99,7 @@ class MovieEditDatesTest {
         mediaDates.replaceFor(
             id,
             MediaType.MOVIES,
-            listOf(LocalDate.of(2024, 5, 10).toEpochMs()),
+            listOf(LocalDate.of(2024, 5, 10).toDayMs()),
         )
 
         val vm = editVm(id)
@@ -115,6 +116,7 @@ class MovieEditDatesTest {
         SavedStateHandle(),
         movies,
         mediaDates,
+        SaveMovieUseCase(db, movies, mediaDates),
         ApplicationProvider.getApplicationContext(),
         NoOpCoverStorage,
     )
@@ -123,6 +125,7 @@ class MovieEditDatesTest {
         SavedStateHandle(mapOf("movieId" to movieId)),
         movies,
         mediaDates,
+        SaveMovieUseCase(db, movies, mediaDates),
         ApplicationProvider.getApplicationContext(),
         NoOpCoverStorage,
     )

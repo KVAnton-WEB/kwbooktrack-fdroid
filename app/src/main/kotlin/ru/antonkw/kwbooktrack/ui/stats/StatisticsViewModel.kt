@@ -18,7 +18,7 @@ import ru.antonkw.kwbooktrack.R
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
 import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 import ru.antonkw.kwbooktrack.data.media.MediaTypeStore
-import ru.antonkw.kwbooktrack.data.media.extrasByOwner
+import ru.antonkw.kwbooktrack.data.media.extrasOfType
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.MediaDateRepository
 import ru.antonkw.kwbooktrack.data.repository.MovieRepository
@@ -82,9 +82,7 @@ class StatisticsViewModel @Inject constructor(
         if (type == MediaType.MOVIES) {
             combine(movieRepository.observeAll(), mediaDateRepository.observeAll()) { movies, dates ->
                 // Дополнительные даты просмотра — по id фильма.
-                val byMovie = dates
-                    .filter { it.mediaType == MediaType.MOVIES }
-                    .groupBy({ it.mediaId }, { it.date })
+                val byMovie = extrasOfType(dates, MediaType.MOVIES)
                 StatisticsData.Movies(MovieStatsCalculator.compute(movies, byMovie))
             }
         } else {
@@ -93,9 +91,7 @@ class StatisticsViewModel @Inject constructor(
                 sessionRepository.observeAll(),
                 mediaDateRepository.observeAll(),
             ) { books, sessions, dates ->
-                val byBook = dates
-                    .filter { it.mediaType == MediaType.BOOKS }
-                    .groupBy({ it.mediaId }, { it.date })
+                val byBook = extrasOfType(dates, MediaType.BOOKS)
                 // Даты прочтения: основная плюс дополнительные (перечитывания).
                 val finishedDates = books.flatMap { book ->
                     val primary = if (book.status == BookStatus.FINISHED) {

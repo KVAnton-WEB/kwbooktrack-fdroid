@@ -47,6 +47,7 @@ object DatabaseModule {
                 ru.antonkw.kwbooktrack.data.db.migration.Migrate9To10,
                 ru.antonkw.kwbooktrack.data.db.migration.Migrate10To11,
                 ru.antonkw.kwbooktrack.data.db.migration.Migrate11To12,
+                ru.antonkw.kwbooktrack.data.db.migration.Migrate12To13,
             )
             .build()
 

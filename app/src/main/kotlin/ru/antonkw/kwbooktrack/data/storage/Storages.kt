@@ -21,9 +21,6 @@ interface CoverStorage {
     /** Скопировать байты в `covers/cover_{uuid}.{ext}`, вернуть абсолютный путь. */
     fun saveTemp(source: InputStream, extension: String): String
 
-    /** Окончательный путь обложки. Имя уже уникальное — переименовывать нечего. */
-    fun promote(tempPath: String?): String?
-
     /** Удалить файл обложки по точному пути. */
     fun delete(path: String?)
 }
@@ -47,8 +44,6 @@ class FileCoverStorage @Inject constructor(
         target.writeBytes(bytes)
         return target.absolutePath
     }
-
-    override fun promote(tempPath: String?): String? = tempPath
 
     override fun delete(path: String?) {
         if (path.isNullOrBlank()) return

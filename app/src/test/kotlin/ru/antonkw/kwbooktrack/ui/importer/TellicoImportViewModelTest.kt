@@ -71,6 +71,8 @@ class TellicoImportViewModelTest {
         )
         noteRepository = NoteRepository(db.noteDao(), NoOpPhotoStorage)
         val applier = SnapshotApplier(
+        database = db,
+        coverStorage = NoOpCoverStorage,
             bookRepository = bookRepository,
                 movieRepository = MovieRepository(db.movieDao(), NoOpCoverStorage, photoRepository),
             noteRepository = noteRepository,

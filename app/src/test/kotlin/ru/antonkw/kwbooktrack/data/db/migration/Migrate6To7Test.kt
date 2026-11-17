@@ -11,7 +11,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import ru.antonkw.kwbooktrack.data.time.toEpochMs
+import ru.antonkw.kwbooktrack.data.time.toLocalDayStartMs
 
 /**
  * Exercises [Migrate6To7] against a hand-crafted v6 schema. Same approach as
@@ -142,7 +142,7 @@ class Migrate6To7Test {
 
             Migrate6To7.migrate(db)
 
-            val expected = date.toEpochMs()
+            val expected = date.toLocalDayStartMs()
             assertThat(longOf(db, "books", 1, "finished_at")).isEqualTo(expected)
             assertThat(longOf(db, "books", 1, "purchase_date")).isEqualTo(expected)
         } finally {
@@ -191,13 +191,13 @@ class Migrate6To7Test {
             Migrate6To7.migrate(db)
 
             assertThat(longOf(db, "reading_sessions", 10, "started_at"))
-                .isEqualTo(LocalDate.of(2026, 5, 1).toEpochMs())
+                .isEqualTo(LocalDate.of(2026, 5, 1).toLocalDayStartMs())
             assertThat(longOf(db, "reading_sessions", 10, "ended_at"))
-                .isEqualTo(LocalDate.of(2026, 5, 10).toEpochMs())
+                .isEqualTo(LocalDate.of(2026, 5, 10).toLocalDayStartMs())
             assertThat(longOf(db, "notes", 20, "created_at"))
-                .isEqualTo(LocalDate.of(2026, 5, 5).toEpochMs())
+                .isEqualTo(LocalDate.of(2026, 5, 5).toLocalDayStartMs())
             assertThat(longOf(db, "notes", 20, "updated_at"))
-                .isEqualTo(LocalDate.of(2026, 5, 5).toEpochMs())
+                .isEqualTo(LocalDate.of(2026, 5, 5).toLocalDayStartMs())
         } finally {
             helper.close()
         }

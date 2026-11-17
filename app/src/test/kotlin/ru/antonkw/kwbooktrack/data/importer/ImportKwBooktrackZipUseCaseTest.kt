@@ -31,7 +31,7 @@ import ru.antonkw.kwbooktrack.data.repository.TagRepository
 import ru.antonkw.kwbooktrack.data.snapshot.SnapshotApplier
 import ru.antonkw.kwbooktrack.data.snapshot.SnapshotBuilder
 import ru.antonkw.kwbooktrack.data.storage.CoverTranscoder
-import ru.antonkw.kwbooktrack.data.time.toEpochMs
+import ru.antonkw.kwbooktrack.data.time.toDayMs
 import java.io.File
 import java.nio.file.Files
 import java.time.LocalDate
@@ -107,6 +107,8 @@ class ImportKwBooktrackZipUseCaseTest {
         targetTagRepo = TagRepository(targetDb.tagDao())
         importer = ImportKwBooktrackZipUseCase(
             SnapshotApplier(
+    database = targetDb,
+    coverStorage = NoOpCoverStorage,
                 bookRepository = targetRepo,
                 movieRepository = MovieRepository(targetDb.movieDao(), NoOpCoverStorage, targetPhotoRepo),
                 noteRepository = targetNoteRepo,
@@ -368,6 +370,8 @@ class ImportKwBooktrackZipUseCaseTest {
             val photoRepository = PhotoRepository(targetDb.photoDao(), NoOpPhotoStorage)
             val cancelling = ImportKwBooktrackZipUseCase(
                 SnapshotApplier(
+    database = targetDb,
+    coverStorage = NoOpCoverStorage,
                     bookRepository = BookRepository(
                         CancellingBookDao(targetDb.bookDao()),
                         targetDb.tagDao(),
@@ -411,7 +415,7 @@ class ImportKwBooktrackZipUseCaseTest {
             assertThat(movie.cast).isEqualTo("Тимоти Шаламе::Пол Атрейдес")
             assertThat(movie.durationMin).isEqualTo(155)
             assertThat(movie.rating).isEqualTo(5)
-            assertThat(movie.watchedAt).isEqualTo(LocalDate.of(2021, 10, 22).toEpochMs())
+            assertThat(movie.watchedAt).isEqualTo(LocalDate.of(2021, 10, 22).toDayMs())
             assertThat(movie.plot).isEqualTo("Пустыня планеты Аренис")
             assertThat(movie.comments).isEqualTo("Комментарий")
             assertThat(movie.url).isEqualTo("https://www.kinopoisk.ru/film/1")

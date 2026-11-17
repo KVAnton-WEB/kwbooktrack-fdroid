@@ -205,6 +205,8 @@ class ImportTellicoUseCaseTest {
         bookRepository: BookRepository,
         photoRepository: PhotoRepository,
     ) = SnapshotApplier(
+database = db,
+coverStorage = NoOpCoverStorage,
         bookRepository = bookRepository,
                 movieRepository = MovieRepository(db.movieDao(), NoOpCoverStorage, photoRepository),
         noteRepository = NoteRepository(db.noteDao(), NoOpPhotoStorage),

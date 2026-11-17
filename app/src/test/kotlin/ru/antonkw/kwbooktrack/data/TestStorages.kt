@@ -7,7 +7,6 @@ import java.io.InputStream
 /** Stub CoverStorage для unit-тестов: ничего не записывает, ничего не удаляет. */
 object NoOpCoverStorage : CoverStorage {
     override fun saveTemp(source: InputStream, extension: String): String = ""
-    override fun promote(tempPath: String?): String? = tempPath
     override fun delete(path: String?) = Unit
 }
 

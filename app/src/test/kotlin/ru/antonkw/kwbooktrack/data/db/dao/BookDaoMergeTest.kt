@@ -94,10 +94,11 @@ class BookDaoMergeTest {
     }
 
     @Test
-    fun v5IncomingValueWinsWhenPresent() = runBlocking {
-        // When the import DOES supply a value, that value wins (overwrites
-        // the existing one). E.g. user had "Твёрдый", new Tellico export
-        // says "Мягкий" — the new value is authoritative.
+    fun v5IncomingValueDoesNotOverwriteExistingOnWeakKey() = runBlocking {
+        // Название и автор — не уникальный ключ: так совпадают и две разные
+        // книги (два экземпляра без ISBN). Вторая запись не должна затирать
+        // поля первой: у пользователя было «Твёрдый», а после импорта
+        // осталось бы «Мягкий» — а первая книга потеряла бы своё состояние.
         dao.insert(
             BookEntity(
                 title = "Hyperion",
@@ -117,7 +118,69 @@ class BookDaoMergeTest {
             ),
         )
 
-        assertThat(dao.observeAll().first().first().binding).isEqualTo("Мягкий")
+        assertThat(dao.observeAll().first().first().binding).isEqualTo("Твёрдый")
+    }
+
+    @Test
+    fun strongKeyIsbnLetsIncomingValueWin() = runBlocking {
+        // ISBN — сильный ключ: это тот же самый товар, и импорт обновляет поля.
+        // E.g. у пользователя «Твёрдый», в новой выгрузке Tellico «Мягкий» —
+        // новое значение авторитетно.
+        dao.insert(
+            BookEntity(
+                title = "Hyperion",
+                author = "Dan Simmons",
+                isbn13 = "9780441013593",
+                createdAt = 0L,
+                updatedAt = 0L,
+                binding = "Твёрдый",
+            ),
+        )
+        dao.upsertFromImport(
+            BookEntity(
+                title = "Hyperion",
+                author = "Dan Simmons",
+                isbn13 = "9780441013593",
+                createdAt = 0L,
+                updatedAt = 0L,
+                binding = "Мягкий",
+            ),
+        )
+
+        val row = dao.observeAll().first().single()
+        assertThat(row.binding).isEqualTo("Мягкий")
+    }
+
+    @Test
+    fun snapshotIdUpdatesExactlyThatRow() = runBlocking {
+        // Свой zip-бэкап знает id строки: импорт обновляет ровно её, а не
+        // «любую книгу с таким названием». Две книги с одинаковым названием и
+        // автором остаются двумя.
+        dao.insert(
+            BookEntity(
+                title = "Мастер и Маргарит",
+                author = "Булгаков",
+                createdAt = 0L,
+                updatedAt = 0L,
+                rating = 5,
+            ),
+        )
+        val id = dao.observeAll().first().single().id
+
+        dao.upsertFromImport(
+            BookEntity(
+                title = "Мастер и Маргарит",
+                author = "Булгаков",
+                createdAt = 0L,
+                updatedAt = 0L,
+                rating = 3,
+            ),
+            snapshotId = id,
+        )
+
+        val rows = dao.observeAll().first()
+        assertThat(rows).hasSize(1)
+        assertThat(rows.single().rating).isEqualTo(3)
     }
 
     @Test

@@ -27,7 +27,7 @@ import ru.antonkw.kwbooktrack.data.snapshot.SnapshotApplier
 import ru.antonkw.kwbooktrack.data.snapshot.SnapshotBuilder
 import ru.antonkw.kwbooktrack.data.storage.CoverTranscoder
 import ru.antonkw.kwbooktrack.data.storage.FilePhotoStorage
-import ru.antonkw.kwbooktrack.data.time.toEpochMs
+import ru.antonkw.kwbooktrack.data.time.toDayMs
 import java.io.File
 import java.nio.file.Files
 import java.time.LocalDate
@@ -78,6 +78,8 @@ class KwBooktrackZipDatesTest {
         val targetPhotos = PhotoRepository(targetDb.photoDao(), FilePhotoStorage(context))
         importUseCase = ImportKwBooktrackZipUseCase(
             SnapshotApplier(
+    database = targetDb,
+    coverStorage = NoOpCoverStorage,
                 bookRepository = BookRepository(
                     targetDb.bookDao(),
                     targetDb.tagDao(),
@@ -116,8 +118,8 @@ class KwBooktrackZipDatesTest {
         val targetMovies = MovieRepository(targetDb.movieDao(), NoOpCoverStorage, targetPhotos)
         val targetDates = MediaDateRepository(targetDb.mediaDateDao())
 
-        val march = LocalDate.of(2024, 3, 10).toEpochMs()
-        val may = LocalDate.of(2024, 5, 15).toEpochMs()
+        val march = LocalDate.of(2024, 3, 10).toDayMs()
+        val may = LocalDate.of(2024, 5, 15).toDayMs()
         val sourceId = MovieRepository(
             sourceDb.movieDao(),
             NoOpCoverStorage,
@@ -162,8 +164,8 @@ class KwBooktrackZipDatesTest {
         val movies = MovieRepository(sourceDb.movieDao(), NoOpCoverStorage, sourcePhotos)
         val sourceDates = MediaDateRepository(sourceDb.mediaDateDao())
 
-        val march = LocalDate.of(2024, 3, 10).toEpochMs()
-        val may = LocalDate.of(2024, 5, 15).toEpochMs()
+        val march = LocalDate.of(2024, 3, 10).toDayMs()
+        val may = LocalDate.of(2024, 5, 15).toDayMs()
         val id = movies.insert(
             MovieEntity(
                 title = "Малхолланд Драйв",

@@ -8,6 +8,7 @@ import ru.antonkw.kwbooktrack.data.db.dao.PhotoDao
 import ru.antonkw.kwbooktrack.data.db.dao.ReadingSessionDao
 import ru.antonkw.kwbooktrack.data.db.dao.TagDao
 import ru.antonkw.kwbooktrack.data.db.entity.MediaType
+import ru.antonkw.kwbooktrack.data.media.extrasOfType
 import ru.antonkw.kwbooktrack.data.db.entity.NoteEntity
 import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
 import ru.antonkw.kwbooktrack.data.db.entity.PhotoEntity
@@ -48,9 +49,7 @@ class SnapshotBuilder @Inject constructor(
             .filter { it.mediaType == MediaType.BOOKS }
             .groupBy { it.mediaId }
         // Дополнительные даты прочтения — по id книги.
-        val extraDatesByBook = mediaDateDao.getAll()
-            .filter { it.mediaType == MediaType.BOOKS }
-            .groupBy({ it.mediaId }, { it.date })
+        val extraDatesByBook = extrasOfType(mediaDateDao.getAll(), MediaType.BOOKS)
         // Ключ — пара (id, тип): id книг и id фильмов считаются независимо
         // и могут совпадать, поэтому одного id мало.
         val tagsByOwner = tagDao.tagsForAllMedia().groupBy { it.mediaId to it.mediaType }
@@ -96,9 +95,7 @@ class SnapshotBuilder @Inject constructor(
             .filter { it.mediaType == MediaType.MOVIES }
             .groupBy { it.mediaId }
         // Дополнительные даты просмотра — по id фильма.
-        val extraDatesByMovie = mediaDateDao.getAll()
-            .filter { it.mediaType == MediaType.MOVIES }
-            .groupBy({ it.mediaId }, { it.date })
+        val extraDatesByMovie = extrasOfType(mediaDateDao.getAll(), MediaType.MOVIES)
         val tagsByOwner = tagDao.tagsForAllMedia().groupBy { it.mediaId to it.mediaType }
         return movies.map { movie ->
             val notes = notesByMovie[movie.id].orEmpty().sortedWith(NOTE_ORDER)

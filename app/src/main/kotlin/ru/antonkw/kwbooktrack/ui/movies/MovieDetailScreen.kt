@@ -49,8 +49,10 @@ import ru.antonkw.kwbooktrack.R
 import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 import ru.antonkw.kwbooktrack.data.db.entity.NoteEntity
 import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
-import ru.antonkw.kwbooktrack.data.time.toLocalDate
+import ru.antonkw.kwbooktrack.data.time.toDayDate
+import ru.antonkw.kwbooktrack.data.time.toLocalDay
 import ru.antonkw.kwbooktrack.ui.common.CoverImage
+import ru.antonkw.kwbooktrack.ui.common.ExtraFieldsSection
 import ru.antonkw.kwbooktrack.ui.common.formatDuration
 import ru.antonkw.kwbooktrack.ui.common.MarkdownText
 import ru.antonkw.kwbooktrack.ui.common.UrlText
@@ -194,11 +196,11 @@ fun MovieDetailScreen(
             MovieFieldRows(
                 R.string.movie_field_watched_at,
                 // Все даты просмотра — по возрастанию, по одной на строку.
-                state.dates.map { it.toLocalDate().toString() },
+                state.dates.map { it.toDayDate().toString() },
             )
             MovieFieldRow(R.string.movie_field_url, movie.url)
 
-            ru.antonkw.kwbooktrack.ui.common.ExtraFieldsSection(movie.extraFields)
+            ExtraFieldsSection(movie.extraFields)
 
             if (!movie.plot.isNullOrBlank()) {
                 Text(stringResource(R.string.movie_field_plot), style = MaterialTheme.typography.titleMedium)
@@ -338,7 +340,7 @@ private fun NoteRow(note: NoteEntity, onOpen: () -> Unit) {
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = note.createdAt.toLocalDate().toString(),
+                text = note.createdAt.toLocalDay().toString(),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

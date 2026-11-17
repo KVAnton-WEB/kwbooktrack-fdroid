@@ -23,13 +23,15 @@ import ru.antonkw.kwbooktrack.data.repository.MediaDateRepository
 import ru.antonkw.kwbooktrack.data.repository.MovieRepository
 import ru.antonkw.kwbooktrack.data.repository.SessionRepository
 import ru.antonkw.kwbooktrack.data.stats.StatsCalculator
-import ru.antonkw.kwbooktrack.data.time.toEpochMs
-import ru.antonkw.kwbooktrack.data.time.toLocalDate
+import ru.antonkw.kwbooktrack.data.time.toDayDate
+import ru.antonkw.kwbooktrack.data.time.toLocalDayStartMs
 import java.time.LocalDate
 import java.time.YearMonth
 import javax.inject.Inject
 
 data class CalendarBook(
+    /** id владельца: две книги с одинаковым названием — разные книги. */
+    val id: Long,
     val title: String,
     val coverPath: String?,
     val rating: Int?,
@@ -132,14 +134,14 @@ class CalendarViewModel @Inject constructor(
             mediaDates(book.finishedAt, extraDates[book.id to MediaType.BOOKS].orEmpty())
                 .map { date -> book to date }
         }
-            .groupBy({ it.second.toLocalDate() }, { it.first })
+            .groupBy({ it.second.toDayDate() }, { it.first })
         val pagesByDate = StatsCalculator.aggregateDailyPages(sessions).associate { it.date to it.pages }
         val booksById = books.associateBy { it.id }
         return monthGrid(month) { date ->
             val booksForDay = (
                 sessionsForDate(date, sessions, booksById) +
                     finishedByDate[date].orEmpty().map { it.toCalendarBook() }
-                ).distinctBy { it.title }
+                ).distinctBy { it.id }
             CalendarDay(date = date, books = booksForDay, pages = pagesByDate[date] ?: 0)
         }
     }
@@ -155,7 +157,7 @@ class CalendarViewModel @Inject constructor(
             mediaDates(movie.watchedAt, extraDates[movie.id to MediaType.MOVIES].orEmpty())
                 .map { date -> movie to date }
         }
-            .groupBy({ it.second.toLocalDate() }, { it.first })
+            .groupBy({ it.second.toDayDate() }, { it.first })
         return monthGrid(month) { date ->
             val watched = watchedByDate[date].orEmpty()
             CalendarDay(
@@ -191,17 +193,17 @@ class CalendarViewModel @Inject constructor(
         sessions: List<ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity>,
         booksById: Map<Long, ru.antonkw.kwbooktrack.data.db.entity.BookEntity>,
     ): List<CalendarBook> {
-        val start = date.toEpochMs()
-        val end = date.plusDays(1).toEpochMs()
+        val start = date.toLocalDayStartMs()
+        val end = date.plusDays(1).toLocalDayStartMs()
         return sessions.filter { it.startedAt in start until end }
             .mapNotNull { session -> booksById[session.bookId]?.toCalendarBook() }
     }
 
     private fun ru.antonkw.kwbooktrack.data.db.entity.BookEntity.toCalendarBook() =
-        CalendarBook(title = title, coverPath = coverPath, rating = rating)
+        CalendarBook(id = id, title = title, coverPath = coverPath, rating = rating)
 
     private fun MovieEntity.toCalendarBook() =
-        CalendarBook(title = title, coverPath = coverPath, rating = rating)
+        CalendarBook(id = id, title = title, coverPath = coverPath, rating = rating)
 
     private fun emptyState(month: YearMonth): CalendarUiState =
         CalendarUiState(month = month, days = monthGrid(month) { CalendarDay(it, emptyList()) }.days)

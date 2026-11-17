@@ -9,7 +9,8 @@ import ru.antonkw.kwbooktrack.data.snapshot.ExtraField
 import ru.antonkw.kwbooktrack.data.snapshot.PhotoSnapshot
 import ru.antonkw.kwbooktrack.data.snapshot.SessionSnapshot
 import ru.antonkw.kwbooktrack.data.tellico.TellicoRecord
-import ru.antonkw.kwbooktrack.data.time.toEpochMs
+import ru.antonkw.kwbooktrack.data.time.toDayMs
+import ru.antonkw.kwbooktrack.data.time.toLocalDayStartMs
 import java.time.LocalDate
 
 /**
@@ -48,17 +49,19 @@ class TellicoBookMapperTest {
     }
 
     @Test
-    fun isbnWithTenDigitsIsKept() {
+    fun isbnWithTenDigitsIsConvertedToIsbn13() {
+        // Десятизначный ISBN приводится к 13 цифрам: иначе он не совпал бы
+        // с тем же номером, введённым вручную.
         val book = mapper.map(record("title" to "Foo", "author" to "Bar", "isbn" to "5-04168446-4"))!!.book
 
-        assertThat(book.isbn13).isEqualTo("5041684464")
+        assertThat(book.isbn13).isEqualTo("9785041684464")
     }
 
     @Test
-    fun isbnWithXCheckDigitIsKept() {
+    fun isbnWithXCheckDigitIsConvertedToIsbn13() {
         val book = mapper.map(record("title" to "Foo", "author" to "Bar", "isbn" to "5-04089273-X"))!!.book
 
-        assertThat(book.isbn13).isEqualTo("504089273X")
+        assertThat(book.isbn13).isEqualTo("9785040892730")
     }
 
     @Test
@@ -207,6 +210,23 @@ class TellicoBookMapperTest {
     }
 
     @Test
+    fun severalReviewsInOneFieldBecomeSeveralNotes() {
+        // Экспорт склеивает все рецензии книги через перевод строки — так они
+        // разбираются обратно и не теряются. Раньше читалась только первая, а
+        // вместе с ней терялась привязка фото.
+        val snapshot = mapper.map(
+            record(
+                "title" to "Дюна",
+                "author" to "Герберт",
+                "рецензия" to "Первая рецензия.\nВторая рецензия.",
+            ),
+        )!!
+
+        assertThat(snapshot.notes.filter { it.kind == NoteKind.REVIEW }.map { it.body })
+            .containsExactly("Первая рецензия.", "Вторая рецензия.").inOrder()
+    }
+
+    @Test
     fun quotesWithPagePrefixBecomeQuoteNotes() {
         val snapshot = mapper.map(
             record("title" to "X", "author" to "Y", "цитаты" to "1::первая\n3::вторая\n4"),
@@ -279,7 +299,7 @@ class TellicoBookMapperTest {
         val note = snapshot.notes.single { it.kind == NoteKind.NOTE }
         assertThat(note.page).isEqualTo(12)
         assertThat(note.body).isEqualTo("мысль")
-        assertThat(note.createdAt).isEqualTo(LocalDate.parse("2024-03-01").toEpochMs())
+        assertThat(note.createdAt).isEqualTo(LocalDate.parse("2024-03-01").toLocalDayStartMs())
     }
 
     @Test
@@ -302,7 +322,7 @@ class TellicoBookMapperTest {
         val note = snapshot.notes.single { it.kind == NoteKind.NOTE }
         assertThat(note.body).isEqualTo("мысль :: продолжение")
         assertThat(note.page).isEqualTo(12)
-        assertThat(note.createdAt).isEqualTo(LocalDate.parse("2024-03-01").toEpochMs())
+        assertThat(note.createdAt).isEqualTo(LocalDate.parse("2024-03-01").toLocalDayStartMs())
     }
 
     @Test
@@ -370,15 +390,15 @@ class TellicoBookMapperTest {
         val year = mapper.map(record("title" to "X", "author" to "Y", "дата-прочтения" to "2023"))!!.book
         val month = mapper.map(record("title" to "X", "author" to "Y", "дата-прочтения" to "2023-02"))!!.book
 
-        assertThat(year.finishedAt).isEqualTo(LocalDate.parse("2023-01-01").toEpochMs())
-        assertThat(month.finishedAt).isEqualTo(LocalDate.parse("2023-02-01").toEpochMs())
+        assertThat(year.finishedAt).isEqualTo(LocalDate.parse("2023-01-01").toDayMs())
+        assertThat(month.finishedAt).isEqualTo(LocalDate.parse("2023-02-01").toDayMs())
     }
 
     @Test
     fun purchaseDateIsParsedFromIso() {
         val book = mapper.map(record("title" to "X", "author" to "Y", "pur_date" to "2023-08-04"))!!.book
 
-        assertThat(book.purchaseDate).isEqualTo(LocalDate.parse("2023-08-04").toEpochMs())
+        assertThat(book.purchaseDate).isEqualTo(LocalDate.parse("2023-08-04").toDayMs())
     }
 
     @Test
@@ -494,8 +514,8 @@ class TellicoBookMapperTest {
             record("title" to "X", "author" to "Y", "cdate" to "2023-02-14", "mdate" to "2024-10-28"),
         )!!.book
 
-        assertThat(book.createdAt).isEqualTo(LocalDate.parse("2023-02-14").toEpochMs())
-        assertThat(book.updatedAt).isEqualTo(LocalDate.parse("2024-10-28").toEpochMs())
+        assertThat(book.createdAt).isEqualTo(LocalDate.parse("2023-02-14").toLocalDayStartMs())
+        assertThat(book.updatedAt).isEqualTo(LocalDate.parse("2024-10-28").toLocalDayStartMs())
     }
 
     private fun record(vararg pairs: Pair<String, String>): TellicoRecord =

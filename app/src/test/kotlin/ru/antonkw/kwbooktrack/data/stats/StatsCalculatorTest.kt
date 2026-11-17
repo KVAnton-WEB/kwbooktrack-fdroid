@@ -4,7 +4,8 @@ import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
 import ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity
-import ru.antonkw.kwbooktrack.data.time.toEpochMs
+import ru.antonkw.kwbooktrack.data.time.toDayMs
+import ru.antonkw.kwbooktrack.data.time.toLocalDayStartMs
 import java.time.LocalDate
 
 class StatsCalculatorTest {
@@ -21,7 +22,7 @@ class StatsCalculatorTest {
     @Test
     fun dailyPagesAggregatesAcrossSessionsOnSameDay() {
         val day = LocalDate.of(2026, 9, 15)
-        val ts = day.toEpochMs()
+        val ts = day.toLocalDayStartMs()
         val sessions = listOf(
             ReadingSessionEntity(bookId = 1, startedAt = ts, endPage = 50),
             ReadingSessionEntity(bookId = 1, startedAt = ts + 1000L, endPage = 80),
@@ -41,7 +42,7 @@ class StatsCalculatorTest {
         // into a negative number, which .filter { it > 0 } then dropped —
         // "Страниц: 0" while the book screen showed 80.
         val day = LocalDate.of(2026, 9, 15)
-        val ts = day.toEpochMs()
+        val ts = day.toLocalDayStartMs()
         val sessions = listOf(
             ReadingSessionEntity(bookId = 1, startedAt = ts + 1000L, endPage = 80),
             ReadingSessionEntity(bookId = 1, startedAt = ts, endPage = 50),
@@ -56,8 +57,8 @@ class StatsCalculatorTest {
         val day1 = LocalDate.of(2026, 9, 15)
         val day2 = LocalDate.of(2026, 9, 16)
         val sessions = listOf(
-            ReadingSessionEntity(bookId = 1, startedAt = day2.toEpochMs(), endPage = 80),
-            ReadingSessionEntity(bookId = 1, startedAt = day1.toEpochMs(), endPage = 50),
+            ReadingSessionEntity(bookId = 1, startedAt = day2.toLocalDayStartMs(), endPage = 80),
+            ReadingSessionEntity(bookId = 1, startedAt = day1.toLocalDayStartMs(), endPage = 50),
         )
         val stats = StatsCalculator.compute(sessions, emptyList())
         assertThat(stats.dailyPages.map { it.pages }).containsExactly(50, 30).inOrder()
@@ -69,7 +70,7 @@ class StatsCalculatorTest {
         // end_page is a cursor into one book, so a jump from book 1 page 300 to
         // book 2 page 40 is not -260 pages of reading.
         val day = LocalDate.of(2026, 9, 15)
-        val ts = day.toEpochMs()
+        val ts = day.toLocalDayStartMs()
         val sessions = listOf(
             ReadingSessionEntity(bookId = 1, startedAt = ts, endPage = 300),
             ReadingSessionEntity(bookId = 2, startedAt = ts + 1000L, endPage = 40),
@@ -81,9 +82,9 @@ class StatsCalculatorTest {
     @Test
     fun monthlyBooksGroupsFinishedByMonth() {
         val dates = listOf(
-            LocalDate.of(2026, 1, 10).toEpochMs(),
-            LocalDate.of(2026, 1, 20).toEpochMs(),
-            LocalDate.of(2026, 2, 5).toEpochMs(),
+            LocalDate.of(2026, 1, 10).toDayMs(),
+            LocalDate.of(2026, 1, 20).toDayMs(),
+            LocalDate.of(2026, 2, 5).toDayMs(),
         )
         val stats = StatsCalculator.compute(emptyList(), dates)
         assertThat(stats.monthlyCompleted).hasSize(2)
@@ -97,7 +98,7 @@ class StatsCalculatorTest {
     fun sessionDeltasCountPagesSinceThePreviousSession() {
         // Журнал чтения показывает, сколько страниц прочитано с прошлой записи.
         val day = LocalDate.of(2026, 9, 15)
-        val ts = day.toEpochMs()
+        val ts = day.toLocalDayStartMs()
         val sessions = listOf(
             ReadingSessionEntity(id = 1, bookId = 1, startedAt = ts, endPage = 50),
             ReadingSessionEntity(id = 2, bookId = 1, startedAt = ts + 1000L, endPage = 80),
@@ -170,7 +171,7 @@ class StatsCalculatorTest {
         author = "Author",
         createdAt = 0L,
         updatedAt = 0L,
-        purchaseDate = date.toEpochMs(),
+        purchaseDate = date.toDayMs(),
         purchasePrice = price,
     )
 }

@@ -1,8 +1,10 @@
 package ru.antonkw.kwbooktrack.data.snapshot
 
 import android.util.Log
+import androidx.room.withTransaction
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
+import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 import ru.antonkw.kwbooktrack.data.db.entity.NoteEntity
 import ru.antonkw.kwbooktrack.data.db.entity.PhotoEntity
@@ -14,6 +16,7 @@ import ru.antonkw.kwbooktrack.data.repository.MediaDateRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
 import ru.antonkw.kwbooktrack.data.repository.SessionRepository
 import ru.antonkw.kwbooktrack.data.repository.TagRepository
+import ru.antonkw.kwbooktrack.data.storage.CoverStorage
 import ru.antonkw.kwbooktrack.data.storage.CoverTranscoder
 import ru.antonkw.kwbooktrack.data.storage.PhotoStorage
 import java.io.File
@@ -45,6 +48,7 @@ data class ApplyStats(
  * фото — по локальному пути файла, тег — по имени.
  */
 class SnapshotApplier @Inject constructor(
+    private val database: KwBooktrackDatabase,
     private val bookRepository: BookRepository,
     private val movieRepository: MovieRepository,
     private val noteRepository: NoteRepository,
@@ -53,10 +57,31 @@ class SnapshotApplier @Inject constructor(
     private val photoRepository: PhotoRepository,
     private val mediaDateRepository: MediaDateRepository,
     private val photoStorage: PhotoStorage,
+    private val coverStorage: CoverStorage,
     private val transcoder: CoverTranscoder,
 ) {
 
-    suspend fun apply(snapshot: BookSnapshot, assets: ImportAssets): ApplyStats {
+    /**
+     * Книга вливается в БД **одной транзакцией**.
+     *
+     * Без неё запись обрывалась на полпути: книга, заметки и теги уже
+     * записаны, а фото — нет (кончилось место). Пользователю говорили
+     * «импортировано 500, пропущено 1», и он не знал, что у книги часть
+     * данных потеряна.
+     */
+    suspend fun apply(snapshot: BookSnapshot, assets: ImportAssets): ApplyStats =
+        database.withTransaction { applyBook(snapshot, assets) }
+
+    /**
+     * Фильм применяется теми же правилами, что и книга: заметки, теги и фото
+     * общие, различается только владелец — пара (id, тип).
+     *
+     * Сессий чтения у фильма нет: трекера страниц у него не бывает.
+     */
+    suspend fun apply(snapshot: MovieSnapshot, assets: ImportAssets): ApplyStats =
+        database.withTransaction { applyMovie(snapshot, assets) }
+
+    private suspend fun applyBook(snapshot: BookSnapshot, assets: ImportAssets): ApplyStats {
         val now = System.currentTimeMillis()
         // Имя обложки из архива — не локальный путь, в БД ему не место.
         // id снимка — тоже: снимок не привязан к строкам БД, а книга ищется
@@ -66,7 +91,10 @@ class SnapshotApplier @Inject constructor(
             coverPath = null,
             extraFields = snapshot.book.extraFields + snapshot.extraFields,
         )
-        val bookId = bookRepository.upsertFromImport(book)
+        val bookId = bookRepository.upsertFromImport(book, snapshot.book.id)
+        // id = -1 значит «строка не записалась» (занятый ISBN). Идти дальше
+        // нельзя: заметки и фото ушли бы в несуществующую книгу.
+        if (bookId <= 0L) throw IllegalStateException("книга не записалась: id=$bookId")
         // Даты прочтения: архив приносит основную (в CSV) и дополнительные.
         // Берём основную из СЛИТОЙ строки, а не из архива: в архиве её может
         // не быть, а в базе — быть, и тогда дата потерялась бы.
@@ -92,20 +120,16 @@ class SnapshotApplier @Inject constructor(
         )
     }
 
-    /**
-     * Фильм применяется теми же правилами, что и книга: заметки, теги и фото
-     * общие, различается только владелец — пара (id, тип).
-     *
-     * Сессий чтения у фильма нет: трекера страниц у него не бывает.
-     */
-    suspend fun apply(snapshot: MovieSnapshot, assets: ImportAssets): ApplyStats {
+    private suspend fun applyMovie(snapshot: MovieSnapshot, assets: ImportAssets): ApplyStats {
         val now = System.currentTimeMillis()
         val movie = snapshot.movie.copy(
             id = 0L,
             coverPath = null,
             extraFields = snapshot.movie.extraFields + snapshot.extraFields,
         )
-        val movieId = movieRepository.upsertFromImport(movie)
+        val movieId = movieRepository.upsertFromImport(movie, snapshot.movie.id)
+        // id = -1 значит «строка не записалась» — идти дальше нельзя.
+        if (movieId <= 0L) throw IllegalStateException("фильм не записался: id=$movieId")
         // Даты просмотра: архив приносит основную (в CSV) и дополнительные.
         // Основная — из слитой строки: в архиве её может не быть, а в базе
         // быть, и тогда дата потерялась бы.
@@ -158,7 +182,9 @@ class SnapshotApplier @Inject constructor(
     private suspend fun applyBookCover(snapshot: BookSnapshot, bookId: Long, assets: ImportAssets): Int {
         val dest = copyCover(snapshot.book.coverPath, assets) ?: return 0
         val existing = bookRepository.findById(bookId) ?: return 0
-        bookRepository.updateFromImport(existing.copy(coverPath = dest.absolutePath))
+        // Прежний файл удаляем только после того, как строка обновилась: иначе
+        // при неудачной записи обложка пропала бы совсем.
+        if (bookRepository.updateFromImport(existing.copy(coverPath = dest.absolutePath)) <= 0) return 0
         dropPreviousCover(existing.coverPath, dest.absolutePath)
         return 1
     }
@@ -166,7 +192,7 @@ class SnapshotApplier @Inject constructor(
     private suspend fun applyMovieCover(snapshot: MovieSnapshot, movieId: Long, assets: ImportAssets): Int {
         val dest = copyCover(snapshot.movie.coverPath, assets) ?: return 0
         val existing = movieRepository.findById(movieId) ?: return 0
-        movieRepository.updateFromImport(existing.copy(coverPath = dest.absolutePath))
+        if (movieRepository.updateFromImport(existing.copy(coverPath = dest.absolutePath)) <= 0) return 0
         dropPreviousCover(existing.coverPath, dest.absolutePath)
         return 1
     }
@@ -201,11 +227,13 @@ class SnapshotApplier @Inject constructor(
     /**
      * Прежняя обложка больше не нужна: имя новое, и без удаления старый файл
      * остался бы на диске навсегда.
+     *
+     * Удаляем через [CoverStorage]: он проверяет, что файл лежит в каталоге
+     * обложек, — путь из БД удалять нельзя.
      */
     private fun dropPreviousCover(previous: String?, current: String) {
-        previous
-            ?.takeIf { it != current }
-            ?.let { runCatching { File(it).delete() } }
+        if (previous.isNullOrBlank() || previous == current) return
+        coverStorage.delete(previous)
     }
 
     /**
@@ -278,8 +306,9 @@ class SnapshotApplier @Inject constructor(
             val tagId = tagRepository.findOrCreate(name)
             // findOrCreate отдаёт -1 на пустом имени — такого тега нет.
             if (tagId <= 0L) continue
-            tagRepository.attachToMedia(mediaId, mediaType, tagId)
-            added++
+            // Считаем только те привязки, которых раньше не было: повторный
+            // импорт не «добавляет» то, что уже было.
+            if (tagRepository.attachToMedia(mediaId, mediaType, tagId)) added++
         }
         return added
     }

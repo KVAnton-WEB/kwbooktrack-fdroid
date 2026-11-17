@@ -70,20 +70,13 @@ class StoragesTest {
     }
 
     @Test
-    fun coverPromoteKeepsUuidName() {
+    fun coverFileKeepsUuidName() {
         // Имя обложки — UUID, а не id книги: у книг и фильмов id считаются
         // независимо, и имя по id у них совпадало бы.
         val temp = coverStorage.saveTemp(ByteArrayInputStream(pngBytes()), "png")
-        val promoted = coverStorage.promote(temp)
 
-        assertThat(promoted).isEqualTo(temp)
-        assertThat(File(promoted!!).name).startsWith("cover_")
-        assertThat(File(promoted).exists()).isTrue()
-    }
-
-    @Test
-    fun coverPromoteOfNullIsNull() {
-        assertThat(coverStorage.promote(null)).isNull()
+        assertThat(File(temp).name).startsWith("cover_")
+        assertThat(File(temp).exists()).isTrue()
     }
 
     @Test

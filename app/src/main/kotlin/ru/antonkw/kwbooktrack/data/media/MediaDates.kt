@@ -20,3 +20,12 @@ fun mediaDates(primary: Long?, extra: List<Long>): List<Long> =
  */
 fun extrasByOwner(extras: List<MediaDateEntity>): Map<Pair<Long, MediaType>, List<Long>> =
     extras.groupBy({ it.mediaId to it.mediaType }, { it.date })
+
+/**
+ * Дополнительные даты владельцев одного типа: id → даты.
+ *
+ * Одна и та же группировка нужна списку, календарю, статистике и снимку —
+ * разные копии правила разъезжались бы.
+ */
+fun extrasOfType(extras: List<MediaDateEntity>, mediaType: MediaType): Map<Long, List<Long>> =
+    extras.filter { it.mediaType == mediaType }.groupBy({ it.mediaId }, { it.date })

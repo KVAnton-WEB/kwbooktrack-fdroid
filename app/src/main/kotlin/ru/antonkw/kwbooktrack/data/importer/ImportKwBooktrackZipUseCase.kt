@@ -27,8 +27,9 @@ import ru.antonkw.kwbooktrack.data.snapshot.PhotoSnapshot
 import ru.antonkw.kwbooktrack.data.snapshot.SessionJson
 import ru.antonkw.kwbooktrack.data.snapshot.SessionSnapshot
 import ru.antonkw.kwbooktrack.data.snapshot.SnapshotApplier
+import ru.antonkw.kwbooktrack.data.text.Isbn
 import ru.antonkw.kwbooktrack.data.text.parseDecimal
-import ru.antonkw.kwbooktrack.data.time.toEpochMs
+import ru.antonkw.kwbooktrack.data.time.toDayMs
 import java.io.File
 import java.io.IOException
 import java.time.LocalDate
@@ -203,8 +204,19 @@ class ImportKwBooktrackZipUseCase @Inject constructor(
                 counts.notes + counts.quotes,
             )
         }
-        if (extrasFile != null && extras.isNotEmpty() && rows.none { it.id != null }) {
-            result += UNBOUND_EXTRA_WARNING
+        if (extrasFile != null && extras.isNotEmpty()) {
+            // Строки без id не получают свои заметки, фото и теги: `extra.json`
+            // привязан к id. Раньше предупреждение было только когда id не было
+            // ни у одной строки — а если id не у части строк, потеря проходила
+            // молча.
+            val unbound = rows.count { it.id == null }
+            if (unbound > 0) {
+                result += if (unbound == rows.size) {
+                    UNBOUND_EXTRA_WARNING
+                } else {
+                    UNBOUND_EXTRA_PARTIAL_WARNING.format(unbound)
+                }
+            }
         }
         return result
     }
@@ -313,10 +325,16 @@ class ImportKwBooktrackZipUseCase @Inject constructor(
         if (title.isEmpty()) return null
         val now = System.currentTimeMillis()
         return BookEntity(
+            // id из архива: по нему импорт находит ту же самую книгу, а не
+            // «любую с таким названием» — две книги с одинаковым названием
+            // и автором остаются двумя.
+            id = cell("id")?.toLongOrNull() ?: 0L,
             title = title,
             subtitle = cell("subtitle"),
             author = cell("author") ?: "(автор неизвестен)",
-            isbn13 = cell("isbn13"),
+            // Старые бэкапы могли хранить десятизначный ISBN — приводим к
+            // 13 цифрам, иначе та же книга не совпала бы с введённой вручную.
+            isbn13 = Isbn.normalize(cell("isbn13")),
             pageCount = cell("page_count")?.toIntOrNull(),
             language = cell("language") ?: "ru",
             genre = cell("genre"),
@@ -363,6 +381,8 @@ class ImportKwBooktrackZipUseCase @Inject constructor(
         if (title.isEmpty()) return null
         val now = System.currentTimeMillis()
         return MovieEntity(
+            // id из архива: по нему импорт находит тот же самый фильм.
+            id = cell("id")?.toLongOrNull() ?: 0L,
             title = title,
             originalTitle = cell("original_title"),
             year = cell("year")?.toIntOrNull(),
@@ -392,7 +412,7 @@ class ImportKwBooktrackZipUseCase @Inject constructor(
         val text = raw?.trim().orEmpty()
         if (text.isEmpty()) return null
         text.toLongOrNull()?.let { return it }
-        return runCatching { LocalDate.parse(text, DateTimeFormatter.ISO_LOCAL_DATE).toEpochMs() }.getOrNull()
+        return runCatching { LocalDate.parse(text, DateTimeFormatter.ISO_LOCAL_DATE).toDayMs() }.getOrNull()
     }
 
     /** Флаги экспорта: «1», «true», «да», «yes». */
@@ -443,6 +463,14 @@ class ImportKwBooktrackZipUseCase @Inject constructor(
         const val UNBOUND_EXTRA_WARNING =
             "Заметки и сессии в архиве не привязались к книгам: в books.csv нет " +
                 "колонки id (старый формат бэкапа). Прогресс и заметки не перенесены."
+
+        /**
+         * Часть строк `books.csv` без колонки `id`: у этих книг не перенеслись
+         * заметки, фото и теги, а у остальных перенеслись.
+         */
+        const val UNBOUND_EXTRA_PARTIAL_WARNING =
+            "У %1\$d книг в books.csv нет колонки id: их заметки, фото и теги не " +
+                "перенеслись. У остальных книг всё на месте."
 
         val JSON = Json { ignoreUnknownKeys = true }
 

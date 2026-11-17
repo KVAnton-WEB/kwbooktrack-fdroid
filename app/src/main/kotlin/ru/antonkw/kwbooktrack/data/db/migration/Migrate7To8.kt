@@ -49,7 +49,14 @@ val Migrate7To8: Migration = object : Migration(7, 8) {
         //
         // В страховке только строки живой книги, поэтому внешний ключ
         // проходит. Сироты в живой таблице не трогаем — они там и были.
+        //
+        // Строки потомков удаляем **сами**: каскад при `DROP TABLE` зависит от
+        // `PRAGMA foreign_keys`, а Room включает его в `onOpen` — то есть уже
+        // ПОСЛЕ миграции. Без этого удаления строки остались бы на месте, и
+        // возврат страховки падал бы на уникальном индексе: миграция падала,
+        // база не открывалась, и библиотека выглядела пустой.
         for (table in CHILDREN) {
+            db.execSQL("DELETE FROM `$table` WHERE `book_id` IN (SELECT `id` FROM `books`)")
             db.execSQL("INSERT INTO `$table` SELECT * FROM `_${table}_bak`")
         }
 

@@ -64,20 +64,40 @@ interface MovieDao {
     @Query("SELECT COUNT(*) FROM movies")
     suspend fun count(): Int
 
+    /** Счётчик фильмов потоком — экран «О приложении» считает, а не грузит. */
+    @Query("SELECT COUNT(*) FROM movies")
+    fun observeCount(): Flow<Int>
+
     /**
-     * Upsert по названию и году — ключ фильма в Tellico.
+     * Upsert по id архива, затем по названию и году — ключ фильма в Tellico.
      *
-     * Те же правила слияния, что у книги: заполненные поля не затираются
-     * пустыми из импорта, источник сохраняется, флаги не сливаются.
+     * @param snapshotId id строки в архиве (свой zip-бэкап): по нему запись
+     *   обновляется точно.
      */
     @Transaction
-    suspend fun upsertFromImport(movie: MovieEntity): Long {
+    suspend fun upsertFromImport(movie: MovieEntity, snapshotId: Long = 0L): Long {
+        // Точное совпадение по id архива: та же самая строка, её надо обновить.
+        if (snapshotId > 0L) {
+            val byId = findById(snapshotId)
+            if (byId != null && byId.title == movie.title) {
+                update(movie.mergeWith(byId))
+                return byId.id
+            }
+        }
+        // Слабый ключ — название и год: так совпадают и два разных фильма.
+        // Заполненные поля существующей строки не трогаем.
         val existing = findByTitleAndYear(movie.title, movie.year)
         return if (existing != null) {
-            update(movie.mergeWith(existing))
+            update(movie.mergeIntoExisting(existing))
             existing.id
         } else {
-            insert(movie)
+            // Новая строка: id из архива сохраняем, если он свободен — тогда
+            // следующий импорт найдёт этот фильм точно, а не по названию.
+            insert(if (snapshotId > 0L && findById(snapshotId) == null) {
+                movie.copy(id = snapshotId)
+            } else {
+                movie
+            })
         }
     }
 
@@ -143,5 +163,35 @@ private fun MovieEntity.mergeWith(existing: MovieEntity): MovieEntity = copy(
     source = existing.source,
     // Чужие поля Tellico: импорт побеждает по ключу, а ключи, которых в
     // импорте нет, остаются (пустой импорт не стирает данные).
+    extraFields = existing.extraFields + extraFields,
+)
+
+/**
+ * Слияние по слабому ключу (название и год): заполненные поля существующей
+ * строки не трогаем.
+ *
+ * Название и год — не уникальный ключ: так совпадают и два разных фильма
+ * (перезапись, ремейк с тем же годом). Раньше вторая запись затирала режиссёра
+ * и описание первого.
+ */
+private fun MovieEntity.mergeIntoExisting(existing: MovieEntity): MovieEntity = existing.copy(
+    // Метка «изменено» — из источника (`mdate` в Tellico, `updated_at` в
+    // zip-бэкапе), а не «сейчас».
+    updatedAt = updatedAt.takeIf { it > 0L } ?: existing.updatedAt,
+    originalTitle = existing.originalTitle ?: originalTitle,
+    year = existing.year ?: year,
+    genre = existing.genre ?: genre,
+    nationality = existing.nationality ?: nationality,
+    director = existing.director ?: director,
+    cast = existing.cast ?: cast,
+    durationMin = existing.durationMin ?: durationMin,
+    rating = existing.rating ?: rating,
+    watchedAt = existing.watchedAt ?: watchedAt,
+    coverPath = existing.coverPath ?: coverPath,
+    plot = existing.plot ?: plot,
+    comments = existing.comments ?: comments,
+    url = existing.url ?: url,
+    isDownloaded = existing.isDownloaded || isDownloaded,
+    source = existing.source,
     extraFields = existing.extraFields + extraFields,
 )

@@ -2,7 +2,6 @@ package ru.antonkw.kwbooktrack.data.settings
 
 import android.content.Context
 import android.content.res.Configuration
-import android.os.LocaleList
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -94,7 +93,4 @@ object LocaleContextWrapper {
         config.setLayoutDirection(locale)
         return base.createConfigurationContext(config)
     }
-
-    /** Локали контекста — для тестов и отладки. */
-    fun locales(context: Context): LocaleList = context.resources.configuration.locales
 }

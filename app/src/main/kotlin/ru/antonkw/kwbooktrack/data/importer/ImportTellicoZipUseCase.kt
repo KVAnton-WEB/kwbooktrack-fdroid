@@ -6,6 +6,10 @@ import ru.antonkw.kwbooktrack.data.tellico.TellicoCsvReader
 import ru.antonkw.kwbooktrack.data.tellico.TellicoRecord
 import ru.antonkw.kwbooktrack.data.tellico.TellicoXmlReader
 import java.io.File
+import java.nio.ByteBuffer
+import java.nio.charset.Charset
+import java.nio.charset.CodingErrorAction
+import java.util.UUID
 import javax.inject.Inject
 
 /**
@@ -42,7 +46,10 @@ class ImportTellicoZipUseCase @Inject constructor(
                 errors = listOf(IllegalStateException("файл не найден: ${file.absolutePath}")),
             )
         }
-        val staging = File(outputDir, ".import-staging")
+        // Каталог распаковки — свой на каждый импорт: два параллельных импорта
+        // (или импорт, прерванный пользователем) делили бы один каталог, и
+        // `deleteRecursively()` в `finally` сносил бы чужую распаковку.
+        val staging = File(outputDir, ".import-staging-${UUID.randomUUID()}")
         try {
             val prepared = withContext(Dispatchers.IO) { prepare(file, format, staging) }
             // Корень ассетов: распакованный архив; обложки кладутся в outputDir.
@@ -80,17 +87,42 @@ class ImportTellicoZipUseCase @Inject constructor(
             ImportFormat.TELLICO_XML -> {
                 val xml = source(root, file, zipped) { it.name == "tellico.xml" }
                     ?: throw IllegalStateException("в архиве нет tellico.xml")
-                xmlReader.read(xml.readBytes())
+                // Потоковое чтение: `readBytes()` грузил весь файл в память
+                // целиком, и большая коллекция (десятки мегабайт XML) давала OOM.
+                xmlReader.read(xml)
             }
             ImportFormat.TELLICO_CSV -> {
                 val csv = source(root, file, zipped) { it.name.endsWith(".csv", ignoreCase = true) }
                     ?: throw IllegalStateException("в архиве нет CSV")
-                csv.inputStream().bufferedReader().use { reader -> csvReader.read(reader) }
+                csvReader.read(csv.readText().reader())
             }
             ImportFormat.KWBOOKTRACK_ZIP ->
                 throw IllegalStateException("свой бэкап импортируется отдельным импортёром")
         }
         return Prepared(root, records)
+    }
+
+    /**
+     * Текст файла: UTF-8, а если он не UTF-8 — cp1251.
+     *
+     * Кодировку платформы брать нельзя: выгрузка Tellico под Windows — это
+     * cp1251, и в русской локали весь текст превращался бы в мусор.
+     */
+    private fun File.readText(): String {
+        val bytes = readBytes()
+        val utf8 = runCatching {
+            Charsets.UTF_8.newDecoder()
+                .onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT)
+                .decode(ByteBuffer.wrap(bytes))
+                .toString()
+        }.getOrNull()
+        return utf8 ?: String(bytes, CHARSET_CP1251)
+    }
+
+    private companion object {
+        /** Кодировка выгрузки Tellico под Windows. */
+        val CHARSET_CP1251: Charset = Charset.forName("windows-1251")
     }
 
     /** Корень ассетов и прочитанные записи. */

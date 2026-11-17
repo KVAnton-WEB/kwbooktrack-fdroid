@@ -29,7 +29,8 @@ import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
 import ru.antonkw.kwbooktrack.data.repository.MediaDateRepository
 import ru.antonkw.kwbooktrack.data.repository.MovieRepository
 import ru.antonkw.kwbooktrack.data.repository.SessionRepository
-import ru.antonkw.kwbooktrack.data.time.toEpochMs
+import ru.antonkw.kwbooktrack.data.time.toDayMs
+import ru.antonkw.kwbooktrack.data.time.toLocalDayStartMs
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -87,7 +88,7 @@ class CalendarViewModelTest {
         val bookId = bookRepository.insert(
             BookEntity(title = "Hyperion", author = "Simmons", createdAt = 0L, updatedAt = 0L),
         )
-        val midnight = firstOfMonth.toEpochMs()
+        val midnight = firstOfMonth.toLocalDayStartMs()
         sessionRepository.insert(
             ReadingSessionEntity(bookId = bookId, startedAt = midnight, endPage = 50),
         )
@@ -110,7 +111,7 @@ class CalendarViewModelTest {
                 title = "Dune",
                 author = "Herbert",
                 status = BookStatus.FINISHED,
-                finishedAt = firstOfMonth.toEpochMs(),
+                finishedAt = firstOfMonth.toDayMs(),
                 createdAt = 0L,
                 updatedAt = 0L,
             ),
@@ -131,7 +132,7 @@ class CalendarViewModelTest {
         val bookId = bookRepository.insert(
             BookEntity(title = "Hyperion", author = "Simmons", createdAt = 0L, updatedAt = 0L),
         )
-        val midnight = firstOfMonth.toEpochMs()
+        val midnight = firstOfMonth.toLocalDayStartMs()
         sessionRepository.insert(
             ReadingSessionEntity(bookId = bookId, startedAt = midnight, endPage = 50),
         )

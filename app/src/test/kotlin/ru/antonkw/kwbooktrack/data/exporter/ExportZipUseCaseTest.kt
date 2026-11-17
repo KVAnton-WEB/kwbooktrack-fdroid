@@ -110,6 +110,40 @@ class ExportZipUseCaseTest {
     }
 
     @Test
+    fun exportQuotesFieldWithLoneCarriageReturn() {
+        // Одиночный CR — тоже конец записи для CSV. Без кавычек строка рвалась
+        // на импорте, и следующая строка читалась как отдельная книга.
+        runBlocking {
+            repo.insert(sampleBook("Дюна", "Герберт", annotation = "первая\rвторая"))
+
+            val outFile = File(tempDir, "export.zip")
+            useCase(outFile)
+
+            val csv = readZipEntries(outFile)["books.csv"]!!
+            val format = CSVFormat.Builder.create(CSVFormat.EXCEL).setDelimiter(';').setHeader().setSkipHeaderRecord(true).build()
+            val records = CSVParser(StringReader(csv), format).use { it.records }
+            assertThat(records).hasSize(1)
+            assertThat(records.single().get("title")).isEqualTo("Дюна")
+            assertThat(records.single().get("annotation")).isEqualTo("первая\rвторая")
+        }
+    }
+
+    @Test
+    fun exportCountsLostCovers() {
+        // Обложка, которой нет на диске, — потеря, о которой должен быть виден
+        // счётчик: раньше в архиве просто не было файла, и заметки не было.
+        runBlocking {
+            repo.insert(sampleBook("Book With Cover", "Author", coverPath = "/nonexistent/cover.jpg"))
+
+            val outFile = File(tempDir, "export.zip")
+            val manifest = useCase(outFile)
+
+            assertThat(manifest.counts.coversMissing).isEqualTo(1)
+            assertThat(manifest.counts.covers).isEqualTo(0)
+        }
+    }
+
+    @Test
     fun exportOmitsMissingCovers() {
         runBlocking {
             repo.insert(sampleBook("Book With Cover", "Author", coverPath = "/nonexistent/cover.jpg"))
@@ -273,12 +307,14 @@ class ExportZipUseCaseTest {
         pageCount: Int? = null,
         status: BookStatus = BookStatus.WISHLIST,
         coverPath: String? = null,
+        annotation: String? = null,
     ) = BookEntity(
         title = title,
         author = author,
         pageCount = pageCount,
         status = status,
         coverPath = coverPath,
+        annotation = annotation,
         createdAt = 0L,
         updatedAt = 0L,
     )

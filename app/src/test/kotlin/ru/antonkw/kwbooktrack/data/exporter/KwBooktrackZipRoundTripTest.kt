@@ -45,7 +45,8 @@ import ru.antonkw.kwbooktrack.data.snapshot.SnapshotApplier
 import ru.antonkw.kwbooktrack.data.snapshot.SnapshotBuilder
 import ru.antonkw.kwbooktrack.data.storage.CoverTranscoder
 import ru.antonkw.kwbooktrack.data.storage.FilePhotoStorage
-import ru.antonkw.kwbooktrack.data.time.toEpochMs
+import ru.antonkw.kwbooktrack.data.time.toDayMs
+import ru.antonkw.kwbooktrack.data.time.toLocalDayStartMs
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.StringReader
@@ -110,6 +111,8 @@ class KwBooktrackZipRoundTripTest {
         val targetBooks = BookRepository(targetDb.bookDao(), targetDb.tagDao(), NoOpCoverStorage, targetPhotos)
         importUseCase = ImportKwBooktrackZipUseCase(
             SnapshotApplier(
+    database = targetDb,
+    coverStorage = NoOpCoverStorage,
                 bookRepository = targetBooks,
                 movieRepository = MovieRepository(targetDb.movieDao(), NoOpCoverStorage, targetPhotos),
                 noteRepository = NoteRepository(targetDb.noteDao(), FilePhotoStorage(context)),
@@ -329,8 +332,8 @@ class KwBooktrackZipRoundTripTest {
                 coverPath = cover.absolutePath,
                 purchaseDate = day(2023, 12, 1),
                 purchasePrice = 599.5,
-                createdAt = day(2024, 1, 1),
-                updatedAt = day(2024, 1, 20),
+                createdAt = instant(2024, 1, 1),
+                updatedAt = instant(2024, 1, 20),
                 extraFields = mapOf("посоветовал" to ExtraField("Посоветовал", "Книжный поезд")),
             ),
         )
@@ -396,8 +399,8 @@ class KwBooktrackZipRoundTripTest {
                 comments = "Комментарий",
                 url = "https://www.kinopoisk.ru/film/1",
                 isDownloaded = true,
-                createdAt = day(2024, 2, 1),
-                updatedAt = day(2024, 2, 20),
+                createdAt = instant(2024, 2, 1),
+                updatedAt = instant(2024, 2, 20),
                 source = MediaSource.TELLICO,
             ),
         )
@@ -436,8 +439,13 @@ class KwBooktrackZipRoundTripTest {
         }
     }
 
+    /** Дата (полночь UTC). */
     private fun day(year: Int, month: Int, day: Int): Long =
-        LocalDate.of(year, month, day).toEpochMs()
+        LocalDate.of(year, month, day).toDayMs()
+
+    /** Момент времени (полночь локальной зоны). */
+    private fun instant(year: Int, month: Int, day: Int): Long =
+        LocalDate.of(year, month, day).toLocalDayStartMs()
 
     private companion object {
         const val QUOTE_AT = 1_730_000_000_000L

@@ -60,6 +60,8 @@ class TellicoTcImportTest {
                 mapper = TellicoBookMapper(),
                     movieMapper = TellicoMovieMapper(),
                 applier = SnapshotApplier(
+    database = db,
+    coverStorage = NoOpCoverStorage,
                     bookRepository = bookRepository,
                 movieRepository = MovieRepository(db.movieDao(), NoOpCoverStorage, photoRepository),
                     noteRepository = NoteRepository(db.noteDao(), ru.antonkw.kwbooktrack.data.NoOpPhotoStorage),

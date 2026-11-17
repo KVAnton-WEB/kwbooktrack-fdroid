@@ -15,10 +15,11 @@ import ru.antonkw.kwbooktrack.data.db.entity.MediaSource
 import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 import ru.antonkw.kwbooktrack.data.db.entity.MovieEntity
 import ru.antonkw.kwbooktrack.data.repository.MediaDateRepository
+import ru.antonkw.kwbooktrack.data.repository.SaveMovieUseCase
 import ru.antonkw.kwbooktrack.data.repository.MovieRepository
 import ru.antonkw.kwbooktrack.data.storage.CoverStorage
-import ru.antonkw.kwbooktrack.data.time.toEpochMs
-import ru.antonkw.kwbooktrack.data.time.toLocalDate
+import ru.antonkw.kwbooktrack.data.time.toDayDate
+import ru.antonkw.kwbooktrack.data.time.toDayMs
 import java.io.File
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -56,6 +57,7 @@ class MovieEditViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val movieRepository: MovieRepository,
     private val mediaDateRepository: MediaDateRepository,
+    private val saveMovieUseCase: SaveMovieUseCase,
     @ApplicationContext private val context: Context,
     private val coverStorage: CoverStorage,
 ) : ViewModel() {
@@ -162,7 +164,7 @@ class MovieEditViewModel @Inject constructor(
         // у нового фильма isEditing = false, и save() идёт в insert.
         if (s.saved) return
         viewModelScope.launch {
-            val coverPath = s.coverPath?.let { coverStorage.promote(it) }
+            val coverPath = s.coverPath
             // Основная дата — самая ранняя: из неё Tellico берёт первую дату.
             // Остальные — дополнительные.
             val dates = s.watchedDates.mapNotNull { parseDate(it) }.sorted()
@@ -192,19 +194,19 @@ class MovieEditViewModel @Inject constructor(
                 // Поля, которых в форме нет (комментарии Tellico, чужие
                 // поля, источник), сохраняем: правка названия не должна
                 // стирать то, что приехало из импорта.
-                movieRepository.update(
+                saveMovieUseCase(
                     form.copy(
                         comments = existing.comments,
                         extraFields = existing.extraFields,
                         source = existing.source,
                         createdAt = existing.createdAt,
                     ),
+                    dates.drop(1),
                 )
-                editingMovieId
             } else {
-                movieRepository.insert(form)
+                saveMovieUseCase(form, dates.drop(1))
             }
-            mediaDateRepository.replaceFor(movieId, MediaType.MOVIES, dates.drop(1))
+            if (movieId <= 0L) return@launch
             // Прежняя обложка больше не нужна: путь новой — с UUID-именем.
             originalCoverPath
                 ?.takeIf { it != coverPath }
@@ -218,7 +220,7 @@ class MovieEditViewModel @Inject constructor(
     private fun loadWatchDates(primary: Long?, extra: List<Long>): List<String> {
         val dates = (listOfNotNull(primary) + extra).sorted()
         if (dates.isEmpty()) return listOf("")
-        return dates.map { DATE_FMT.format(it.toLocalDate()) }
+        return dates.map { DATE_FMT.format(it.toDayDate()) }
     }
 
     private fun update(block: MovieEditState.() -> MovieEditState) {
@@ -227,7 +229,7 @@ class MovieEditViewModel @Inject constructor(
 
     private fun parseDate(raw: String): Long? {
         if (raw.isBlank()) return null
-        return runCatching { LocalDate.parse(raw, DATE_FMT).toEpochMs() }.getOrNull()
+        return runCatching { LocalDate.parse(raw, DATE_FMT).toDayMs() }.getOrNull()
     }
 
     companion object {

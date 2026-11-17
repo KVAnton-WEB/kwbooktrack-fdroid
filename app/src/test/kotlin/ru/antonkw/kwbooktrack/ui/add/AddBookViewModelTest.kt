@@ -27,10 +27,11 @@ import ru.antonkw.kwbooktrack.data.db.entity.MediaSource
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.MediaDateRepository
+import ru.antonkw.kwbooktrack.data.repository.SaveBookUseCase
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
 import ru.antonkw.kwbooktrack.data.storage.CoverStorage
 import ru.antonkw.kwbooktrack.data.storage.FileCoverStorage
-import ru.antonkw.kwbooktrack.data.time.toEpochMs
+import ru.antonkw.kwbooktrack.data.time.toDayMs
 import java.io.ByteArrayInputStream
 import java.io.File
 
@@ -72,7 +73,7 @@ class AddBookViewModelTest {
 
     @Test
     fun saveInsertsBookWithManualSource() = runTest(dispatcher) {
-        val vm = AddBookViewModel(androidx.lifecycle.SavedStateHandle(), bookRepository, mediaDates, ApplicationProvider.getApplicationContext(), ru.antonkw.kwbooktrack.data.NoOpCoverStorage)
+        val vm = AddBookViewModel(androidx.lifecycle.SavedStateHandle(), bookRepository, mediaDates, SaveBookUseCase(db, bookRepository, mediaDates), ApplicationProvider.getApplicationContext(), ru.antonkw.kwbooktrack.data.NoOpCoverStorage)
         vm.setTitle("Dune")
         vm.setAuthor("Frank Herbert")
         vm.setIsbn("9780441172719")
@@ -90,7 +91,7 @@ class AddBookViewModelTest {
 
     @Test
     fun emptyTitleDoesNotSave() = runTest(dispatcher) {
-        val vm = AddBookViewModel(androidx.lifecycle.SavedStateHandle(), bookRepository, mediaDates, ApplicationProvider.getApplicationContext(), ru.antonkw.kwbooktrack.data.NoOpCoverStorage)
+        val vm = AddBookViewModel(androidx.lifecycle.SavedStateHandle(), bookRepository, mediaDates, SaveBookUseCase(db, bookRepository, mediaDates), ApplicationProvider.getApplicationContext(), ru.antonkw.kwbooktrack.data.NoOpCoverStorage)
         vm.save()
         advanceUntilIdle()
 
@@ -100,21 +101,21 @@ class AddBookViewModelTest {
 
     @Test
     fun setIsbnStripsNonDigits() = runTest(dispatcher) {
-        val vm = AddBookViewModel(androidx.lifecycle.SavedStateHandle(), bookRepository, mediaDates, ApplicationProvider.getApplicationContext(), ru.antonkw.kwbooktrack.data.NoOpCoverStorage)
+        val vm = AddBookViewModel(androidx.lifecycle.SavedStateHandle(), bookRepository, mediaDates, SaveBookUseCase(db, bookRepository, mediaDates), ApplicationProvider.getApplicationContext(), ru.antonkw.kwbooktrack.data.NoOpCoverStorage)
         vm.setIsbn("978-0-441-17271-X")
         assertThat(vm.state.value.isbn).isEqualTo("978044117271X")
     }
 
     @Test
     fun setPageCountStripsNonDigits() = runTest(dispatcher) {
-        val vm = AddBookViewModel(androidx.lifecycle.SavedStateHandle(), bookRepository, mediaDates, ApplicationProvider.getApplicationContext(), ru.antonkw.kwbooktrack.data.NoOpCoverStorage)
+        val vm = AddBookViewModel(androidx.lifecycle.SavedStateHandle(), bookRepository, mediaDates, SaveBookUseCase(db, bookRepository, mediaDates), ApplicationProvider.getApplicationContext(), ru.antonkw.kwbooktrack.data.NoOpCoverStorage)
         vm.setPageCount("5x0x0")
         assertThat(vm.state.value.pageCount).isEqualTo("500")
     }
 
     @Test
     fun shortIsbnIsKeptAsIs() = runTest(dispatcher) {
-        val vm = AddBookViewModel(androidx.lifecycle.SavedStateHandle(), bookRepository, mediaDates, ApplicationProvider.getApplicationContext(), ru.antonkw.kwbooktrack.data.NoOpCoverStorage)
+        val vm = AddBookViewModel(androidx.lifecycle.SavedStateHandle(), bookRepository, mediaDates, SaveBookUseCase(db, bookRepository, mediaDates), ApplicationProvider.getApplicationContext(), ru.antonkw.kwbooktrack.data.NoOpCoverStorage)
         vm.setIsbn("12345")
         vm.setTitle("Test")
         vm.save()
@@ -131,6 +132,7 @@ class AddBookViewModelTest {
             androidx.lifecycle.SavedStateHandle(),
             bookRepository,
             mediaDates,
+            SaveBookUseCase(db, bookRepository, mediaDates),
             ApplicationProvider.getApplicationContext(),
             ru.antonkw.kwbooktrack.data.NoOpCoverStorage,
         )
@@ -181,6 +183,7 @@ class AddBookViewModelTest {
             androidx.lifecycle.SavedStateHandle(),
             bookRepository,
             mediaDates,
+            SaveBookUseCase(db, bookRepository, mediaDates),
             ApplicationProvider.getApplicationContext(),
             ru.antonkw.kwbooktrack.data.NoOpCoverStorage,
         )
@@ -202,6 +205,7 @@ class AddBookViewModelTest {
             androidx.lifecycle.SavedStateHandle(),
             bookRepository,
             mediaDates,
+            SaveBookUseCase(db, bookRepository, mediaDates),
             ApplicationProvider.getApplicationContext(),
             ru.antonkw.kwbooktrack.data.NoOpCoverStorage,
         )
@@ -223,6 +227,7 @@ class AddBookViewModelTest {
             androidx.lifecycle.SavedStateHandle(),
             bookRepository,
             mediaDates,
+            SaveBookUseCase(db, bookRepository, mediaDates),
             ApplicationProvider.getApplicationContext(),
             ru.antonkw.kwbooktrack.data.NoOpCoverStorage,
         )
@@ -308,7 +313,7 @@ class AddBookViewModelTest {
         vm.save()?.join()
 
         assertThat(bookRepository.findById(id)!!.finishedAt)
-            .isEqualTo(java.time.LocalDate.of(2024, 5, 1).toEpochMs())
+            .isEqualTo(java.time.LocalDate.of(2024, 5, 1).toDayMs())
     }
 
     @Test
@@ -329,6 +334,7 @@ class AddBookViewModelTest {
             androidx.lifecycle.SavedStateHandle(),
             bookRepository,
             mediaDates,
+            SaveBookUseCase(db, bookRepository, mediaDates),
             ApplicationProvider.getApplicationContext(),
             ru.antonkw.kwbooktrack.data.NoOpCoverStorage,
         )
@@ -365,6 +371,38 @@ class AddBookViewModelTest {
         assertThat(vm.state.value.error).isEqualTo(AddBookError.DUPLICATE_ISBN)
         assertThat(vm.state.value.saved).isFalse()
         assertThat(bookRepository.findById(id)!!.isbn13).isNull()
+    }
+
+    @Test
+    fun manualIsbn10IsStoredAsIsbn13() = runTest(dispatcher) {
+        // Десятизначный ISBN приводится к 13 цифрам — иначе он не совпал бы
+        // с тем же номером, введённым вручную или приехавшим из Tellico.
+        val vm = newBookVm()
+        vm.setTitle("Дюна")
+        vm.setIsbn("0-8044-2957-X")
+        vm.save()?.join()
+
+        assertThat(db.bookDao().observeAll().first().single().isbn13).isEqualTo("9780804429573")
+    }
+
+    @Test
+    fun manualIsbn10IsRecognizedAsTheSameBookAsTheStoredIsbn13() = runTest(dispatcher) {
+        db.bookDao().insert(
+            BookEntity(
+                title = "Дюна",
+                author = "Фрэнк Герберт",
+                isbn13 = "9780804429573",
+                createdAt = 0L,
+                updatedAt = 0L,
+            ),
+        )
+        val vm = newBookVm()
+        vm.setTitle("Дюна")
+        vm.setIsbn("080442957X")
+        vm.save()?.join()
+
+        assertThat(vm.state.value.error).isEqualTo(AddBookError.DUPLICATE_ISBN)
+        assertThat(db.bookDao().count()).isEqualTo(1)
     }
 
     // --- cover lifecycle -------------------------------------------------
@@ -406,6 +444,7 @@ class AddBookViewModelTest {
             androidx.lifecycle.SavedStateHandle(mapOf("bookId" to bookId)),
             bookRepository,
             mediaDates,
+            SaveBookUseCase(db, bookRepository, mediaDates),
             context,
             coverStorage,
         )
@@ -433,6 +472,7 @@ class AddBookViewModelTest {
         androidx.lifecycle.SavedStateHandle(),
         bookRepository,
         mediaDates,
+        SaveBookUseCase(db, bookRepository, mediaDates),
         context,
         coverStorage,
     )
@@ -519,6 +559,64 @@ class AddBookViewModelTest {
 
         assertThat(cover.exists()).isTrue()
         assertThat(bookRepository.findById(id)!!.coverPath).isEqualTo(cover.absolutePath)
+    }
+
+    @Test
+    fun purchasePriceSurvivesEditingInAnyLocale() = runTest(dispatcher) {
+        // Цена печаталась по локали устройства («1234,50»), а разбиралась
+        // только с точкой: в русской локали цена молча пропадала при правке.
+        val vm = newBookVm()
+        vm.setTitle("Дюна")
+        vm.setPurchasePrice("1234,5")
+        vm.save()?.join()
+
+        val id = db.bookDao().observeAll().first().single().id
+        val edit = AddBookViewModel(
+            androidx.lifecycle.SavedStateHandle(mapOf("bookId" to id)),
+            bookRepository,
+            mediaDates,
+            SaveBookUseCase(db, bookRepository, mediaDates),
+            context,
+            coverStorage,
+        )
+        edit.state.first { !it.loading }
+        edit.save()?.join()
+
+        assertThat(bookRepository.findById(id)!!.purchasePrice).isEqualTo(1234.5)
+    }
+
+    @Test
+    fun editFormIsNotDirtyBeforeAnyChange() = runTest(dispatcher) {
+        // Снимок исходного состояния снимался до загрузки книги — форма
+        // считалась «грязной» сразу, и «Отменить изменения?» появлялось при
+        // каждом выходе из правки.
+        val (id, _) = bookWithCover()
+        val vm = editVm(id)
+
+        assertThat(vm.isDirty).isFalse()
+    }
+
+    @Test
+    fun failedSaveKeepsTheCoverFile() = runTest(dispatcher) {
+        // Правка падает на уникальном индексе ISBN: обложка должна остаться
+        // на месте — и в строке, и на диске.
+        val (id, cover) = bookWithCover()
+        val other = bookRepository.insert(
+            BookEntity(
+                title = "Дюна",
+                author = "Герберт",
+                isbn13 = "9780441013593",
+                createdAt = 0L,
+                updatedAt = 0L,
+            ),
+        )
+        val vm = editVm(id)
+        vm.setIsbn("9780441013593")
+        vm.save()?.join()
+
+        assertThat(bookRepository.findById(id)!!.coverPath).isEqualTo(cover.absolutePath)
+        assertThat(cover.exists()).isTrue()
+        assertThat(bookRepository.findById(other)).isNotNull()
     }
 
     @Test

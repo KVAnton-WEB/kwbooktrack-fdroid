@@ -43,8 +43,9 @@ import ru.antonkw.kwbooktrack.data.storage.CoverTranscoder
 import ru.antonkw.kwbooktrack.data.storage.FilePhotoStorage
 import ru.antonkw.kwbooktrack.data.tellico.TellicoCsvReader
 import ru.antonkw.kwbooktrack.data.tellico.TellicoXmlReader
-import ru.antonkw.kwbooktrack.data.time.toEpochMs
-import ru.antonkw.kwbooktrack.data.time.toLocalDate
+import ru.antonkw.kwbooktrack.data.time.toDayMs
+import ru.antonkw.kwbooktrack.data.time.toLocalDay
+import ru.antonkw.kwbooktrack.data.time.toLocalDayStartMs
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.StringReader
@@ -112,6 +113,8 @@ class TellicoTcRoundTripTest {
                 mapper = TellicoBookMapper(),
                     movieMapper = TellicoMovieMapper(),
                 applier = SnapshotApplier(
+    database = targetDb,
+    coverStorage = NoOpCoverStorage,
                     bookRepository = targetBooks,
                 movieRepository = MovieRepository(targetDb.movieDao(), NoOpCoverStorage, targetPhotos),
                     noteRepository = NoteRepository(targetDb.noteDao(), FilePhotoStorage(context)),
@@ -317,7 +320,7 @@ class TellicoTcRoundTripTest {
         // Перевод строки внутри заметки переживает экспорт (экранирование ячейки).
         val note = notes.single { it.kind == NoteKind.NOTE }
         assertThat(note.bodyMd).isEqualTo("Заметка\nс переносом")
-        assertThat(note.createdAt).isEqualTo(day(2024, 1, 12))
+        assertThat(note.createdAt).isEqualTo(instant(2024, 1, 12))
 
         assertThat(targetDb.readingSessionDao().observeByBook(book.id).first()).hasSize(1)
         assertThat(targetDb.tagDao().tagsOf(book.id).map { it.name }).containsExactly("фэнтези")
@@ -366,8 +369,8 @@ class TellicoTcRoundTripTest {
         assertThat(book.isSold).isTrue()
         assertThat(book.extraFields["чтец"]?.value).isEqualTo("Иванова")
         // Метки времени Tellico — даты, поэтому время суток не переносится.
-        assertThat(book.createdAt).isEqualTo(day(2024, 1, 1))
-        assertThat(book.updatedAt).isEqualTo(source.updatedAt.toLocalDate().toEpochMs())
+        assertThat(book.createdAt).isEqualTo(instant(2024, 1, 1))
+        assertThat(book.updatedAt).isEqualTo(source.updatedAt.toLocalDay().toLocalDayStartMs())
     }
 
     @Test
@@ -567,8 +570,8 @@ class TellicoTcRoundTripTest {
                 status = BookStatus.FINISHED,
                 startedAt = day(2024, 1, 10),
                 finishedAt = day(2024, 1, 20),
-                createdAt = day(2024, 1, 1),
-                updatedAt = day(2024, 1, 20),
+                createdAt = instant(2024, 1, 1),
+                updatedAt = instant(2024, 1, 20),
                 purchaseDate = day(2023, 12, 1),
                 purchasePrice = 599.0,
                 binding = "Твёрдый",
@@ -594,8 +597,8 @@ class TellicoTcRoundTripTest {
                 page = 12,
                 bodyMd = "Цитата про хаос",
                 kind = NoteKind.QUOTE,
-                createdAt = day(2024, 1, 11),
-                updatedAt = day(2024, 1, 11),
+                createdAt = instant(2024, 1, 11),
+                updatedAt = instant(2024, 1, 11),
             ),
         )
         sourceNotes.insert(
@@ -603,8 +606,8 @@ class TellicoTcRoundTripTest {
                 mediaId = bookId, mediaType = MediaType.BOOKS,
                 bodyMd = "Отзыв",
                 kind = NoteKind.REVIEW,
-                createdAt = day(2024, 1, 15),
-                updatedAt = day(2024, 1, 15),
+                createdAt = instant(2024, 1, 15),
+                updatedAt = instant(2024, 1, 15),
             ),
         )
         if (withPageLessQuote) {
@@ -615,8 +618,8 @@ class TellicoTcRoundTripTest {
                     mediaId = bookId, mediaType = MediaType.BOOKS,
                     bodyMd = "текст без страницы",
                     kind = NoteKind.QUOTE,
-                    createdAt = day(2024, 1, 16),
-                    updatedAt = day(2024, 1, 16),
+                    createdAt = instant(2024, 1, 16),
+                    updatedAt = instant(2024, 1, 16),
                 ),
             )
         }
@@ -626,8 +629,8 @@ class TellicoTcRoundTripTest {
                 page = 30,
                 bodyMd = "Заметка\nс переносом",
                 kind = NoteKind.NOTE,
-                createdAt = day(2024, 1, 12),
-                updatedAt = day(2024, 1, 12),
+                createdAt = instant(2024, 1, 12),
+                updatedAt = instant(2024, 1, 12),
             ),
         )
         sourceSessions.insert(
@@ -648,7 +651,7 @@ class TellicoTcRoundTripTest {
                 mediaId = bookId, mediaType = MediaType.BOOKS,
                 noteId = quoteId,
                 path = photo.absolutePath,
-                createdAt = day(2024, 1, 13),
+                createdAt = instant(2024, 1, 13),
             ),
         )
     }
@@ -714,7 +717,7 @@ class TellicoTcRoundTripTest {
                 title = "Синий бархат",
                 year = 1989,
                 extraFields = mapOf("author" to ExtraField("Автор", "Линч, Дэвид")),
-                createdAt = day(2024, 1, 1),
+                createdAt = instant(2024, 1, 1),
                 updatedAt = day(2024, 1, 1),
             ),
         )
@@ -801,7 +804,7 @@ class TellicoTcRoundTripTest {
                 plot = "Молодая актриса приезжает в Голливуд.",
                 url = "https://www.kinopoisk.ru/film/466/",
                 isDownloaded = true,
-                createdAt = day(2024, 1, 1),
+                createdAt = instant(2024, 1, 1),
                 updatedAt = day(2024, 2, 22),
             ),
         )
@@ -873,8 +876,13 @@ class TellicoTcRoundTripTest {
         }
     }
 
+    /** Дата (полночь UTC). */
     private fun day(year: Int, month: Int, day: Int): Long =
-        LocalDate.of(year, month, day).toEpochMs()
+        LocalDate.of(year, month, day).toDayMs()
+
+    /** Момент времени (полночь локальной зоны). */
+    private fun instant(year: Int, month: Int, day: Int): Long =
+        LocalDate.of(year, month, day).toLocalDayStartMs()
 
     /** Начало объявления поля в `<fields>` — как его пишет TellicoXmlWriter. */
     private fun fieldTag(

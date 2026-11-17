@@ -2,7 +2,7 @@ package ru.antonkw.kwbooktrack.data.stats
 
 import ru.antonkw.kwbooktrack.data.db.entity.MovieEntity
 import ru.antonkw.kwbooktrack.data.media.mediaDates
-import ru.antonkw.kwbooktrack.data.time.toLocalDate
+import ru.antonkw.kwbooktrack.data.time.toDayDate
 import java.time.YearMonth
 
 /**
@@ -46,11 +46,11 @@ object MovieStatsCalculator {
         if (viewings.isEmpty()) return MovieStats()
 
         val monthlyWatched = viewings
-            .groupBy { YearMonth.from(it.second.toLocalDate()) }
+            .groupBy { YearMonth.from(it.second.toDayDate()) }
             .map { (month, items) -> MonthlyBooks(month.year, month.monthValue, items.size) }
             .sortedWith(compareBy({ it.year }, { it.month }))
         val monthlyMinutes = viewings
-            .groupBy { YearMonth.from(it.second.toLocalDate()) }
+            .groupBy { YearMonth.from(it.second.toDayDate()) }
             .map { (month, items) ->
                 MonthlyPages(month.year, month.monthValue, items.sumOf { it.first.durationMin ?: 0 })
             }
@@ -64,7 +64,7 @@ object MovieStatsCalculator {
             .map { (year, items) -> YearlyPages(year, items.sumOf { it.pages }) }
             .sortedBy { it.year }
 
-        val years = viewings.map { it.second.toLocalDate().year }
+        val years = viewings.map { it.second.toDayDate().year }
         return MovieStats(
             totalMovies = viewings.size,
             totalMinutes = viewings.sumOf { it.first.durationMin ?: 0 },

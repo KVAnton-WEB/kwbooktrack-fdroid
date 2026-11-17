@@ -1,6 +1,7 @@
 package ru.antonkw.kwbooktrack.data.exporter
 
 import androidx.room.withTransaction
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
@@ -14,6 +15,7 @@ import ru.antonkw.kwbooktrack.data.tellico.TcMovieEntry
 import ru.antonkw.kwbooktrack.data.tellico.TellicoXmlWriter
 import java.io.BufferedOutputStream
 import java.io.File
+import java.io.FileNotFoundException
 import java.io.FileOutputStream
 import java.io.OutputStream
 import java.nio.charset.StandardCharsets
@@ -71,15 +73,11 @@ class ExportTellicoTcUseCase @Inject constructor(
             zip.closeEntry()
 
             prepared.covers.forEach { (name, file) ->
-                zip.putNextEntry(ZipEntry("images/$name"))
-                file.inputStream().use { it.copyTo(zip) }
-                zip.closeEntry()
+                writeFile(zip, "images/$name", file)
             }
 
             prepared.photos.forEach { (path, file) ->
-                zip.putNextEntry(ZipEntry(path))
-                file.inputStream().use { it.copyTo(zip) }
-                zip.closeEntry()
+                writeFile(zip, path, file)
             }
         }
         // manifest.json в .tc не кладём: детектор формата по нему признал бы
@@ -91,6 +89,25 @@ class ExportTellicoTcUseCase @Inject constructor(
         )
     }
 
+    /**
+     * Файл в архив.
+     *
+     * Файл мог исчезнуть между подготовкой и записью (пользователь удалил его
+     * с диска) — тогда его пропускаем, а не роняем весь экспорт: на SAF-URI
+     * остался бы обрезанный, нечитаемый `.tc`.
+     */
+    private fun writeFile(zip: ZipOutputStream, path: String, file: File) {
+        val input = try {
+            file.inputStream()
+        } catch (e: FileNotFoundException) {
+            Log.w(TAG, "файл пропущен: $path", e)
+            return
+        }
+        zip.putNextEntry(ZipEntry(path))
+        input.use { it.copyTo(zip) }
+        zip.closeEntry()
+    }
+
     /** Снимки книг → то, что попадёт в архив: записи, обложки с MD5-именами и фото. */
     private fun prepareBooks(snapshots: List<BookSnapshot>): Prepared {
         val entries = mutableListOf<TcEntry>()
@@ -99,13 +116,16 @@ class ExportTellicoTcUseCase @Inject constructor(
         var sessions = 0
         var notes = 0
         var quotes = 0
+        var reviews = 0
         var tags = 0
         var photoCount = 0
+        var missingCovers = 0
 
         for (snapshot in snapshots) {
             val coverFile = snapshot.book.coverPath?.let { File(it) }?.takeIf { it.isFile }
             val coverName = coverFile?.let { archiveName(it) }
             if (coverFile != null && coverName != null) covers.putIfAbsent(coverName, coverFile)
+            if (!snapshot.book.coverPath.isNullOrBlank() && coverFile == null) missingCovers++
 
             // Фото без файла в архив не попадает и в разметке не упоминается.
             val photoFiles = snapshot.photos.mapNotNull { photo ->
@@ -121,6 +141,7 @@ class ExportTellicoTcUseCase @Inject constructor(
             sessions += snapshot.sessions.size
             notes += snapshot.notes.count { it.kind == NoteKind.NOTE }
             quotes += snapshot.notes.count { it.kind == NoteKind.QUOTE }
+            reviews += snapshot.notes.count { it.kind == NoteKind.REVIEW }
             tags += snapshot.tags.size
             photoCount += photoFiles.size
         }
@@ -136,6 +157,9 @@ class ExportTellicoTcUseCase @Inject constructor(
                 quotes = quotes,
                 photos = photoCount,
                 tags = tags,
+                covers = covers.size,
+                coversMissing = missingCovers,
+                reviews = reviews,
             ),
         )
     }
@@ -147,13 +171,16 @@ class ExportTellicoTcUseCase @Inject constructor(
         val photos = linkedMapOf<String, File>()
         var notes = 0
         var quotes = 0
+        var reviews = 0
         var tags = 0
         var photoCount = 0
+        var missingCovers = 0
 
         for (snapshot in snapshots) {
             val coverFile = snapshot.movie.coverPath?.let { File(it) }?.takeIf { it.isFile }
             val coverName = coverFile?.let { archiveName(it) }
             if (coverFile != null && coverName != null) covers.putIfAbsent(coverName, coverFile)
+            if (!snapshot.movie.coverPath.isNullOrBlank() && coverFile == null) missingCovers++
 
             val photoFiles = snapshot.photos.mapNotNull { photo ->
                 val file = File(photo.localPath)
@@ -167,6 +194,7 @@ class ExportTellicoTcUseCase @Inject constructor(
             )
             notes += snapshot.notes.count { it.kind == NoteKind.NOTE }
             quotes += snapshot.notes.count { it.kind == NoteKind.QUOTE }
+            reviews += snapshot.notes.count { it.kind == NoteKind.REVIEW }
             tags += snapshot.tags.size
             photoCount += photoFiles.size
         }
@@ -183,6 +211,9 @@ class ExportTellicoTcUseCase @Inject constructor(
                 photos = photoCount,
                 tags = tags,
                 movies = entries.size,
+                covers = covers.size,
+                coversMissing = missingCovers,
+                reviews = reviews,
             ),
         )
     }
@@ -205,4 +236,8 @@ class ExportTellicoTcUseCase @Inject constructor(
         val photos: Map<String, File>,
         val counts: ExportCounts,
     )
+
+    private companion object {
+        const val TAG = "ExportTellicoTc"
+    }
 }
