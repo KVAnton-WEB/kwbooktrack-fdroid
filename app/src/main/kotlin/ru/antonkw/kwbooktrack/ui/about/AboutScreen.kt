@@ -2,12 +2,15 @@ package ru.antonkw.kwbooktrack.ui.about
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.FileDownload
@@ -33,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
@@ -56,9 +60,31 @@ import ru.antonkw.kwbooktrack.data.settings.ThemeMode
 import ru.antonkw.kwbooktrack.R
 import javax.inject.Inject
 import ru.antonkw.kwbooktrack.ui.common.FilterDropdown
+import ru.antonkw.kwbooktrack.ui.common.UrlText
+import ru.antonkw.kwbooktrack.ui.common.copyToClipboard
 import ru.antonkw.kwbooktrack.ui.common.findActivity
 import ru.antonkw.kwbooktrack.ui.common.labelRes
 import ru.antonkw.kwbooktrack.ui.common.mediaLabelRes
+
+/** Автор и каналы связи: подпись + ссылка, открывается в браузере. */
+private val AUTHOR_LINKS = listOf(
+    R.string.about_link_github to "https://github.com/KVAnton-WEB/kwbooktrack",
+    R.string.about_link_telegram to "https://t.me/AntonKw",
+)
+
+/** Способы доната: подпись + ссылка. */
+private val DONATION_LINKS = listOf(
+    R.string.about_link_boosty to "https://boosty.to/kvanton/donate",
+    R.string.about_link_dalink to "https://dalink.to/ant0nk",
+)
+
+/** Криптокошельки: сеть, активы, адрес (тап — копирование в буфер). */
+private val CRYPTO_WALLETS = listOf(
+    Triple("Ethereum", "ETH / USDT / USDC", "0x9a68188c912c70fa4eecb7aaf651c7318047b2a2"),
+    Triple("Polygon", "POL / USDT / USDC", "0x9A68188C912c70Fa4EeCB7AAF651C7318047b2A2"),
+    Triple("Bitcoin", "BTC", "bc1qr0m6alqjk9zzy29ma0wpz66uas0dyrxy9hdr7a"),
+    Triple("Solana", "SOL / USDT / USDC", "ck5YP1JW8hhoMnxdUWPUVnkRNEZWD3EQVJjm33Ec9ma"),
+)
 
 data class AboutInfo(
     val version: String,
@@ -312,6 +338,62 @@ fun AboutScreen(
                     }
                 }
             }
+            // Автор и донаты.
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.about_author_title),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    AUTHOR_LINKS.forEach { (labelRes, url) -> LinkWithLabel(labelRes, url) }
+                    Text(
+                        text = stringResource(R.string.about_support_title),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    DONATION_LINKS.forEach { (labelRes, url) -> LinkWithLabel(labelRes, url) }
+                    Text(
+                        text = stringResource(R.string.about_crypto_title),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    CRYPTO_WALLETS.forEach { (network, asset, address) ->
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text(network, style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                asset,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Text(
+                                text = address,
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontFamily = FontFamily.Monospace,
+                                ),
+                                modifier = Modifier
+                                    .horizontalScroll(rememberScrollState())
+                                    .clickable {
+                                        copyToClipboard(context, address, R.string.about_crypto_title)
+                                    },
+                            )
+                        }
+                    }
+                }
+            }
         }
+    }
+}
+
+/** Подпись ссылки и сама ссылка (открывается в браузере). */
+@Composable
+private fun LinkWithLabel(labelRes: Int, url: String) {
+    Column {
+        Text(
+            text = stringResource(labelRes),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        UrlText(url)
     }
 }

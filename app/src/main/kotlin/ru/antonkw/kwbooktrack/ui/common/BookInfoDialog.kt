@@ -161,7 +161,7 @@ private fun boolLabel(value: Boolean): String = if (value) "✓" else "—"
 
 private fun formatDate(epochMs: Long): String = epochMs.toLocalDate().toString()
 
-private fun copyToClipboard(context: Context, value: String, @androidx.annotation.StringRes labelRes: Int) {
+internal fun copyToClipboard(context: Context, value: String, @androidx.annotation.StringRes labelRes: Int) {
     val label = context.getString(labelRes)
     val clip = ClipData.newPlainText(label, value)
     context.getSystemService(Context.CLIPBOARD_SERVICE)?.let { service ->

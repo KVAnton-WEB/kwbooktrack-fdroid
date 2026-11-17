@@ -8,6 +8,13 @@
     <string name="about_version">Версия</string>
     <string name="about_library">Библиотека</string>
     <string name="about_backup_title">Резервные копии</string>
+    <string name="about_author_title">Автор</string>
+    <string name="about_support_title">Поддержать автора</string>
+    <string name="about_crypto_title">Криптовалюта</string>
+    <string name="about_link_github">GitHub</string>
+    <string name="about_link_telegram">Telegram</string>
+    <string name="about_link_boosty">Boosty</string>
+    <string name="about_link_dalink">Dalink</string>
     <string name="about_backup_description">Экспорт библиотеки в ZIP-архив с CSV и обложками, экспорт в родной формат Tellico (.tc) либо импорт ранее сохранённого архива.</string>
     <string name="action_export">Экспорт</string>
     <string name="action_export_tellico">Экспорт в Tellico (.tc)</string>
