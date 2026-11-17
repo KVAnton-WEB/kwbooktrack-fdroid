@@ -53,6 +53,8 @@ import ru.antonkw.kwbooktrack.data.time.toLocalDate
 import ru.antonkw.kwbooktrack.ui.common.CoverImage
 import ru.antonkw.kwbooktrack.ui.common.formatDuration
 import ru.antonkw.kwbooktrack.ui.common.MarkdownText
+import ru.antonkw.kwbooktrack.ui.common.UrlText
+import ru.antonkw.kwbooktrack.ui.common.asUrl
 import ru.antonkw.kwbooktrack.ui.common.MediaTagsSection
 import ru.antonkw.kwbooktrack.ui.common.PhotoGalleryDialog
 import ru.antonkw.kwbooktrack.ui.common.PhotoSource
@@ -196,6 +198,8 @@ fun MovieDetailScreen(
             )
             MovieFieldRow(R.string.movie_field_url, movie.url)
 
+            ru.antonkw.kwbooktrack.ui.common.ExtraFieldsSection(movie.extraFields)
+
             if (!movie.plot.isNullOrBlank()) {
                 Text(stringResource(R.string.movie_field_plot), style = MaterialTheme.typography.titleMedium)
                 MarkdownText(markdown = movie.plot)
@@ -311,7 +315,13 @@ private fun MovieFieldRow(labelRes: Int, value: String?) {
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Text(text = value, style = MaterialTheme.typography.bodyMedium)
+        // Значение-ссылка (кинопоиск) кликабельно — открывает браузер.
+        val url = asUrl(value)
+        if (url != null) {
+            UrlText(url)
+        } else {
+            Text(text = value, style = MaterialTheme.typography.bodyMedium)
+        }
     }
 }
 

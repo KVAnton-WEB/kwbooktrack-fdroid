@@ -154,7 +154,18 @@
     <string name="rating_value">%1$d / 5</string>
     <string name="price_value">%1$.2f ₽</string>
 
+    <string name="settings_title">Оформление и язык</string>
+    <string name="settings_theme_label">Тема</string>
+    <string name="settings_theme_system">Как в системе</string>
+    <string name="settings_theme_light">Светлая</string>
+    <string name="settings_theme_dark">Тёмная</string>
+    <string name="settings_language_label">Язык интерфейса</string>
+    <string name="settings_language_system">Как в системе</string>
+    <string name="settings_language_ru">Русский</string>
+    <string name="settings_language_en">English</string>
+
     <!-- Note editor -->
+    <string name="label_extra_fields">Дополнительные поля</string>
     <string name="note_editor_title">Заметка</string>
     <string name="note_editor_review_title">Рецензия</string>
     <string name="label_page_optional">Страница (опционально)</string>
@@ -205,6 +216,10 @@
     <string name="action_write_review">Написать рецензию</string>
     <string name="action_save_review">Сохранить рецензию</string>
     <string name="note_editor_preview">Предпросмотр</string>
+    <string name="note_editor_markdown_hint">Поддерживается Markdown</string>
+    <string name="action_markdown_help">Подсказка по Markdown</string>
+    <string name="markdown_help_title">Разметка Markdown</string>
+    <string name="markdown_help_body">`# Заголовок` — заголовок\n`## Заголовок` — подзаголовок\n`&gt; Цитата` — цитата\n`- пункт` — маркированный список\n`1. пункт` — нумерованный список\n`**жирный**` — жирный текст\n`*курсив*` — курсив\n`[текст](ссылка)` — ссылка</string>
     <string name="validation_title_required">Введите название</string>
     <string name="saved">Сохранено</string>
     <string name="action_save_changes">Сохранить изменения</string>

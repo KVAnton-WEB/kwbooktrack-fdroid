@@ -23,6 +23,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -54,6 +55,7 @@ import coil.compose.AsyncImage
 import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
 import ru.antonkw.kwbooktrack.data.db.entity.PhotoEntity
 import ru.antonkw.kwbooktrack.R
+import ru.antonkw.kwbooktrack.ui.common.MarkdownHelpDialog
 import ru.antonkw.kwbooktrack.ui.common.PhotoGalleryDialog
 import ru.antonkw.kwbooktrack.ui.common.PhotoSource
 import java.io.File
@@ -81,6 +83,8 @@ fun NoteEditorScreen(
     ) { uri ->
         if (uri != null) viewModel.attachPhoto(uri)
     }
+
+    var showMarkdownHelp by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.saved) {
         if (state.saved) onBack()
@@ -123,6 +127,28 @@ fun NoteEditorScreen(
                 minLines = 6,
                 modifier = Modifier.fillMaxWidth(),
             )
+
+            // Подсказка про Markdown + кнопка «?» со шпаргалкой.
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.note_editor_markdown_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                IconButton(
+                    onClick = { showMarkdownHelp = true },
+                    modifier = Modifier.size(28.dp),
+                ) {
+                    Icon(
+                        Icons.Filled.HelpOutline,
+                        contentDescription = stringResource(R.string.action_markdown_help),
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
 
             // Live preview — markdown support means what the user types here is
             // rendered with headings/lists/links on the detail screen.
@@ -189,6 +215,10 @@ fun NoteEditorScreen(
                 }
             }
         }
+    }
+
+    if (showMarkdownHelp) {
+        MarkdownHelpDialog(onDismiss = { showMarkdownHelp = false })
     }
 }
 

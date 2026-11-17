@@ -1,12 +1,13 @@
 package ru.antonkw.kwbooktrack.ui.theme
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 
 /**
  * AMOLED-тема: фон 100% чёрный, акцент #D5F1CA.
- * Светлая схема убрана намеренно — приложение всегда тёмное.
  */
 private val AmoledColorScheme = darkColorScheme(
     primary = Accent,
@@ -40,12 +41,52 @@ private val AmoledColorScheme = darkColorScheme(
     outlineVariant = OutlineVariantDark,
 )
 
+/** Светлая схема: тот же акцент, но на светлом фоне. */
+private val LightColorScheme = lightColorScheme(
+    primary = LightAccent,
+    onPrimary = LightOnAccent,
+    primaryContainer = LightAccentContainer,
+    onPrimaryContainer = LightOnAccentContainer,
+    secondary = AccentSecondaryLight,
+    onSecondary = OnAccentSecondaryLight,
+    secondaryContainer = LightAccentContainer,
+    onSecondaryContainer = LightOnAccentContainer,
+    tertiary = LightAccent,
+    onTertiary = LightOnAccent,
+    tertiaryContainer = LightAccentContainer,
+    onTertiaryContainer = LightOnAccentContainer,
+    background = LightBackground,
+    onBackground = LightOnBackground,
+    surface = LightBackground,
+    onSurface = LightOnBackground,
+    surfaceVariant = SurfaceVariantLight,
+    onSurfaceVariant = OnSurfaceVariantLight,
+    surfaceContainerLowest = SurfaceContainerLowestLight,
+    surfaceContainerLow = SurfaceContainerLowLight,
+    surfaceContainer = SurfaceContainerLight,
+    surfaceContainerHigh = SurfaceContainerHighLight,
+    surfaceContainerHighest = SurfaceContainerHighestLight,
+    surfaceTint = LightAccent,
+    inverseSurface = InverseSurfaceLight,
+    inverseOnSurface = OnInverseSurfaceLight,
+    inversePrimary = InversePrimaryLight,
+    outline = OutlineLight,
+    outlineVariant = OutlineVariantLight,
+)
+
+/**
+ * Тема приложения: AMOLED-чёрная или светлая.
+ *
+ * [darkTheme] вычисляется снаружи (в `MainActivity`) из настройки
+ * «Как в системе / Светлая / Тёмная».
+ */
 @Composable
 fun KwBooktrackTheme(
+    darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit,
 ) {
     MaterialTheme(
-        colorScheme = AmoledColorScheme,
+        colorScheme = if (darkTheme) AmoledColorScheme else LightColorScheme,
         typography = Typography,
         content = content,
     )

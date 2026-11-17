@@ -286,6 +286,14 @@ fun BookDetailScreen(
                 }
             }
 
+            // Чужие поля Tellico («livelib/fantlab» и прочие) — их больше
+            // некуда спрятать: в диалоге «все поля» их не было.
+            if (book.extraFields.isNotEmpty()) {
+                item {
+                    ru.antonkw.kwbooktrack.ui.common.ExtraFieldsSection(book.extraFields)
+                }
+            }
+
             item {
                 Card {
                     Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {

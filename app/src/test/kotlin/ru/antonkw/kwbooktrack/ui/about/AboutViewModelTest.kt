@@ -25,6 +25,7 @@ import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.MovieRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
 import ru.antonkw.kwbooktrack.data.media.MediaTypeStore
+import ru.antonkw.kwbooktrack.data.settings.SettingsStore
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -33,6 +34,7 @@ class AboutViewModelTest {
     private lateinit var bookRepository: BookRepository
     private lateinit var movieRepository: MovieRepository
     private val dispatcher = StandardTestDispatcher()
+    private val settingsStore = SettingsStore(ApplicationProvider.getApplicationContext())
     private val versionProvider = object : AppVersionProvider {
         override val appVersion: String = "9.9.9-test"
     }
@@ -62,7 +64,7 @@ class AboutViewModelTest {
 
     @Test
     fun initialInfoUsesProviderVersionAndZeroCounters() = runTest(dispatcher) {
-        val vm = AboutViewModel(bookRepository, movieRepository, MediaTypeStore(), versionProvider)
+        val vm = AboutViewModel(bookRepository, movieRepository, MediaTypeStore(), versionProvider, settingsStore)
         advanceUntilIdle()
         val info = vm.info.first { it.totalBooks == 0 }
         assertThat(info.version).isEqualTo("9.9.9-test")
@@ -72,7 +74,7 @@ class AboutViewModelTest {
 
     @Test
     fun countsAggregatesAcrossStatuses() = runTest(dispatcher) {
-        val vm = AboutViewModel(bookRepository, movieRepository, MediaTypeStore(), versionProvider)
+        val vm = AboutViewModel(bookRepository, movieRepository, MediaTypeStore(), versionProvider, settingsStore)
         advanceUntilIdle()
 
         repeat(3) {
@@ -93,7 +95,7 @@ class AboutViewModelTest {
 
     @Test
     fun reactiveUpdateOnBookInsertion() = runTest(dispatcher) {
-        val vm = AboutViewModel(bookRepository, movieRepository, MediaTypeStore(), versionProvider)
+        val vm = AboutViewModel(bookRepository, movieRepository, MediaTypeStore(), versionProvider, settingsStore)
         advanceUntilIdle()
 
         bookRepository.insert(sampleBook(status = BookStatus.FINISHED))

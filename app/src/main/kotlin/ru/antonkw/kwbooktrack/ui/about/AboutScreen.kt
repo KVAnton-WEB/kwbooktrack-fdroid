@@ -50,9 +50,14 @@ import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 import ru.antonkw.kwbooktrack.data.media.MediaTypeStore
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.MovieRepository
+import ru.antonkw.kwbooktrack.data.settings.AppLanguage
+import ru.antonkw.kwbooktrack.data.settings.SettingsStore
+import ru.antonkw.kwbooktrack.data.settings.ThemeMode
 import ru.antonkw.kwbooktrack.R
 import javax.inject.Inject
 import ru.antonkw.kwbooktrack.ui.common.FilterDropdown
+import ru.antonkw.kwbooktrack.ui.common.findActivity
+import ru.antonkw.kwbooktrack.ui.common.labelRes
 import ru.antonkw.kwbooktrack.ui.common.mediaLabelRes
 
 data class AboutInfo(
@@ -68,6 +73,7 @@ class AboutViewModel @Inject constructor(
     private val movieRepository: MovieRepository,
     private val mediaTypeStore: MediaTypeStore,
     private val appVersionProvider: AppVersionProvider,
+    private val settingsStore: SettingsStore,
 ) : ViewModel() {
     private val _info = MutableStateFlow(AboutInfo(appVersionProvider.appVersion, 0, 0, 0))
     val info: StateFlow<AboutInfo> = _info.asStateFlow()
@@ -82,6 +88,20 @@ class AboutViewModel @Inject constructor(
 
     fun setMediaType(type: MediaType) {
         mediaTypeStore.set(type)
+    }
+
+    /** Тема оформления: по системе, светлая или тёмная. */
+    val themeMode: StateFlow<ThemeMode> = settingsStore.themeMode
+
+    /** Язык интерфейса: по системе, русский или английский. */
+    val language: StateFlow<AppLanguage> = settingsStore.language
+
+    fun setThemeMode(mode: ThemeMode) {
+        settingsStore.setThemeMode(mode)
+    }
+
+    fun setLanguage(language: AppLanguage) {
+        settingsStore.setLanguage(language)
     }
 
     init {
@@ -107,6 +127,8 @@ fun AboutScreen(
 ) {
     val info by viewModel.info.collectAsStateWithLifecycle()
     val mediaType by viewModel.mediaType.collectAsStateWithLifecycle()
+    val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
+    val language by viewModel.language.collectAsStateWithLifecycle()
     val exportState by exportViewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
@@ -193,6 +215,37 @@ fun AboutScreen(
                     Text(
                         stringResource(R.string.about_finished_books, info.finishedBooks, info.totalBooks, percent),
                         style = MaterialTheme.typography.bodyLarge,
+                    )
+                }
+            }
+            // Оформление и язык — вручную: светлая тема и два языка интерфейса.
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.settings_title),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    FilterDropdown(
+                        label = stringResource(R.string.settings_theme_label),
+                        selectedLabel = stringResource(themeMode.labelRes),
+                        options = ThemeMode.entries.map { stringResource(it.labelRes) },
+                        onSelected = { index -> viewModel.setThemeMode(ThemeMode.entries[index]) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    FilterDropdown(
+                        label = stringResource(R.string.settings_language_label),
+                        selectedLabel = stringResource(language.labelRes),
+                        options = AppLanguage.entries.map { stringResource(it.labelRes) },
+                        onSelected = { index ->
+                            viewModel.setLanguage(AppLanguage.entries[index])
+                            // Язык подменяется в attachBaseContext — без
+                            // пересоздания activity ресурсы останутся прежними.
+                            context.findActivity()?.recreate()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
             }

@@ -28,3 +28,33 @@ val SurfaceContainerLow = Color(0xFF0B100B)
 val SurfaceContainer = Color(0xFF111611)
 val SurfaceContainerHigh = Color(0xFF171D17)
 val SurfaceContainerHighest = Color(0xFF1E251E)
+
+/**
+ * Светлая палитра: тот же мятный акцент, но на светлом фоне.
+ *
+ * Акцент тёмный (на нём белый текст), контейнеры — светло-зелёные.
+ */
+val LightAccent = Color(0xFF386A20)
+val LightOnAccent = Color(0xFFFFFFFF)
+val LightAccentContainer = Color(0xFFB6F397)
+val LightOnAccentContainer = Color(0xFF0A2000)
+val AccentSecondaryLight = Color(0xFF55624C)
+val OnAccentSecondaryLight = Color(0xFFFFFFFF)
+
+val LightBackground = Color(0xFFFBFDF6)
+val LightOnBackground = Color(0xFF1A1C18)
+val SurfaceVariantLight = Color(0xFFE1E4D9)
+val OnSurfaceVariantLight = Color(0xFF43483E)
+val OutlineLight = Color(0xFF73786D)
+val OutlineVariantLight = Color(0xFFC3C8BB)
+
+val InverseSurfaceLight = Color(0xFF2F312C)
+val OnInverseSurfaceLight = Color(0xFFF1F2EC)
+val InversePrimaryLight = Color(0xFF9BD788)
+
+val SurfaceContainerLowestLight = Color(0xFFFFFFFF)
+val SurfaceContainerLowLight = Color(0xFFF5F7EF)
+val SurfaceContainerLight = Color(0xFFEFF2E9)
+val SurfaceContainerHighLight = Color(0xFFE9ECE3)
+val SurfaceContainerHighestLight = Color(0xFFE3E6DD)
+

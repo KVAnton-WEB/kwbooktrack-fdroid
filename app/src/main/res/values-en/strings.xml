@@ -154,7 +154,18 @@
     <string name="rating_value">%1$d / 5</string>
     <string name="price_value">%1$.2f ₽</string>
 
+    <string name="settings_title">Appearance and language</string>
+    <string name="settings_theme_label">Theme</string>
+    <string name="settings_theme_system">Follow system</string>
+    <string name="settings_theme_light">Light</string>
+    <string name="settings_theme_dark">Dark</string>
+    <string name="settings_language_label">Language</string>
+    <string name="settings_language_system">Follow system</string>
+    <string name="settings_language_ru">Русский</string>
+    <string name="settings_language_en">English</string>
+
     <!-- Note editor -->
+    <string name="label_extra_fields">Extra fields</string>
     <string name="note_editor_title">Note</string>
     <string name="note_editor_review_title">Review</string>
     <string name="label_page_optional">Page (optional)</string>
@@ -205,6 +216,10 @@
     <string name="action_write_review">Write review</string>
     <string name="action_save_review">Save review</string>
     <string name="note_editor_preview">Preview</string>
+    <string name="note_editor_markdown_hint">Markdown supported</string>
+    <string name="action_markdown_help">Markdown help</string>
+    <string name="markdown_help_title">Markdown formatting</string>
+    <string name="markdown_help_body">`# Heading` — heading\n`## Heading` — subheading\n`&gt; Quote` — quote\n`- item` — bullet list\n`1. item` — numbered list\n`**bold**` — bold\n`*italic*` — italic\n`[text](link)` — link</string>
     <string name="validation_title_required">Title is required</string>
     <string name="saved">Saved</string>
     <string name="action_save_changes">Save changes</string>

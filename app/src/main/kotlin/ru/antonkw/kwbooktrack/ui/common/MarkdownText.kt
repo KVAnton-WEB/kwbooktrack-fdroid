@@ -1,6 +1,12 @@
 package ru.antonkw.kwbooktrack.ui.common
 
+import android.content.Context
 import android.graphics.Typeface
+import android.text.Spannable
+import android.text.Spanned
+import android.text.method.LinkMovementMethod
+import android.text.style.ClickableSpan
+import android.text.style.ForegroundColorSpan
 import android.util.TypedValue
 import android.widget.TextView
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,6 +20,35 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.viewinterop.AndroidView
 import io.noties.markwon.Markwon
+
+/**
+ * TextView под Markwon: ссылки кликабельны и открываются в браузере.
+ *
+ * Markwon оборачивает markdown-ссылки в `ClickableSpan`, а клик по такому
+ * span'у обрабатывает только `LinkMovementMethod` — с `ArrowKeyMovementMethod`
+ * (его ставит `setTextIsSelectable`) ссылка остаётся «мёртвой».
+ */
+internal fun markdownTextView(context: Context): TextView = TextView(context).apply {
+    setTextIsSelectable(true)
+    linksClickable = true
+    movementMethod = LinkMovementMethod.getInstance()
+}
+
+/**
+ * Подсвечивает ссылки: Markwon сам их не красит, и без цвета они
+ * неотличимы от обычного текста — по ним никто не кликнет.
+ */
+internal fun highlightLinks(view: TextView, linkColor: Int) {
+    val spanned = view.text as? Spannable ?: return
+    spanned.getSpans(0, spanned.length, ClickableSpan::class.java).forEach { span ->
+        spanned.setSpan(
+            ForegroundColorSpan(linkColor),
+            spanned.getSpanStart(span),
+            spanned.getSpanEnd(span),
+            Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
+        )
+    }
+}
 
 /**
  * Renders [markdown] through Markwon (Android TextView wrapped in AndroidView).
@@ -35,25 +70,25 @@ fun MarkdownText(
     val context = LocalContext.current
     val markwon = remember(context) { Markwon.create(context) }
     val onSurface = textColor.toArgb()
+    val linkColor = MaterialTheme.colorScheme.primary.toArgb()
     val sizeSp = textStyle.fontSize.value
     val lineHeightSp = textStyle.lineHeight.value
 
     AndroidView(
         modifier = modifier.fillMaxWidth(),
         factory = { ctx ->
-            TextView(ctx).apply {
+            markdownTextView(ctx).apply {
                 setTextColor(onSurface)
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, sizeSp)
                 typeface = Typeface.create(typeface, textStyle.fontStyle.toAndroidTypeface())
                 setLineSpacing(0f, (lineHeightSp / sizeSp.coerceAtLeast(1f)))
-                setTextIsSelectable(true)
-                linksClickable = true
             }
         },
         update = { tv ->
             tv.setTextColor(onSurface)
             tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, sizeSp)
             markwon.setMarkdown(tv, markdown.ifBlank { "" })
+            highlightLinks(tv, linkColor)
         },
     )
 }

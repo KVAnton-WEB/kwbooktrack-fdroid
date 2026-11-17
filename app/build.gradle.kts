@@ -16,8 +16,8 @@ android {
         applicationId = "ru.antonkw.kwbooktrack"
         minSdk = 31
         targetSdk = 34
-        versionCode = 84
-        versionName = "0.7.13"
+        versionCode = 85
+        versionName = "0.7.14"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -79,6 +79,13 @@ android {
 
 ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
+}
+
+// KSP-вывод нельзя брать из build cache: ключ задачи не меняется при удалении
+// исходников, поэтому из кэша возвращаются сгенерированные файлы уже
+// удалённых пакетов (data/catalog) — javac на них падает с «cannot find symbol».
+tasks.withType<com.google.devtools.ksp.gradle.KspTask>().configureEach {
+    outputs.doNotCacheIf("stale KSP generated sources") { true }
 }
 
 dependencies {
