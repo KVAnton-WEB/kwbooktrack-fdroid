@@ -24,6 +24,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AddPhotoAlternate
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Star
@@ -40,6 +41,8 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -88,6 +91,7 @@ fun AddBookScreen(
 
     var showDiscardDialog by remember { mutableStateOf(false) }
     var pendingBack by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
 
     // A new book with even a single keystroke in title/author/etc. is worth
     // prompting for — silently dropping user input on back was the old behaviour.
@@ -100,7 +104,7 @@ fun AddBookScreen(
         state.condition, state.translator, state.printYear, state.printPages,
         state.originalLanguage, state.originalTitle, state.annotation, state.purchasePlace,
         state.isGift, state.isLent, state.isSold, state.coverPath, state.rating,
-        state.isRead, state.finishedDate,
+        state.isRead, state.finishedDates,
     ) {
         state.title.isNotBlank() || state.author.isNotBlank() || state.isbn.isNotBlank() ||
             state.pageCount.isNotBlank() || state.year.isNotBlank() ||
@@ -178,6 +182,18 @@ fun AddBookScreen(
         if (state.saved) onBack()
     }
 
+    // Ошибка сохранения (например, чужой ISBN) — показываем и не закрываем
+    // экран: книга не записана, пусть пользователь поправит поле.
+    // Строку читаем до эффекта: stringResource нельзя звать из LaunchedEffect.
+    val errorMessage = when (state.error) {
+        AddBookError.DUPLICATE_ISBN -> stringResource(R.string.error_duplicate_isbn)
+        null -> null
+    }
+    LaunchedEffect(state.error) {
+        val message = errorMessage ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(message)
+    }
+
     if (showDiscardDialog) {
         AlertDialog(
             onDismissRequest = { showDiscardDialog = false },
@@ -213,6 +229,7 @@ fun AddBookScreen(
                 },
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
         Column(
             modifier = Modifier
@@ -354,12 +371,29 @@ fun AddBookScreen(
                 label = stringResource(R.string.field_is_read),
             )
             if (state.isRead) {
-                DatePickerField(
-                    value = state.finishedDate,
-                    onValueChange = viewModel::setFinishedDate,
-                    label = stringResource(R.string.label_finished_date),
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                // Даты прочтения: их может быть несколько — книгу можно
+                // перечитать. Основная (самая ранняя) — первая.
+                state.finishedDates.forEachIndexed { index, value ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        DatePickerField(
+                            value = value,
+                            onValueChange = { viewModel.setFinishedDate(index, it) },
+                            label = stringResource(R.string.label_finished_date),
+                            modifier = Modifier.weight(1f),
+                        )
+                        if (state.finishedDates.size > 1) {
+                            IconButton(onClick = { viewModel.removeFinishedDate(index) }) {
+                                Icon(
+                                    Icons.Filled.Close,
+                                    contentDescription = stringResource(R.string.action_remove_reading),
+                                )
+                            }
+                        }
+                    }
+                }
+                TextButton(onClick = viewModel::addFinishedDate) {
+                    Text(stringResource(R.string.action_add_reading))
+                }
             }
 
             // v5: extra fields in a single Card so the form doesn't grow taller

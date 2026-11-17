@@ -1,6 +1,7 @@
 package ru.antonkw.kwbooktrack.data.stats
 
 import ru.antonkw.kwbooktrack.data.db.entity.MovieEntity
+import ru.antonkw.kwbooktrack.data.media.mediaDates
 import ru.antonkw.kwbooktrack.data.time.toLocalDate
 import java.time.YearMonth
 
@@ -28,19 +29,30 @@ data class MovieStats(
  */
 object MovieStatsCalculator {
 
-    /** Фильмы без даты просмотра в статистику не попадают: их не смотрели. */
-    fun compute(movies: List<MovieEntity>): MovieStats {
-        val watched = movies.filter { it.watchedAt != null }
-        if (watched.isEmpty()) return MovieStats()
+    /**
+     * Статистика фильмов.
+     *
+     * Просмотр — одна дата: пересмотренный фильм даёт два просмотра и вдвое
+     * больше минут. [datesByMovie] — дополнительные даты просмотра по id
+     * фильма; основная лежит в самом фильме.
+     */
+    fun compute(
+        movies: List<MovieEntity>,
+        datesByMovie: Map<Long, List<Long>> = emptyMap(),
+    ): MovieStats {
+        val viewings = movies.flatMap { movie ->
+            mediaDates(movie.watchedAt, datesByMovie[movie.id].orEmpty()).map { date -> movie to date }
+        }
+        if (viewings.isEmpty()) return MovieStats()
 
-        val monthlyWatched = watched
-            .groupBy { YearMonth.from(it.watchedAt!!.toLocalDate()) }
+        val monthlyWatched = viewings
+            .groupBy { YearMonth.from(it.second.toLocalDate()) }
             .map { (month, items) -> MonthlyBooks(month.year, month.monthValue, items.size) }
             .sortedWith(compareBy({ it.year }, { it.month }))
-        val monthlyMinutes = watched
-            .groupBy { YearMonth.from(it.watchedAt!!.toLocalDate()) }
+        val monthlyMinutes = viewings
+            .groupBy { YearMonth.from(it.second.toLocalDate()) }
             .map { (month, items) ->
-                MonthlyPages(month.year, month.monthValue, items.sumOf { it.durationMin ?: 0 })
+                MonthlyPages(month.year, month.monthValue, items.sumOf { it.first.durationMin ?: 0 })
             }
             .sortedWith(compareBy({ it.year }, { it.month }))
         val yearlyWatched = monthlyWatched
@@ -52,10 +64,10 @@ object MovieStatsCalculator {
             .map { (year, items) -> YearlyPages(year, items.sumOf { it.pages }) }
             .sortedBy { it.year }
 
-        val years = watched.map { it.watchedAt!!.toLocalDate().year }
+        val years = viewings.map { it.second.toLocalDate().year }
         return MovieStats(
-            totalMovies = watched.size,
-            totalMinutes = watched.sumOf { it.durationMin ?: 0 },
+            totalMovies = viewings.size,
+            totalMinutes = viewings.sumOf { it.first.durationMin ?: 0 },
             monthlyWatched = monthlyWatched,
             monthlyMinutes = monthlyMinutes,
             yearlyWatched = yearlyWatched,

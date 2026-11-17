@@ -25,8 +25,10 @@ import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.NoteRepository
+import ru.antonkw.kwbooktrack.data.repository.MediaDateRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
 import ru.antonkw.kwbooktrack.data.repository.SessionRepository
+import ru.antonkw.kwbooktrack.data.repository.TagRepository
 import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -37,6 +39,8 @@ class BookDetailViewModelTest {
     private lateinit var sessionRepository: SessionRepository
     private lateinit var noteRepository: NoteRepository
     private lateinit var photoRepository: PhotoRepository
+    private lateinit var tagRepository: TagRepository
+    private lateinit var mediaDates: MediaDateRepository
     private val dispatcher = StandardTestDispatcher()
 
     @Before
@@ -47,6 +51,8 @@ class BookDetailViewModelTest {
         bookRepository = BookRepository(db.bookDao(), db.tagDao(), ru.antonkw.kwbooktrack.data.NoOpCoverStorage, photoRepository)
         sessionRepository = SessionRepository(db.readingSessionDao())
         noteRepository = NoteRepository(db.noteDao(), ru.antonkw.kwbooktrack.data.NoOpPhotoStorage)
+        tagRepository = TagRepository(db.tagDao())
+        mediaDates = MediaDateRepository(db.mediaDateDao())
     }
 
     @After
@@ -64,7 +70,8 @@ class BookDetailViewModelTest {
             sessionRepository,
             noteRepository,
             photoRepository,
-            NoOpPhotoStorage,
+            tagRepository,
+            mediaDates,
         )
         TestViewModels.track(viewModel)
         assertThat(viewModel.uiState.value.book).isNull()
@@ -80,7 +87,8 @@ class BookDetailViewModelTest {
             sessionRepository,
             noteRepository,
             photoRepository,
-            NoOpPhotoStorage,
+            tagRepository,
+            mediaDates,
         )
         TestViewModels.track(viewModel)
         viewModel.setCurrentPage(150)
@@ -100,7 +108,8 @@ class BookDetailViewModelTest {
             sessionRepository,
             noteRepository,
             photoRepository,
-            NoOpPhotoStorage,
+            tagRepository,
+            mediaDates,
         )
         TestViewModels.track(viewModel)
         viewModel.setCurrentPage(50)
@@ -120,7 +129,8 @@ class BookDetailViewModelTest {
             sessionRepository,
             noteRepository,
             photoRepository,
-            NoOpPhotoStorage,
+            tagRepository,
+            mediaDates,
         )
         TestViewModels.track(viewModel)
         viewModel.markFinished(rating = 5)
@@ -183,6 +193,19 @@ class BookDetailViewModelTest {
         assertThat(state.sessionDeltas.values).containsExactly(50, 30)
     }
 
+    @Test
+    fun tagsOfBookAreShownInState() = runTest(dispatcher) {
+        // Теги общие у книг и фильмов — карточка книги показывает их так же,
+        // как карточка фильма.
+        val bookId = bookRepository.insert(sampleBook("Dune", pageCount = 500))
+        val tagId = tagRepository.findOrCreate("фэнтези")
+        tagRepository.attachToMedia(bookId, MediaType.BOOKS, tagId)
+
+        val state = viewModelForBook(bookId).uiState.first { it.tags.isNotEmpty() }
+
+        assertThat(state.tags).containsExactly("фэнтези")
+    }
+
     private fun viewModelForBook(bookId: Long): BookDetailViewModel {
         val vm = BookDetailViewModel(
             androidx.lifecycle.SavedStateHandle(mapOf("bookId" to bookId)),
@@ -190,7 +213,8 @@ class BookDetailViewModelTest {
             sessionRepository,
             noteRepository,
             photoRepository,
-            NoOpPhotoStorage,
+            tagRepository,
+            mediaDates,
         )
         TestViewModels.track(vm)
         return vm

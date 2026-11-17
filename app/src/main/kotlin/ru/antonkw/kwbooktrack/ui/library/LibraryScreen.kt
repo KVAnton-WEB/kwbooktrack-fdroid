@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.FilterAltOff
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Info
@@ -52,7 +53,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -74,6 +74,7 @@ import com.journeyapps.barcodescanner.ScanOptions
 import ru.antonkw.kwbooktrack.R
 import ru.antonkw.kwbooktrack.data.time.toLocalDate
 import ru.antonkw.kwbooktrack.ui.common.CoverImage
+import ru.antonkw.kwbooktrack.ui.common.formatDuration
 import ru.antonkw.kwbooktrack.ui.common.FilterDropdown
 import ru.antonkw.kwbooktrack.ui.common.MonthYearPickerDialog
 import ru.antonkw.kwbooktrack.ui.common.PeriodOption
@@ -264,7 +265,14 @@ fun LibraryScreen(
                     modifier = Modifier.weight(1f),
                 )
                 if (filter.isActive) {
-                    TextButton(onClick = viewModel::clearFilters) { Text(stringResource(R.string.action_reset)) }
+                    // Зачёркнутая воронка — сброс фильтров: кнопка занимает
+                    // меньше места, чем слово, и говорит о действии картинкой.
+                    IconButton(onClick = viewModel::clearFilters) {
+                        Icon(
+                            imageVector = Icons.Filled.FilterAltOff,
+                            contentDescription = stringResource(R.string.cd_reset_filters),
+                        )
+                    }
                 }
             }
 
@@ -616,7 +624,7 @@ private fun MovieListCard(item: LibraryItem.Movie, onClick: () -> Unit) {
                 )
                 val meta = listOfNotNull(
                     movie.genre,
-                    movie.durationMin?.let { stringResource(R.string.movie_duration_label, it) },
+                    movie.durationMin?.let { formatDuration(it) },
                 ).joinToString(" · ")
                 if (meta.isNotEmpty()) {
                     Text(

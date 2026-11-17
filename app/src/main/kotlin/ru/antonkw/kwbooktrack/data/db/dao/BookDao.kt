@@ -19,6 +19,10 @@ interface BookDao {
     @Query("SELECT * FROM books ORDER BY updated_at DESC")
     fun observeAll(): Flow<List<BookEntity>>
 
+    /** Книга по id потоком — для экрана карточки. */
+    @Query("SELECT * FROM books WHERE id = :id LIMIT 1")
+    fun observeById(id: Long): Flow<BookEntity?>
+
     /**
      * Все книги разом — для снимка библиотеки.
      *
@@ -123,6 +127,7 @@ interface BookDao {
         deleteTagRefs(bookId)
         deletePhotos(bookId)
         deleteNotes(bookId)
+        deleteDates(bookId)
         return deleteById(bookId)
     }
 
@@ -134,6 +139,10 @@ interface BookDao {
 
     @Query("DELETE FROM notes WHERE media_id = :bookId AND media_type = 'BOOKS'")
     suspend fun deleteNotes(bookId: Long): Int
+
+    /** Дополнительные даты прочтения — внешнего ключа на владельца нет. */
+    @Query("DELETE FROM media_dates WHERE media_id = :bookId AND media_type = 'BOOKS'")
+    suspend fun deleteDates(bookId: Long): Int
 }
 
 /**
@@ -141,15 +150,17 @@ interface BookDao {
  * incoming value is null/default. Source is preserved so re-importing via
  * Tellico does not overwrite Bookmory-sourced rows (and vice versa).
  *
- * Booleans are not merged — Tellico's `Подарок` cell is "да"/"нет"/blank,
+ * Booleans are merged too, by "or": Tellico's `Подарок` cell is "да"/"нет"/blank,
  * and "да"→true is the only state we care about. A re-import with a blank
- * cell writes the import-side default (false), which is the desired
- * "lost in source → drop the flag" semantics.
+ * cell must not flip a flag the user set by hand.
  */
 private fun BookEntity.mergeWith(existing: BookEntity): BookEntity = copy(
     id = existing.id,
     createdAt = existing.createdAt,
-    updatedAt = System.currentTimeMillis(),
+    // Метка «изменено» — из источника (`mdate` в Tellico, `updated_at` в
+    // zip-бэкапе), а не «сейчас»: книгу изменили не сейчас, а когда её
+    // редактировали в источнике.
+    updatedAt = updatedAt.takeIf { it > 0L } ?: existing.updatedAt,
     isbn13 = isbn13 ?: existing.isbn13,
     subtitle = subtitle ?: existing.subtitle,
     pageCount = pageCount ?: existing.pageCount,

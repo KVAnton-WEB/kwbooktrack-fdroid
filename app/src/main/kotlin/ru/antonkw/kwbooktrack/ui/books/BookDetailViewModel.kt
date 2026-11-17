@@ -10,8 +10,6 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -20,13 +18,17 @@ import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 import ru.antonkw.kwbooktrack.data.db.entity.NoteEntity
 import ru.antonkw.kwbooktrack.data.db.entity.PhotoEntity
 import ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity
+import ru.antonkw.kwbooktrack.data.media.mediaDates
 import ru.antonkw.kwbooktrack.data.progress.ReadingProgress
+import ru.antonkw.kwbooktrack.data.time.toEpochMs
+import java.time.LocalDate
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.NoteRepository
+import ru.antonkw.kwbooktrack.data.repository.MediaDateRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
 import ru.antonkw.kwbooktrack.data.repository.SessionRepository
+import ru.antonkw.kwbooktrack.data.repository.TagRepository
 import ru.antonkw.kwbooktrack.data.stats.StatsCalculator
-import ru.antonkw.kwbooktrack.data.storage.PhotoStorage
 import javax.inject.Inject
 
 data class BookProgress(
@@ -42,8 +44,12 @@ data class BookDetailUiState(
     val notes: List<NoteEntity>,
     val photos: List<PhotoEntity>,
     val progress: BookProgress,
+    /** Даты прочтения — по возрастанию. */
+    val dates: List<Long> = emptyList(),
     // Сколько страниц прочитано в каждой сессии журнала (id сессии -> страницы).
     val sessionDeltas: Map<Long, Int> = emptyMap(),
+    /** Теги книги — как у фильма, теги общие. */
+    val tags: List<String> = emptyList(),
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -54,7 +60,8 @@ class BookDetailViewModel @Inject constructor(
     private val sessionRepository: SessionRepository,
     private val noteRepository: NoteRepository,
     private val photoRepository: PhotoRepository,
-    private val photoStorage: PhotoStorage,
+    private val tagRepository: TagRepository,
+    private val mediaDateRepository: MediaDateRepository,
 ) : ViewModel() {
 
     private val bookId: Long = savedStateHandle.get<Long>(KEY_BOOK_ID) ?: -1L
@@ -67,13 +74,16 @@ class BookDetailViewModel @Inject constructor(
                 .stateIn(viewModelScope, SharingStarted.Eagerly, emptyState())
         } else {
             combine(
-                bookRepository.observeAll().flatMapLatest { all ->
-                    kotlinx.coroutines.flow.flowOf(all.firstOrNull { it.id == bookId })
-                },
+                bookRepository.observeById(bookId),
                 sessionRepository.observeByBook(bookId),
                 noteRepository.observeByMedia(bookId, MediaType.BOOKS),
                 photoRepository.observeByMedia(bookId, MediaType.BOOKS),
-            ) { book, sessions, notes, photos ->
+                // Теги и даты — одним потоком: у combine пять аргументов.
+                combine(
+                    tagRepository.observeTagsOfMedia(bookId, MediaType.BOOKS),
+                    mediaDateRepository.observeFor(bookId, MediaType.BOOKS),
+                ) { tags, extraDates -> tags to extraDates },
+            ) { book, sessions, notes, photos, tagsAndDates ->
                 val progress = computeProgress(book, sessions)
                 BookDetailUiState(
                     book,
@@ -81,7 +91,10 @@ class BookDetailViewModel @Inject constructor(
                     notes,
                     photos,
                     progress,
+                    // Даты прочтения: основная плюс дополнительные.
+                    mediaDates(book?.finishedAt, tagsAndDates.second.map { it.date }),
                     StatsCalculator.sessionDeltas(sessions),
+                    tagsAndDates.first,
                 )
             }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyState())
         }
@@ -111,28 +124,34 @@ class BookDetailViewModel @Inject constructor(
     suspend fun markFinished(rating: Int?) {
         val now = System.currentTimeMillis()
         val book = bookRepository.findById(bookId) ?: return
+        // Отметить прочитанным — добавить дату, а не заменить: книга,
+        // прочитанная в январе и отмеченная прочитанной в ноябре, сохраняет
+        // обе даты. Основная — самая ранняя.
+        val extra = mediaDateRepository.getFor(bookId, MediaType.BOOKS)
+        // Дата — полночь по местному времени (как в остальных колонках с
+        // датами), иначе «два прочтения» в один день не отличались бы от
+        // одного.
+        val today = LocalDate.now().toEpochMs()
+        // Прежние даты перечитывания не теряются: «отметить прочитанным»
+        // добавляет дату, а не заменяет список.
+        val dates = (listOfNotNull(book.finishedAt) + extra + today).distinct().sorted()
         bookRepository.update(
             book.copy(
                 status = ru.antonkw.kwbooktrack.data.db.entity.BookStatus.FINISHED,
-                finishedAt = now,
+                finishedAt = dates.first(),
                 rating = rating?.coerceIn(1, 5),
                 updatedAt = now,
             ),
         )
+        mediaDateRepository.replaceFor(bookId, MediaType.BOOKS, dates.drop(1))
     }
 
     fun deleteBook() {
         viewModelScope.launch {
-            // Snapshot photo paths BEFORE the cascade — the DAO will also delete
-            // the rows in BookRepository.deleteById (issue #18) and the storage
-            // layer unlinks them. Going through photoStorage keeps the cleanup
-            // in one place and avoids unlinking a file the user might have
-            // reattached to a different book.
-            val photoPaths = photoRepository.observeByMedia(bookId, MediaType.BOOKS).first().map { it.path }
-            // FK CASCADE on sessions, notes, and photos removes DB records; the
-            // repository also runs photoStorage.deletePaths for us.
+            // Файлы фото удаляет репозиторий: он читает пути до удаления
+            // строк и снимает их с диска. Здесь второй раз удалять нечего —
+            // два места с одной логикой расходятся при правке.
             bookRepository.deleteById(bookId)
-            photoStorage.deletePaths(photoPaths)
             _deleted.value = true
         }
     }

@@ -31,6 +31,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import ru.antonkw.kwbooktrack.ui.common.MonthYearPickerDialog
+import ru.antonkw.kwbooktrack.ui.common.formatDurationCompact
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -267,9 +268,16 @@ private fun DayCell(day: CalendarDay?, mode: CalendarMode, isMovies: Boolean) {
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
-                            text = value.toString(),
-                            style = MaterialTheme.typography.titleMedium,
+                            // У фильма длительность — «2ч12м»: в седьмой части
+                            // экрана полная форма «2 ч 12 мин» не влезает.
+                            text = if (isMovies) formatDurationCompact(value) else value.toString(),
+                            style = if (isMovies) {
+                                MaterialTheme.typography.labelLarge
+                            } else {
+                                MaterialTheme.typography.titleMedium
+                            },
                             color = MaterialTheme.colorScheme.primary,
+                            maxLines = 1,
                         )
                     }
                 }

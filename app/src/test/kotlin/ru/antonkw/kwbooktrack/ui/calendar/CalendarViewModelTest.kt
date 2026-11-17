@@ -26,6 +26,7 @@ import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
 import ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
+import ru.antonkw.kwbooktrack.data.repository.MediaDateRepository
 import ru.antonkw.kwbooktrack.data.repository.MovieRepository
 import ru.antonkw.kwbooktrack.data.repository.SessionRepository
 import ru.antonkw.kwbooktrack.data.time.toEpochMs
@@ -37,6 +38,7 @@ class CalendarViewModelTest {
     private lateinit var bookRepository: BookRepository
     private lateinit var sessionRepository: SessionRepository
     private lateinit var movieRepository: MovieRepository
+    private lateinit var mediaDates: MediaDateRepository
     private lateinit var mediaTypeStore: MediaTypeStore
     private val dispatcher = StandardTestDispatcher()
 
@@ -53,6 +55,7 @@ class CalendarViewModelTest {
         )
         sessionRepository = SessionRepository(db.readingSessionDao())
         movieRepository = MovieRepository(db.movieDao(), NoOpCoverStorage, PhotoRepository(db.photoDao(), NoOpPhotoStorage))
+        mediaDates = MediaDateRepository(db.mediaDateDao())
         mediaTypeStore = MediaTypeStore()
     }
 
@@ -65,7 +68,7 @@ class CalendarViewModelTest {
 
     @Test
     fun emptySessionsYieldsEmptyDaysButCorrectShape() = runTest(dispatcher) {
-        val vm = CalendarViewModel(bookRepository, movieRepository, sessionRepository, mediaTypeStore)
+        val vm = CalendarViewModel(bookRepository, movieRepository, sessionRepository, mediaDates, mediaTypeStore)
         TestViewModels.track(vm)
         advanceUntilIdle()
         val state = vm.uiState.first { it.days.size >= 28 } // any month has >= 28 days
@@ -78,7 +81,7 @@ class CalendarViewModelTest {
 
     @Test
     fun sessionOnDayShowsBookInThatCell() = runTest(dispatcher) {
-        val vm = CalendarViewModel(bookRepository, movieRepository, sessionRepository, mediaTypeStore)
+        val vm = CalendarViewModel(bookRepository, movieRepository, sessionRepository, mediaDates, mediaTypeStore)
         TestViewModels.track(vm)
         val firstOfMonth = vm.month.value.atDay(1)
         val bookId = bookRepository.insert(
@@ -99,7 +102,7 @@ class CalendarViewModelTest {
     fun finishedBookWithoutSessionsShowsOnItsFinishedDate() = runTest(dispatcher) {
         // Прочитанная книга попадает в календарь по дате прочтения,
         // даже если по ней нет ни одной сессии чтения.
-        val vm = CalendarViewModel(bookRepository, movieRepository, sessionRepository, mediaTypeStore)
+        val vm = CalendarViewModel(bookRepository, movieRepository, sessionRepository, mediaDates, mediaTypeStore)
         TestViewModels.track(vm)
         val firstOfMonth = vm.month.value.atDay(1)
         bookRepository.insert(
@@ -122,7 +125,7 @@ class CalendarViewModelTest {
     @Test
     fun dayCellCarriesTheTotalPagesReadThatDay() = runTest(dispatcher) {
         // Режим «Страницы» показывает сумму прочитанных за день страниц.
-        val vm = CalendarViewModel(bookRepository, movieRepository, sessionRepository, mediaTypeStore)
+        val vm = CalendarViewModel(bookRepository, movieRepository, sessionRepository, mediaDates, mediaTypeStore)
         TestViewModels.track(vm)
         val firstOfMonth = vm.month.value.atDay(1)
         val bookId = bookRepository.insert(

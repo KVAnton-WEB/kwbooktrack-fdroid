@@ -15,6 +15,7 @@ import ru.antonkw.kwbooktrack.data.NoOpPhotoStorage
 import ru.antonkw.kwbooktrack.data.TestDb
 import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
+import ru.antonkw.kwbooktrack.data.repository.MediaDateRepository
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.NoteRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
@@ -65,6 +66,7 @@ class TellicoZipImportRealTest {
                     sessionRepository = SessionRepository(db.readingSessionDao()),
                     tagRepository = TagRepository(db.tagDao()),
                     photoRepository = photoRepository,
+                mediaDateRepository = MediaDateRepository(db.mediaDateDao()),
                     photoStorage = NoOpPhotoStorage,
                     transcoder = CoverTranscoder(),
                 ),

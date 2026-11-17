@@ -123,6 +123,7 @@ object TellicoXmlWriter {
     private fun foreignFields(
         allExtra: List<Map<String, ExtraField>>,
         known: Set<String> = TellicoFields.KNOWN,
+        skipBuiltins: Boolean = true,
     ): Map<String, ExtraField> {
         val result = linkedMapOf<String, ExtraField>()
         for (extraFields in allExtra) {
@@ -130,7 +131,7 @@ object TellicoXmlWriter {
                 if (!isSafeName(name)) continue
                 // Поле, которое Tellico знает сам, объявлять нельзя — будет дубликат.
                 if (name in known) continue
-                if (name in TellicoFields.TELLICO_BUILTIN) continue
+                if (skipBuiltins && name in TellicoFields.TELLICO_BUILTIN) continue
                 result.putIfAbsent(name, extra)
             }
         }
@@ -264,6 +265,11 @@ object TellicoXmlWriter {
     /**
      * `<fields>` коллекции фильмов: поля Tellico для видео плюс наши
      * собственные (иначе Tellico молча выбросил бы заметки, теги и фото).
+     *
+     * Чужие поля — по словарю коллекции фильмов: имена из книжного словаря
+     * (`author`, `publisher`…) в фильмовой коллекции чужие, и без объявления
+     * Tellico молча выбросил бы их значения при импорте. Встроенные поля
+     * Tellico — встроенные у книжной коллекции; у видео коллекции таких нет.
      */
     private fun writeMovieFields(xml: StringBuilder, entries: List<TcMovieEntry>) {
         xml.append("  <fields>\n")
@@ -271,7 +277,8 @@ object TellicoXmlWriter {
         ownMovieFields.forEach { writeField(xml, it) }
         foreignFields(
             entries.map { it.snapshot.extraFields },
-            TellicoFields.KNOWN + TellicoFields.MOVIE_KNOWN,
+            known = TellicoFields.MOVIE_KNOWN,
+            skipBuiltins = false,
         ).forEach { (name, extra) ->
             writeField(xml, FieldDef(name = name, title = extra.title, type = 1, category = "Общее"))
         }

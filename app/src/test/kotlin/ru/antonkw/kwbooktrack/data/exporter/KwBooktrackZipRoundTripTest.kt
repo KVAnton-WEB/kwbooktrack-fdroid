@@ -34,6 +34,7 @@ import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
 import ru.antonkw.kwbooktrack.data.db.entity.PhotoEntity
 import ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity
 import ru.antonkw.kwbooktrack.data.importer.ImportKwBooktrackZipUseCase
+import ru.antonkw.kwbooktrack.data.repository.MediaDateRepository
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.NoteRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
@@ -96,6 +97,7 @@ class KwBooktrackZipRoundTripTest {
                 sessionDao = sourceDb.readingSessionDao(),
                 photoDao = sourceDb.photoDao(),
                 tagDao = sourceDb.tagDao(),
+                mediaDateDao = sourceDb.mediaDateDao(),
             ),
             versionProvider = object : AppVersionProvider {
                 override val appVersion: String = "0.1.0"
@@ -114,6 +116,7 @@ class KwBooktrackZipRoundTripTest {
                 sessionRepository = SessionRepository(targetDb.readingSessionDao()),
                 tagRepository = TagRepository(targetDb.tagDao()),
                 photoRepository = targetPhotos,
+                mediaDateRepository = MediaDateRepository(targetDb.mediaDateDao()),
                 photoStorage = FilePhotoStorage(context),
                 transcoder = CoverTranscoder(),
             ),

@@ -93,6 +93,7 @@ interface MovieDao {
         deleteTagRefs(movieId)
         deletePhotos(movieId)
         deleteNotes(movieId)
+        deleteDates(movieId)
         return deleteById(movieId)
     }
 
@@ -104,6 +105,10 @@ interface MovieDao {
 
     @Query("DELETE FROM notes WHERE media_id = :movieId AND media_type = 'MOVIES'")
     suspend fun deleteNotes(movieId: Long): Int
+
+    /** Дополнительные даты просмотра — внешнего ключа на владельца нет. */
+    @Query("DELETE FROM media_dates WHERE media_id = :movieId AND media_type = 'MOVIES'")
+    suspend fun deleteDates(movieId: Long): Int
 }
 
 /**
@@ -115,7 +120,10 @@ interface MovieDao {
 private fun MovieEntity.mergeWith(existing: MovieEntity): MovieEntity = copy(
     id = existing.id,
     createdAt = existing.createdAt,
-    updatedAt = System.currentTimeMillis(),
+    // Метка «изменено» — из источника (`mdate` в Tellico, `updated_at` в
+    // zip-бэкапе), а не «сейчас»: фильм изменили не сейчас, а когда его
+    // редактировали в источнике.
+    updatedAt = updatedAt.takeIf { it > 0L } ?: existing.updatedAt,
     originalTitle = originalTitle ?: existing.originalTitle,
     year = year ?: existing.year,
     genre = genre ?: existing.genre,
@@ -129,6 +137,9 @@ private fun MovieEntity.mergeWith(existing: MovieEntity): MovieEntity = copy(
     plot = plot ?: existing.plot,
     comments = comments ?: existing.comments,
     url = url ?: existing.url,
+    // Флаг «скачан» — как флаги книги: отметка пользователя не теряется,
+    // если в импорте её нет.
+    isDownloaded = isDownloaded.takeIf { it } ?: existing.isDownloaded,
     source = existing.source,
     // Чужие поля Tellico: импорт побеждает по ключу, а ключи, которых в
     // импорте нет, остаются (пустой импорт не стирает данные).

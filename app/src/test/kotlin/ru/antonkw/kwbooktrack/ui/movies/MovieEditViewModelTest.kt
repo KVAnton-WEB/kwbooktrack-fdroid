@@ -6,6 +6,7 @@ import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
@@ -20,6 +21,7 @@ import ru.antonkw.kwbooktrack.data.TestDb
 import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.db.entity.MediaSource
 import ru.antonkw.kwbooktrack.data.db.entity.MovieEntity
+import ru.antonkw.kwbooktrack.data.repository.MediaDateRepository
 import ru.antonkw.kwbooktrack.data.repository.MovieRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
 import ru.antonkw.kwbooktrack.data.snapshot.ExtraField
@@ -29,6 +31,7 @@ class MovieEditViewModelTest {
 
     private lateinit var db: KwBooktrackDatabase
     private lateinit var movies: MovieRepository
+    private lateinit var mediaDates: MediaDateRepository
     private val dispatcher = StandardTestDispatcher()
 
     @Before
@@ -40,6 +43,7 @@ class MovieEditViewModelTest {
             NoOpCoverStorage,
             PhotoRepository(db.photoDao(), NoOpPhotoStorage),
         )
+        mediaDates = MediaDateRepository(db.mediaDateDao())
     }
 
     @After
@@ -89,9 +93,24 @@ class MovieEditViewModelTest {
         assertThat(saved.source).isEqualTo(MediaSource.MANUAL)
     }
 
+    @Test
+    fun secondSaveDoesNotDuplicateMovie() = runTest(dispatcher) {
+        // У нового фильма isEditing = false, и save() идёт в insert — без
+        // защиты второе нажатие «Сохранить» создало бы второй фильм.
+        val vm = newVm()
+        vm.setTitle("Новый фильм")
+        vm.save()
+        vm.state.first { it.saved }
+        vm.save()
+        advanceUntilIdle()
+
+        assertThat(movies.getAll()).hasSize(1)
+    }
+
     private fun editVm(movieId: Long) = MovieEditViewModel(
         SavedStateHandle(mapOf("movieId" to movieId)),
         movies,
+        mediaDates,
         ApplicationProvider.getApplicationContext(),
         NoOpCoverStorage,
     )
@@ -99,6 +118,7 @@ class MovieEditViewModelTest {
     private fun newVm() = MovieEditViewModel(
         SavedStateHandle(),
         movies,
+        mediaDates,
         ApplicationProvider.getApplicationContext(),
         NoOpCoverStorage,
     )

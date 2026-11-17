@@ -18,7 +18,9 @@ import ru.antonkw.kwbooktrack.R
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
 import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 import ru.antonkw.kwbooktrack.data.media.MediaTypeStore
+import ru.antonkw.kwbooktrack.data.media.extrasByOwner
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
+import ru.antonkw.kwbooktrack.data.repository.MediaDateRepository
 import ru.antonkw.kwbooktrack.data.repository.MovieRepository
 import ru.antonkw.kwbooktrack.data.repository.SessionRepository
 import ru.antonkw.kwbooktrack.data.stats.MovieStats
@@ -66,6 +68,7 @@ class StatisticsViewModel @Inject constructor(
     bookRepository: BookRepository,
     movieRepository: MovieRepository,
     sessionRepository: SessionRepository,
+    private val mediaDateRepository: MediaDateRepository,
     mediaTypeStore: MediaTypeStore,
 ) : ViewModel() {
 
@@ -77,12 +80,31 @@ class StatisticsViewModel @Inject constructor(
 
     val stats: StateFlow<StatisticsData> = mediaTypeStore.type.flatMapLatest { type ->
         if (type == MediaType.MOVIES) {
-            movieRepository.observeAll()
-                .map { movies -> StatisticsData.Movies(MovieStatsCalculator.compute(movies)) }
+            combine(movieRepository.observeAll(), mediaDateRepository.observeAll()) { movies, dates ->
+                // Дополнительные даты просмотра — по id фильма.
+                val byMovie = dates
+                    .filter { it.mediaType == MediaType.MOVIES }
+                    .groupBy({ it.mediaId }, { it.date })
+                StatisticsData.Movies(MovieStatsCalculator.compute(movies, byMovie))
+            }
         } else {
-            combine(bookRepository.observeAll(), sessionRepository.observeAll()) { books, sessions ->
-                val finishedDates = books.filter { it.status == BookStatus.FINISHED && it.finishedAt != null }
-                    .mapNotNull { it.finishedAt }
+            combine(
+                bookRepository.observeAll(),
+                sessionRepository.observeAll(),
+                mediaDateRepository.observeAll(),
+            ) { books, sessions, dates ->
+                val byBook = dates
+                    .filter { it.mediaType == MediaType.BOOKS }
+                    .groupBy({ it.mediaId }, { it.date })
+                // Даты прочтения: основная плюс дополнительные (перечитывания).
+                val finishedDates = books.flatMap { book ->
+                    val primary = if (book.status == BookStatus.FINISHED) {
+                        listOfNotNull(book.finishedAt)
+                    } else {
+                        emptyList()
+                    }
+                    primary + byBook[book.id].orEmpty()
+                }
                 StatisticsData.Books(StatsCalculator.compute(sessions, finishedDates, books))
             }
         }

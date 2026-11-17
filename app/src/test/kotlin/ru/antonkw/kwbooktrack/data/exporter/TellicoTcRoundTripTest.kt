@@ -30,6 +30,7 @@ import ru.antonkw.kwbooktrack.data.importer.ImportFormat
 import ru.antonkw.kwbooktrack.data.importer.ImportTellicoUseCase
 import ru.antonkw.kwbooktrack.data.importer.ImportTellicoZipUseCase
 import ru.antonkw.kwbooktrack.data.importer.TellicoBookMapper
+import ru.antonkw.kwbooktrack.data.repository.MediaDateRepository
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.NoteRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
@@ -117,6 +118,7 @@ class TellicoTcRoundTripTest {
                     sessionRepository = SessionRepository(targetDb.readingSessionDao()),
                     tagRepository = TagRepository(targetDb.tagDao()),
                     photoRepository = targetPhotos,
+                mediaDateRepository = MediaDateRepository(targetDb.mediaDateDao()),
                     photoStorage = FilePhotoStorage(context),
                     transcoder = CoverTranscoder(),
                 ),
@@ -702,6 +704,32 @@ class TellicoTcRoundTripTest {
     }
 
     @Test
+    fun everyFieldUsedInMovieEntryIsDeclaredInFieldsBlock() = runTest {
+        // Tellico при импорте берёт поля только из `<fields>`, а значения
+        // необъявленных полей молча выбрасывает. Имена из книжного словаря
+        // (`author`) в фильмовой коллекции чужие — их надо объявлять, иначе
+        // значение терялось бы по дороге в Tellico.
+        sourceMovies.insert(
+            MovieEntity(
+                title = "Синий бархат",
+                year = 1989,
+                extraFields = mapOf("author" to ExtraField("Автор", "Линч, Дэвид")),
+                createdAt = day(2024, 1, 1),
+                updatedAt = day(2024, 1, 1),
+            ),
+        )
+
+        val xml = exportedXml(File(tempDir, "movies.tc").also { exportUseCase(it, MediaType.MOVIES) })
+
+        val (declared, used) = parseFieldUsage(xml)
+        val undeclared = used.filter { name ->
+            name !in declared && name.removeSuffix("s") !in declared
+        }
+        assertThat(undeclared).isEmpty()
+        assertThat(declared).contains("author")
+    }
+
+    @Test
     fun roundTripOfMovieKeepsFields() = runTest {
         seedMovies()
         val file = File(tempDir, "movies.tc")
@@ -808,6 +836,7 @@ class TellicoTcRoundTripTest {
                 sessionDao = db.readingSessionDao(),
                 photoDao = db.photoDao(),
                 tagDao = db.tagDao(),
+                mediaDateDao = sourceDb.mediaDateDao(),
             ),
             database = db,
             versionProvider = object : AppVersionProvider {

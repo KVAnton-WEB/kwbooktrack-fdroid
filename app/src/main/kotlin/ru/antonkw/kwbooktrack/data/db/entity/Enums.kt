@@ -10,6 +10,10 @@ enum class BookStatus {
 enum class MediaSource {
     MANUAL,
     TELLICO,
+    /**
+     * Импорт из Bookmory удалён, но значение осталось в базах пользователей:
+     * без него старые строки читались бы как MANUAL.
+     */
     BOOKMORY,
     CATALOG,
 }

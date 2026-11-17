@@ -49,6 +49,7 @@ class SnapshotBuilderTest {
             sessionDao = db.readingSessionDao(),
             photoDao = db.photoDao(),
             tagDao = db.tagDao(),
+                mediaDateDao = db.mediaDateDao(),
         )
         tempDir = Files.createTempDirectory("kwbooktrack-snapshot-").toFile()
     }

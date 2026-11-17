@@ -318,6 +318,8 @@ class ExportZipUseCase @Inject constructor(
         ExtraArchive(
             books = books.associate { snapshot ->
                 snapshot.book.id.toString() to BookExtras(
+                    // Дополнительные даты прочтения: основная — в колонке CSV.
+                    dates = snapshot.dates,
                     notes = notesJson(snapshot.notes),
                     sessions = snapshot.sessions.map { session ->
                         SessionJson(
@@ -336,6 +338,8 @@ class ExportZipUseCase @Inject constructor(
             },
             movies = movies.associate { snapshot ->
                 snapshot.movie.id.toString() to MovieExtras(
+                    // Дополнительные даты просмотра: основная — в колонке CSV.
+                    dates = snapshot.dates,
                     notes = notesJson(snapshot.notes),
                     tags = snapshot.tags,
                     photos = photosJson(snapshot.photos),

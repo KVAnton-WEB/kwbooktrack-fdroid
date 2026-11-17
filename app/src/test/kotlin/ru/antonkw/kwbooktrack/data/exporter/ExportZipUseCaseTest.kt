@@ -66,6 +66,7 @@ class ExportZipUseCaseTest {
                 sessionDao = db.readingSessionDao(),
                 photoDao = db.photoDao(),
                 tagDao = db.tagDao(),
+                mediaDateDao = db.mediaDateDao(),
             ),
             versionProvider = versionProvider,
             database = db,
@@ -182,6 +183,7 @@ class ExportZipUseCaseTest {
                     sessionDao = db.readingSessionDao(),
                     photoDao = db.photoDao(),
                     tagDao = db.tagDao(),
+                mediaDateDao = db.mediaDateDao(),
                 ),
                 versionProvider = object : AppVersionProvider {
                     override val appVersion: String

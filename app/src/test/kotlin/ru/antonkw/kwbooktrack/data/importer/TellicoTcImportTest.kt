@@ -18,6 +18,7 @@ import ru.antonkw.kwbooktrack.data.tagsOf
 import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
 import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
+import ru.antonkw.kwbooktrack.data.repository.MediaDateRepository
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.NoteRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
@@ -65,6 +66,7 @@ class TellicoTcImportTest {
                     sessionRepository = SessionRepository(db.readingSessionDao()),
                     tagRepository = TagRepository(db.tagDao()),
                     photoRepository = photoRepository,
+                mediaDateRepository = MediaDateRepository(db.mediaDateDao()),
                     photoStorage = FilePhotoStorage(ApplicationProvider.getApplicationContext()),
                     transcoder = CoverTranscoder(),
                 ),

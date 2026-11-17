@@ -50,12 +50,16 @@ class ExportTellicoTcUseCase @Inject constructor(
         output: OutputStream,
         mediaType: MediaType = MediaType.BOOKS,
     ): ExportManifest {
-        val prepared = database.withTransaction {
-            if (mediaType == MediaType.MOVIES) {
-                prepareMovies(snapshotBuilder.buildMovies())
-            } else {
-                prepareBooks(snapshotBuilder.buildAll())
-            }
+        // Снимок — в транзакции, подготовка — снаружи: `prepare*` читает и
+        // хеширует файлы обложек, а это блокирующий I/O. Внутри транзакции
+        // он держал бы её на всё время чтения файлов — и все записи в БД
+        // в приложении вставали бы на это время.
+        val prepared = if (mediaType == MediaType.MOVIES) {
+            val snapshots = database.withTransaction { snapshotBuilder.buildMovies() }
+            withContext(Dispatchers.IO) { prepareMovies(snapshots) }
+        } else {
+            val snapshots = database.withTransaction { snapshotBuilder.buildAll() }
+            withContext(Dispatchers.IO) { prepareBooks(snapshots) }
         }
         return withContext(Dispatchers.IO) { writeArchive(prepared, output) }
     }

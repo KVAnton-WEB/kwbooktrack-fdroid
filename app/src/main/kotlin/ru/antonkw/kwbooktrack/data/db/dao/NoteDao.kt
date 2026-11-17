@@ -5,9 +5,7 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
-import androidx.room.RawQuery
 import androidx.room.Update
-import androidx.sqlite.db.SupportSQLiteQuery
 import kotlinx.coroutines.flow.Flow
 import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 import ru.antonkw.kwbooktrack.data.db.entity.NoteEntity
@@ -52,9 +50,6 @@ interface NoteDao {
 
     @Query("SELECT * FROM notes WHERE id = :id LIMIT 1")
     suspend fun findById(id: Long): NoteEntity?
-
-    @RawQuery(observedEntities = [NoteEntity::class])
-    fun rawSearch(query: SupportSQLiteQuery): Flow<List<NoteEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(note: NoteEntity): Long

@@ -104,6 +104,14 @@ class BookDaoTest {
         assertThat(dao.count()).isEqualTo(1)
     }
 
+    @Test
+    fun observeByIdReturnsTheBookOrNull() = runTest {
+        val id = dao.insert(sampleBook(title = "Дюна", createdAt = 0L, updatedAt = 0L))
+
+        assertThat(dao.observeById(id).first()?.title).isEqualTo("Дюна")
+        assertThat(dao.observeById(id + 1000).first()).isNull()
+    }
+
     private fun sampleBook(
         title: String = "Sample",
         author: String = "Anon",

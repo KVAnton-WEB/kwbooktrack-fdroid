@@ -51,7 +51,9 @@ import ru.antonkw.kwbooktrack.data.db.entity.NoteEntity
 import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
 import ru.antonkw.kwbooktrack.data.time.toLocalDate
 import ru.antonkw.kwbooktrack.ui.common.CoverImage
+import ru.antonkw.kwbooktrack.ui.common.formatDuration
 import ru.antonkw.kwbooktrack.ui.common.MarkdownText
+import ru.antonkw.kwbooktrack.ui.common.MediaTagsSection
 import ru.antonkw.kwbooktrack.ui.common.PhotoGalleryDialog
 import ru.antonkw.kwbooktrack.ui.common.PhotoSource
 import java.io.File
@@ -181,15 +183,16 @@ fun MovieDetailScreen(
             MovieFieldRow(R.string.movie_field_year, movie.year?.toString())
             MovieFieldRow(
                 R.string.movie_field_duration,
-                movie.durationMin?.let { stringResource(R.string.movie_duration_label, it) },
+                movie.durationMin?.let { formatDuration(it) },
             )
             MovieFieldRow(R.string.movie_field_genre, movie.genre)
             MovieFieldRow(R.string.movie_field_nationality, movie.nationality)
             MovieFieldRow(R.string.movie_field_director, movie.director)
             MovieFieldRow(R.string.movie_field_cast, movie.cast?.replace("\n", " · "))
-            MovieFieldRow(
+            MovieFieldRows(
                 R.string.movie_field_watched_at,
-                movie.watchedAt?.let { it.toLocalDate().toString() },
+                // Все даты просмотра — по возрастанию, по одной на строку.
+                state.dates.map { it.toLocalDate().toString() },
             )
             MovieFieldRow(R.string.movie_field_url, movie.url)
 
@@ -221,14 +224,7 @@ fun MovieDetailScreen(
                 MarkdownText(markdown = movie.comments)
             }
 
-            if (state.tags.isNotEmpty()) {
-                Text(stringResource(R.string.label_tags), style = MaterialTheme.typography.titleMedium)
-                Text(
-                    text = state.tags.joinToString(", "),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            MediaTagsSection(state.tags)
 
             if (otherNotes.isNotEmpty()) {
                 Text(stringResource(R.string.notes_section), style = MaterialTheme.typography.titleMedium)
@@ -286,6 +282,22 @@ fun MovieDetailScreen(
                 }
             },
         )
+    }
+}
+
+/** Поле со списком значений — по одному на строку (даты просмотра). */
+@Composable
+private fun MovieFieldRows(labelRes: Int, values: List<String>) {
+    if (values.isEmpty()) return
+    Column {
+        Text(
+            text = stringResource(labelRes),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        values.forEach {
+            Text(text = it, style = MaterialTheme.typography.bodyMedium)
+        }
     }
 }
 

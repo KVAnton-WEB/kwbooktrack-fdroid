@@ -44,6 +44,7 @@ import ru.antonkw.kwbooktrack.data.stats.MonthlyPages
 import ru.antonkw.kwbooktrack.data.stats.MovieStats
 import ru.antonkw.kwbooktrack.data.stats.ReadingStats
 import ru.antonkw.kwbooktrack.data.stats.StatsCalculator
+import ru.antonkw.kwbooktrack.ui.common.formatDuration
 import kotlin.math.max
 import ru.antonkw.kwbooktrack.R
 
@@ -93,7 +94,7 @@ fun StatisticsScreen(
                         }
                         is StatisticsData.Movies -> {
                             Text(stringResource(R.string.stats_movies_watched, d.stats.totalMovies))
-                            Text(stringResource(R.string.stats_minutes_watched, d.stats.totalMinutes))
+                            Text(stringResource(R.string.stats_minutes_watched, formatDuration(d.stats.totalMinutes)))
                         }
                     }
                 }

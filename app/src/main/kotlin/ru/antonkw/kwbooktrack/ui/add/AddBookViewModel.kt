@@ -1,6 +1,7 @@
 package ru.antonkw.kwbooktrack.ui.add
 
 import android.content.Context
+import android.database.sqlite.SQLiteConstraintException
 import android.net.Uri
 import androidx.core.content.FileProvider
 import androidx.lifecycle.SavedStateHandle
@@ -22,8 +23,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
 import ru.antonkw.kwbooktrack.data.db.entity.MediaSource
+import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
+import ru.antonkw.kwbooktrack.data.repository.MediaDateRepository
 import ru.antonkw.kwbooktrack.data.storage.CoverStorage
 import ru.antonkw.kwbooktrack.data.text.formatDecimal
 import ru.antonkw.kwbooktrack.data.text.parseDecimal
@@ -31,6 +34,17 @@ import ru.antonkw.kwbooktrack.data.time.toEpochMs
 import ru.antonkw.kwbooktrack.data.time.toLocalDate
 import java.io.File
 import javax.inject.Inject
+
+/**
+ * Ошибка сохранения.
+ *
+ * В ViewModel живут не строки ресурсов, а вид ошибки: текст подставляет
+ * экран.
+ */
+enum class AddBookError {
+    /** Такой ISBN-13 уже есть в библиотеке. */
+    DUPLICATE_ISBN,
+}
 
 data class AddBookState(
     val title: String = "",
@@ -46,7 +60,8 @@ data class AddBookState(
     val purchasePrice: String = "",
     // "Прочитано" — the finished flag and the date it was finished on.
     val isRead: Boolean = false,
-    val finishedDate: String = "",
+    /** Даты прочтения — по одной на поле. Основная (самая ранняя) — первая. */
+    val finishedDates: List<String> = listOf(""),
     // --- v5: extended Tellico fields ---
     val subtitle: String = "",
     val binding: String = "",
@@ -65,12 +80,15 @@ data class AddBookState(
     val isSold: Boolean = false,
     val saved: Boolean = false,
     val loading: Boolean = false,
+    /** Ошибка сохранения — экран показывает её и не закрывается. */
+    val error: AddBookError? = null,
 )
 
 @HiltViewModel
 class AddBookViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val bookRepository: BookRepository,
+    private val mediaDateRepository: MediaDateRepository,
     @ApplicationContext private val context: Context,
     private val coverStorage: CoverStorage,
 ) : ViewModel() {
@@ -165,7 +183,7 @@ class AddBookViewModel @Inject constructor(
                         purchaseDate = book.purchaseDate?.let { formatDate(it) }.orEmpty(),
                         purchasePrice = book.purchasePrice?.let { formatPrice(it) }.orEmpty(),
                         isRead = book.status == BookStatus.FINISHED,
-                        finishedDate = book.finishedAt?.let { formatDate(it) }.orEmpty(),
+                        finishedDates = loadFinishedDates(book.finishedAt, mediaDateRepository.getFor(book.id, MediaType.BOOKS)),
                         subtitle = book.subtitle.orEmpty(),
                         binding = book.binding.orEmpty(),
                         series = book.series.orEmpty(),
@@ -192,7 +210,13 @@ class AddBookViewModel @Inject constructor(
 
     fun setTitle(value: String) { _state.value = _state.value.copy(title = value) }
     fun setAuthor(value: String) { _state.value = _state.value.copy(author = value) }
-    fun setIsbn(value: String) { _state.value = _state.value.copy(isbn = value.filter { it.isDigit() || it == 'X' || it == 'x' }) }
+    fun setIsbn(value: String) {
+        // Правка ISBN снимает прошлую ошибку «такой ISBN уже есть».
+        _state.value = _state.value.copy(
+            isbn = value.filter { it.isDigit() || it == 'X' || it == 'x' },
+            error = null,
+        )
+    }
     fun setPageCount(value: String) { _state.value = _state.value.copy(pageCount = value.filter { it.isDigit() }) }
     fun setYear(value: String) { _state.value = _state.value.copy(year = value.filter { it.isDigit() }) }
     fun setPublisher(value: String) { _state.value = _state.value.copy(publisher = value) }
@@ -209,10 +233,34 @@ class AddBookViewModel @Inject constructor(
             isRead = value,
             // Prefill today the first time the book is ticked as read, so
             // finished_at gets a value without the user typing a date.
-            finishedDate = if (value && s.finishedDate.isBlank()) formatDate(System.currentTimeMillis()) else s.finishedDate,
+            finishedDates = if (value && s.finishedDates.all { it.isBlank() }) {
+                listOf(formatDate(System.currentTimeMillis()))
+            } else {
+                s.finishedDates
+            },
         )
     }
-    fun setFinishedDate(value: String) { _state.value = _state.value.copy(finishedDate = value) }
+
+    fun setFinishedDate(index: Int, value: String) {
+        _state.value = _state.value.copy(
+            finishedDates = _state.value.finishedDates.toMutableList().also { list ->
+                if (index in list.indices) list[index] = value
+            },
+        )
+    }
+
+    /** Ещё одно поле даты прочтения — перечитывание. */
+    fun addFinishedDate() {
+        _state.value = _state.value.copy(finishedDates = _state.value.finishedDates + "")
+    }
+
+    /** Убрать поле даты. Последнее не убираем — вместо него пустое поле. */
+    fun removeFinishedDate(index: Int) {
+        _state.value = _state.value.copy(
+            finishedDates = _state.value.finishedDates.filterIndexed { i, _ -> i != index }
+                .ifEmpty { listOf("") },
+        )
+    }
     fun setSubtitle(value: String) { _state.value = _state.value.copy(subtitle = value) }
     fun setBinding(value: String) { _state.value = _state.value.copy(binding = value) }
     fun setSeries(value: String) { _state.value = _state.value.copy(series = value) }
@@ -310,9 +358,22 @@ class AddBookViewModel @Inject constructor(
             val now = System.currentTimeMillis()
             val purchaseDate = parseDateInput(s.purchaseDate)
             val purchasePrice = parsePriceInput(s.purchasePrice)
-            val finishedDate = parseDateInput(s.finishedDate)
+            // Основная дата — самая ранняя: из неё Tellico берёт первую дату.
+            // Остальные — дополнительные.
+            val finishedDates = s.finishedDates.mapNotNull { parseDateInput(it) }.sorted()
             val printYear = s.printYear.toIntOrNull()
             val printPages = parseDecimal(s.printPages)
+            // ISBN-13 уникален, и чужой ISBN в поле — это уже другая книга.
+            // Без проверки добавление молча теряло строку (insert с IGNORE
+            // возвращает -1), а правка била по уникальному индексу и роняла
+            // приложение.
+            val isbn = s.isbn.takeIf { it.length == 13 }
+            val duplicate = isbn?.let { bookRepository.findByIsbn(it) }
+            if (duplicate != null && duplicate.id != editingBookId) {
+                _state.value = s.copy(error = AddBookError.DUPLICATE_ISBN)
+                return@launch
+            }
+            var bookId = editingBookId
             if (isEditing) {
                 val existing = bookRepository.findById(editingBookId) ?: return@launch
                 // "Прочитано" is a checkbox, so the finished date travels with
@@ -326,7 +387,7 @@ class AddBookViewModel @Inject constructor(
                         if (existing.startedAt != null) BookStatus.READING else BookStatus.WISHLIST
                     else -> existing.status
                 }
-                val finishedAt = if (s.isRead) finishedDate else null
+                val finishedAt = if (s.isRead) finishedDates.firstOrNull() else null
                 // What the row will point at from now on. promote()
                 // returns null for both "left alone" and "cleared", so
                 // removedCover is what tells them apart — without it the
@@ -338,42 +399,47 @@ class AddBookViewModel @Inject constructor(
                 } else {
                     coverStorage.promote(s.coverPath) ?: existing.coverPath
                 }
-                bookRepository.update(
-                    existing.copy(
-                        title = s.title,
-                        author = s.author.ifBlank { "(автор неизвестен)" },
-                        isbn13 = s.isbn.takeIf { it.length == 13 },
-                        pageCount = s.pageCount.toIntOrNull(),
-                        year = s.year.toIntOrNull(),
-                        publisher = s.publisher.takeUnless { it.isBlank() },
-                        genre = s.genre.takeUnless { it.isBlank() },
-                        rating = s.rating,
-                        status = status,
-                        finishedAt = finishedAt,
-                        coverPath = finalCoverPath,
-                        purchaseDate = purchaseDate,
-                        purchasePrice = purchasePrice,
-                        // v5 — explicit fields. takeUnless(blank) collapses empty
-                        // strings to null so the row's NULL is preserved when
-                        // the user clears the field.
-                        subtitle = s.subtitle.takeUnless { it.isBlank() },
-                        binding = s.binding.takeUnless { it.isBlank() },
-                        series = s.series.takeUnless { it.isBlank() },
-                        seriesNumber = s.seriesNumber.takeUnless { it.isBlank() },
-                        condition = s.condition.takeUnless { it.isBlank() },
-                        translator = s.translator.takeUnless { it.isBlank() },
-                        printYear = printYear,
-                        printPages = printPages,
-                        originalLanguage = s.originalLanguage.takeUnless { it.isBlank() },
-                        originalTitle = s.originalTitle.takeUnless { it.isBlank() },
-                        annotation = s.annotation.takeUnless { it.isBlank() },
-                        purchasePlace = s.purchasePlace.takeUnless { it.isBlank() },
-                        isGift = s.isGift,
-                        isLent = s.isLent,
-                        isSold = s.isSold,
-                        updatedAt = now,
-                    ),
-                )
+                if (!updateBook(
+                        existing.copy(
+                            title = s.title,
+                            author = s.author.ifBlank { "(автор неизвестен)" },
+                            isbn13 = s.isbn.takeIf { it.length == 13 },
+                            pageCount = s.pageCount.toIntOrNull(),
+                            year = s.year.toIntOrNull(),
+                            publisher = s.publisher.takeUnless { it.isBlank() },
+                            genre = s.genre.takeUnless { it.isBlank() },
+                            rating = s.rating,
+                            status = status,
+                            finishedAt = finishedAt,
+                            coverPath = finalCoverPath,
+                            purchaseDate = purchaseDate,
+                            purchasePrice = purchasePrice,
+                            // v5 — explicit fields. takeUnless(blank) collapses empty
+                            // strings to null so the row's NULL is preserved when
+                            // the user clears the field.
+                            subtitle = s.subtitle.takeUnless { it.isBlank() },
+                            binding = s.binding.takeUnless { it.isBlank() },
+                            series = s.series.takeUnless { it.isBlank() },
+                            seriesNumber = s.seriesNumber.takeUnless { it.isBlank() },
+                            condition = s.condition.takeUnless { it.isBlank() },
+                            translator = s.translator.takeUnless { it.isBlank() },
+                            printYear = printYear,
+                            printPages = printPages,
+                            originalLanguage = s.originalLanguage.takeUnless { it.isBlank() },
+                            originalTitle = s.originalTitle.takeUnless { it.isBlank() },
+                            annotation = s.annotation.takeUnless { it.isBlank() },
+                            purchasePlace = s.purchasePlace.takeUnless { it.isBlank() },
+                            isGift = s.isGift,
+                            isLent = s.isLent,
+                            isSold = s.isSold,
+                            updatedAt = now,
+                        ),
+                    )
+                ) {
+                    _state.value = s.copy(error = AddBookError.DUPLICATE_ISBN)
+                    return@launch
+                }
+                editingBookId
                 // The previous persisted cover (kept alive across the edit so
                 // Discard could roll it back) is now orphaned: the new
                 // selection lives at finalCoverPath. delete() above already
@@ -397,7 +463,7 @@ class AddBookViewModel @Inject constructor(
                     genre = s.genre.takeUnless { it.isBlank() },
                     rating = s.rating,
                     status = if (s.isRead) BookStatus.FINISHED else BookStatus.WISHLIST,
-                    finishedAt = if (s.isRead) finishedDate else null,
+                    finishedAt = if (s.isRead) finishedDates.firstOrNull() else null,
                     createdAt = now,
                     updatedAt = now,
                     source = MediaSource.MANUAL,
@@ -420,14 +486,54 @@ class AddBookViewModel @Inject constructor(
                     isSold = s.isSold,
                 )
                 val newId = bookRepository.insert(tempBook)
+                if (newId == -1L) {
+                    // insert с IGNORE вернул -1: строка не вставилась —
+                    // ISBN занят (проверка выше могла разойтись с базой).
+                    _state.value = s.copy(error = AddBookError.DUPLICATE_ISBN)
+                    return@launch
+                }
                 val finalCoverPath = coverStorage.promote(s.coverPath)
                 if (finalCoverPath != null) {
-                    bookRepository.update(tempBook.copy(id = newId, coverPath = finalCoverPath))
+                    if (!updateBook(tempBook.copy(id = newId, coverPath = finalCoverPath))) {
+                        _state.value = s.copy(error = AddBookError.DUPLICATE_ISBN)
+                        return@launch
+                    }
                 }
                 originalCoverPath = finalCoverPath
+                bookId = newId
             }
-            _state.value = s.copy(saved = true)
+            // Дополнительные даты прочтения: основная — в finished_at.
+            mediaDateRepository.replaceFor(
+                bookId,
+                MediaType.BOOKS,
+                if (s.isRead) finishedDates.drop(1) else emptyList(),
+            )
+            _state.value = s.copy(saved = true, error = null)
         }
+    }
+
+    /**
+     * Запись книги с защитой от конфликта по ISBN.
+     *
+     * Уникальный индекс по isbn13 при нарушении роняет приложение
+     * SQLiteConstraintException — а «книга уже есть» это сообщение
+     * пользователю, а не крэш.
+     *
+     * Счётчик строк не проверяем: в обоих вызовах строка точно есть —
+     * её только что вставили или прочитали через findById.
+     */
+    private suspend fun updateBook(book: BookEntity): Boolean = try {
+        bookRepository.update(book)
+        true
+    } catch (e: SQLiteConstraintException) {
+        false
+    }
+
+    /** Даты прочтения книги — по возрастанию, в виде строк формы. */
+    private fun loadFinishedDates(primary: Long?, extra: List<Long>): List<String> {
+        val dates = (listOfNotNull(primary) + extra).sorted()
+        if (dates.isEmpty()) return listOf("")
+        return dates.map { formatDate(it) }
     }
 
     private fun parseDateInput(raw: String): Long? {

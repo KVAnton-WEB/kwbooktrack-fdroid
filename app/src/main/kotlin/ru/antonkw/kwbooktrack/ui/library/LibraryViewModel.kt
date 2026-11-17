@@ -26,8 +26,10 @@ import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 import ru.antonkw.kwbooktrack.data.db.entity.MovieEntity
 import ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity
 import ru.antonkw.kwbooktrack.data.media.MediaTypeStore
+import ru.antonkw.kwbooktrack.data.media.mediaDates
 import ru.antonkw.kwbooktrack.data.progress.ReadingProgress
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
+import ru.antonkw.kwbooktrack.data.repository.MediaDateRepository
 import ru.antonkw.kwbooktrack.data.repository.MovieRepository
 import ru.antonkw.kwbooktrack.data.repository.SessionRepository
 import ru.antonkw.kwbooktrack.data.time.toLocalDate
@@ -122,6 +124,7 @@ class LibraryViewModel @Inject constructor(
     private val bookRepository: BookRepository,
     private val movieRepository: MovieRepository,
     private val sessionRepository: SessionRepository,
+    private val mediaDateRepository: MediaDateRepository,
     private val mediaTypeStore: MediaTypeStore,
     private val savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
@@ -179,14 +182,19 @@ class LibraryViewModel @Inject constructor(
         }
     }
 
-    private fun applyBookFilters(books: List<BookEntity>, filters: Filters): List<BookEntity> =
+    private fun applyBookFilters(
+        books: List<BookEntity>,
+        filters: Filters,
+        extraDates: Map<Long, List<Long>> = emptyMap(),
+    ): List<BookEntity> =
         books.filter { book ->
             when (filters.bookFilter) {
                 // Период сужает любой тип фильтра: «Все» — по любой дате книги,
                 // «В процессе» — по дате начала чтения или покупки. Книга без
                 // дат не попадает ни в какой ограниченный период.
-                BookFilterType.ALL ->
-                    filters.period.matchesAny(book.finishedAt, book.startedAt, book.purchaseDate)
+                BookFilterType.ALL -> filters.period.matchesAny(
+                    *readDates(book, extraDates).plus(book.startedAt).plus(book.purchaseDate).toTypedArray(),
+                )
                 // «Не прочитано» — обратная сторона «Прочитано»: всё, что ещё
                 // не дочитано (к прочтению, в процессе, брошено). Период для
                 // такой книги — по дате начала чтения или покупки.
@@ -194,7 +202,8 @@ class LibraryViewModel @Inject constructor(
                     book.status != BookStatus.FINISHED &&
                         filters.period.matchesAny(book.startedAt, book.purchaseDate)
                 BookFilterType.FINISHED ->
-                    book.status == BookStatus.FINISHED && filters.period.matches(book.finishedAt)
+                    book.status == BookStatus.FINISHED &&
+                        readDates(book, extraDates).any { filters.period.matches(it) }
                 BookFilterType.READING ->
                     book.status == BookStatus.READING &&
                         filters.period.matchesAny(book.startedAt, book.purchaseDate)
@@ -202,18 +211,25 @@ class LibraryViewModel @Inject constructor(
             }
         }
 
-    private fun applyMovieFilters(movies: List<MovieEntity>, filters: Filters): List<MovieEntity> =
+    private fun applyMovieFilters(
+        movies: List<MovieEntity>,
+        filters: Filters,
+        extraDates: Map<Long, List<Long>> = emptyMap(),
+    ): List<MovieEntity> =
         movies.filter { movie ->
+            // Даты просмотра: основная плюс дополнительные. Пересмотренный
+            // фильм попадает в период любой своей даты.
+            val dates = mediaDates(movie.watchedAt, extraDates[movie.id].orEmpty())
             when (filters.movieFilter) {
                 // Фильм без даты просмотра — это фильм, который добавили
                 // вручную и ещё не смотрели: под фильтром «Все» он виден, а в
                 // ограниченный период не попадает (даты нет — не сказать, что
                 // он туда относится).
-                MovieFilterType.ALL -> filters.period.matchesAny(movie.watchedAt)
+                MovieFilterType.ALL -> filters.period.matchesAny(*dates.toTypedArray())
                 MovieFilterType.WATCHED ->
-                    movie.watchedAt != null && filters.period.matches(movie.watchedAt)
+                    dates.isNotEmpty() && dates.any { filters.period.matches(it) }
                 MovieFilterType.UNWATCHED ->
-                    movie.watchedAt == null && filters.period.isAllTime
+                    dates.isEmpty() && filters.period.isAllTime
             }
         }
 
@@ -246,42 +262,69 @@ class LibraryViewModel @Inject constructor(
     /** Содержимое списка — по текущему типу носителя. */
     private fun load(filters: Filters): Flow<LibraryUiState> =
         currentMediaType.flatMapLatest { type ->
-            if (type == MediaType.MOVIES) movieItems(filters) else bookItems(filters)
-        }
-
-    private fun bookItems(filters: Filters): Flow<LibraryUiState> =
-        combine(
-            if (filters.query.isBlank()) {
-                bookRepository.observeAll()
+            if (type == MediaType.MOVIES) {
+                combine(
+                    if (filters.query.isBlank()) {
+                        movieRepository.observeAll()
+                    } else {
+                        movieRepository.search(filters.query.trim())
+                    },
+                    mediaDateRepository.observeAll(),
+                ) { movies, dates -> movieItems(filters, movies, dates) }
             } else {
-                bookRepository.search(filters.query.trim())
-            },
-            sessionRepository.observeAll(),
-        ) { books, sessions ->
-            LibraryUiState.Loaded(
-                items = attachProgress(applyBookFilters(books, filters), sessions),
-                mediaType = MediaType.BOOKS,
-                query = filters.query,
-                isGrid = filters.isGrid,
-                filter = filterState(filters),
-            )
+                combine(
+                    if (filters.query.isBlank()) {
+                        bookRepository.observeAll()
+                    } else {
+                        bookRepository.search(filters.query.trim())
+                    },
+                    sessionRepository.observeAll(),
+                    mediaDateRepository.observeAll(),
+                ) { books, sessions, dates -> bookItems(filters, books, sessions, dates) }
+            }
         }
 
-    private fun movieItems(filters: Filters): Flow<LibraryUiState> =
-        (if (filters.query.isBlank()) {
-            movieRepository.observeAll()
-        } else {
-            movieRepository.search(filters.query.trim())
-        })
-            .map { movies ->
-                LibraryUiState.Loaded(
-                    items = applyMovieFilters(movies, filters).map { LibraryItem.Movie(it) },
-                    mediaType = MediaType.MOVIES,
-                    query = filters.query,
-                    isGrid = filters.isGrid,
-                    filter = filterState(filters),
-                )
-            }
+    private fun bookItems(
+        filters: Filters,
+        books: List<BookEntity>,
+        sessions: List<ReadingSessionEntity>,
+        dates: List<ru.antonkw.kwbooktrack.data.db.entity.MediaDateEntity>,
+    ): LibraryUiState =
+        LibraryUiState.Loaded(
+            items = attachProgress(
+                applyBookFilters(books, filters, extraDatesOf(dates, MediaType.BOOKS)),
+                sessions,
+            ),
+            mediaType = MediaType.BOOKS,
+            query = filters.query,
+            isGrid = filters.isGrid,
+            filter = filterState(filters),
+        )
+
+    private fun movieItems(
+        filters: Filters,
+        movies: List<MovieEntity>,
+        dates: List<ru.antonkw.kwbooktrack.data.db.entity.MediaDateEntity>,
+    ): LibraryUiState =
+        LibraryUiState.Loaded(
+            items = applyMovieFilters(movies, filters, extraDatesOf(dates, MediaType.MOVIES))
+                .map { LibraryItem.Movie(it) },
+            mediaType = MediaType.MOVIES,
+            query = filters.query,
+            isGrid = filters.isGrid,
+            filter = filterState(filters),
+        )
+
+    /** Дополнительные даты владельцев — по id, для нужного типа носителя. */
+    private fun extraDatesOf(
+        dates: List<ru.antonkw.kwbooktrack.data.db.entity.MediaDateEntity>,
+        mediaType: MediaType,
+    ): Map<Long, List<Long>> =
+        dates.filter { it.mediaType == mediaType }.groupBy({ it.mediaId }, { it.date })
+
+    /** Даты прочтения книги: основная плюс дополнительные. */
+    private fun readDates(book: BookEntity, extraDates: Map<Long, List<Long>>): List<Long> =
+        mediaDates(book.finishedAt, extraDates[book.id].orEmpty())
 
     val currentQuery: StateFlow<String> = query
     val currentLayout: StateFlow<Boolean> = isGrid

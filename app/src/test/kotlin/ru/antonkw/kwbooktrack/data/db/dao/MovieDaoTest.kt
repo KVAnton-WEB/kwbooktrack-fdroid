@@ -71,6 +71,26 @@ class MovieDaoTest {
     }
 
     @Test
+    fun upsertFromImportKeepsDownloadedFlag() = runTest {
+        // Пользователь отметил фильм скачанным. Повторный импорт бэкапа, где
+        // флага нет, не должен молча снимать отметку — как флаги книги.
+        val id = dao.insert(sampleMovie(title = "Малхолланд Драйв", year = 1999, isDownloaded = true))
+        dao.upsertFromImport(sampleMovie(title = "Малхолланд Драйв", year = 1999, isDownloaded = false))
+
+        assertThat(dao.findById(id)!!.isDownloaded).isTrue()
+    }
+
+    @Test
+    fun upsertFromImportKeepsModifiedDateFromSource() = runTest {
+        // Метка «изменено» — из источника, а не «сейчас»: архив хранит её
+        // именно для того, чтобы история фильма пережила импорт.
+        val id = dao.insert(sampleMovie(title = "Начало", year = 2010, updatedAt = 1_700_000_000_000L))
+        dao.upsertFromImport(sampleMovie(title = "Начало", year = 2010, updatedAt = 1_600_000_000_000L))
+
+        assertThat(dao.findById(id)!!.updatedAt).isEqualTo(1_600_000_000_000L)
+    }
+
+    @Test
     fun searchFindsByDirector() = runTest {
         dao.insert(sampleMovie(title = "Малхолланд Драйв", director = "Линч, Дэвид"))
         dao.insert(sampleMovie(title = "Синий бархат", director = "Линч, Дэвид"))
@@ -89,6 +109,8 @@ class MovieDaoTest {
         director: String? = "Режиссёр",
         durationMin: Int? = 147,
         rating: Int? = null,
+        isDownloaded: Boolean = false,
+        updatedAt: Long = 0L,
     ) = MovieEntity(
         title = title,
         originalTitle = null,
@@ -104,9 +126,9 @@ class MovieDaoTest {
         plot = null,
         comments = null,
         url = null,
-        isDownloaded = false,
+        isDownloaded = isDownloaded,
         createdAt = 0L,
-        updatedAt = 0L,
+        updatedAt = updatedAt,
         source = MediaSource.MANUAL,
         titleSearch = title.lowercase(),
         peopleSearch = (director ?: "").lowercase(),

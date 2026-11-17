@@ -10,6 +10,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.db.dao.BookDao
+import ru.antonkw.kwbooktrack.data.db.dao.MediaDateDao
 import ru.antonkw.kwbooktrack.data.db.dao.MovieDao
 import ru.antonkw.kwbooktrack.data.db.dao.NoteDao
 import ru.antonkw.kwbooktrack.data.db.dao.PhotoDao
@@ -45,6 +46,7 @@ object DatabaseModule {
                 ru.antonkw.kwbooktrack.data.db.migration.Migrate8To9,
                 ru.antonkw.kwbooktrack.data.db.migration.Migrate9To10,
                 ru.antonkw.kwbooktrack.data.db.migration.Migrate10To11,
+                ru.antonkw.kwbooktrack.data.db.migration.Migrate11To12,
             )
             .build()
 
@@ -65,4 +67,7 @@ object DatabaseModule {
 
     @Provides
     fun provideMovieDao(db: KwBooktrackDatabase): MovieDao = db.movieDao()
+
+    @Provides
+    fun provideMediaDateDao(db: KwBooktrackDatabase): MediaDateDao = db.mediaDateDao()
 }

@@ -10,6 +10,7 @@ import ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.MovieRepository
 import ru.antonkw.kwbooktrack.data.repository.NoteRepository
+import ru.antonkw.kwbooktrack.data.repository.MediaDateRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
 import ru.antonkw.kwbooktrack.data.repository.SessionRepository
 import ru.antonkw.kwbooktrack.data.repository.TagRepository
@@ -50,6 +51,7 @@ class SnapshotApplier @Inject constructor(
     private val sessionRepository: SessionRepository,
     private val tagRepository: TagRepository,
     private val photoRepository: PhotoRepository,
+    private val mediaDateRepository: MediaDateRepository,
     private val photoStorage: PhotoStorage,
     private val transcoder: CoverTranscoder,
 ) {
@@ -65,6 +67,14 @@ class SnapshotApplier @Inject constructor(
             extraFields = snapshot.book.extraFields + snapshot.extraFields,
         )
         val bookId = bookRepository.upsertFromImport(book)
+        // Даты прочтения: архив приносит основную (в CSV) и дополнительные.
+        // Берём основную из СЛИТОЙ строки, а не из архива: в архиве её может
+        // не быть, а в базе — быть, и тогда дата потерялась бы.
+        val row = bookRepository.findById(bookId)
+        val primary = applyDates(row?.finishedAt, snapshot.dates, bookId, MediaType.BOOKS)
+        if (primary != row?.finishedAt) {
+            row?.let { bookRepository.updateFromImport(it.copy(finishedAt = primary)) }
+        }
 
         val covers = applyBookCover(snapshot, bookId, assets)
         val notes = applyNotes(snapshot.notes, bookId, MediaType.BOOKS, now)
@@ -96,6 +106,14 @@ class SnapshotApplier @Inject constructor(
             extraFields = snapshot.movie.extraFields + snapshot.extraFields,
         )
         val movieId = movieRepository.upsertFromImport(movie)
+        // Даты просмотра: архив приносит основную (в CSV) и дополнительные.
+        // Основная — из слитой строки: в архиве её может не быть, а в базе
+        // быть, и тогда дата потерялась бы.
+        val row = movieRepository.findById(movieId)
+        val primary = applyDates(row?.watchedAt, snapshot.dates, movieId, MediaType.MOVIES)
+        if (primary != row?.watchedAt) {
+            row?.let { movieRepository.updateFromImport(it.copy(watchedAt = primary)) }
+        }
 
         val covers = applyMovieCover(snapshot, movieId, assets)
         val notes = applyNotes(snapshot.notes, movieId, MediaType.MOVIES, now)
@@ -109,6 +127,25 @@ class SnapshotApplier @Inject constructor(
             photos = photos,
             covers = covers,
         )
+    }
+
+    /**
+     * Даты владельца: основная (из колонки записи) и дополнительные (из
+     * архива) объединяются с тем, что уже есть в базе.
+     *
+     * Основной остаётся самая ранняя — из неё Tellico берёт первую дату.
+     * Возвращает новую основную дату.
+     */
+    private suspend fun applyDates(
+        primary: Long?,
+        extra: List<Long>,
+        mediaId: Long,
+        mediaType: MediaType,
+    ): Long? {
+        val existing = mediaDateRepository.getFor(mediaId, mediaType)
+        val dates = (listOfNotNull(primary) + extra + existing).distinct().sorted()
+        mediaDateRepository.replaceFor(mediaId, mediaType, dates.drop(1))
+        return dates.firstOrNull()
     }
 
     /**

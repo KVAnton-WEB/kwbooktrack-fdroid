@@ -1,12 +1,16 @@
 package ru.antonkw.kwbooktrack.ui.importer
 
+import android.app.Application
 import android.net.Uri
+import androidx.lifecycle.viewModelScope
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -15,6 +19,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows
 import ru.antonkw.kwbooktrack.data.NoOpCoverStorage
 import ru.antonkw.kwbooktrack.data.NoOpPhotoStorage
 import ru.antonkw.kwbooktrack.data.TestDb
@@ -24,6 +29,7 @@ import ru.antonkw.kwbooktrack.data.importer.ImportKwBooktrackZipUseCase
 import ru.antonkw.kwbooktrack.data.importer.ImportTellicoUseCase
 import ru.antonkw.kwbooktrack.data.importer.ImportTellicoZipUseCase
 import ru.antonkw.kwbooktrack.data.importer.TellicoBookMapper
+import ru.antonkw.kwbooktrack.data.repository.MediaDateRepository
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.NoteRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
@@ -34,6 +40,9 @@ import ru.antonkw.kwbooktrack.data.storage.CoverTranscoder
 import ru.antonkw.kwbooktrack.data.tellico.TellicoCsvReader
 import ru.antonkw.kwbooktrack.data.tellico.TellicoXmlReader
 import java.io.File
+import java.io.InputStream
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import ru.antonkw.kwbooktrack.data.repository.MovieRepository
@@ -68,6 +77,7 @@ class TellicoImportViewModelTest {
             sessionRepository = SessionRepository(db.readingSessionDao()),
             tagRepository = TagRepository(db.tagDao()),
             photoRepository = photoRepository,
+                mediaDateRepository = MediaDateRepository(db.mediaDateDao()),
             photoStorage = NoOpPhotoStorage,
             transcoder = CoverTranscoder(),
         )
@@ -117,6 +127,50 @@ class TellicoImportViewModelTest {
         assertThat(s.inProgress).isFalse()
         assertThat(s.result).isNull()
         assertThat(s.error).isNotNull()
+    }
+
+    @Test
+    fun cancellationIsNotShownAsError() = runTest(dispatcher) {
+        // Отмена импорта — не ошибка: пользователь закрыл экран. Раньше
+        // CancellationException гасился общим catch, и UI показывал
+        // «ошибка импорта» там, где всё в порядке.
+        val gate = CountDownLatch(1)
+        val stream = BlockingInputStream(gate)
+        val uri = Uri.parse("content://kwbooktrack.test/slow")
+        Shadows.shadowOf(ApplicationProvider.getApplicationContext<Application>().contentResolver)
+            .registerInputStream(uri, stream)
+
+        vm.importFromUri(uri)
+        val importJob = vm.viewModelScope.coroutineContext[Job]!!.children.first()
+        advanceUntilIdle() // копирование ушло в IO и там встало на гate
+
+        TestViewModels.cancelAll(dispatcher.scheduler)
+        gate.countDown()
+        importJob.join()
+        advanceUntilIdle()
+
+        assertThat(vm.state.value.error).isNull()
+    }
+
+    /** Поток, который не отдаёт данные, пока не отпустят гate. */
+    private class BlockingInputStream(private val gate: CountDownLatch) : InputStream() {
+        private val done = CountDownLatch(1)
+
+        override fun read(): Int {
+            gate.await()
+            done.countDown()
+            return -1
+        }
+
+        override fun read(b: ByteArray, off: Int, len: Int): Int {
+            gate.await()
+            done.countDown()
+            return -1
+        }
+
+        fun awaitDone() {
+            done.await(5, TimeUnit.SECONDS)
+        }
     }
 
     @Test

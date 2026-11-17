@@ -21,6 +21,9 @@ class BookRepository @Inject constructor(
 ) {
     fun observeAll(): Flow<List<BookEntity>> = bookDao.observeAll()
 
+    /** Книга по id потоком — для экрана карточки. */
+    fun observeById(id: Long): Flow<BookEntity?> = bookDao.observeById(id)
+
     /**
      * Все книги разом — для снимка библиотеки.
      *

@@ -10,20 +10,18 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 import ru.antonkw.kwbooktrack.data.db.entity.MovieEntity
 import ru.antonkw.kwbooktrack.data.db.entity.NoteEntity
 import ru.antonkw.kwbooktrack.data.db.entity.PhotoEntity
+import ru.antonkw.kwbooktrack.data.media.mediaDates
 import ru.antonkw.kwbooktrack.data.repository.MovieRepository
 import ru.antonkw.kwbooktrack.data.repository.NoteRepository
+import ru.antonkw.kwbooktrack.data.repository.MediaDateRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
 import ru.antonkw.kwbooktrack.data.repository.TagRepository
-import ru.antonkw.kwbooktrack.data.storage.PhotoStorage
 import javax.inject.Inject
 
 data class MovieDetailUiState(
@@ -31,6 +29,8 @@ data class MovieDetailUiState(
     val notes: List<NoteEntity> = emptyList(),
     val photos: List<PhotoEntity> = emptyList(),
     val tags: List<String> = emptyList(),
+    /** Даты просмотра — по возрастанию. */
+    val dates: List<Long> = emptyList(),
 )
 
 /**
@@ -49,7 +49,7 @@ class MovieDetailViewModel @Inject constructor(
     private val noteRepository: NoteRepository,
     private val photoRepository: PhotoRepository,
     private val tagRepository: TagRepository,
-    private val photoStorage: PhotoStorage,
+    private val mediaDateRepository: MediaDateRepository,
 ) : ViewModel() {
 
     private val movieId: Long = savedStateHandle.get<Long>(KEY_MOVIE_ID) ?: -1L
@@ -62,21 +62,24 @@ class MovieDetailViewModel @Inject constructor(
         noteRepository.observeByMedia(movieId, MediaType.MOVIES),
         photoRepository.observeByMedia(movieId, MediaType.MOVIES),
         tagRepository.observeTagsOfMedia(movieId, MediaType.MOVIES),
-    ) { movie, notes, photos, tags ->
+        mediaDateRepository.observeFor(movieId, MediaType.MOVIES),
+    ) { movie, notes, photos, tags, extraDates ->
         MovieDetailUiState(
             movie = movie,
             notes = notes,
             photos = photos,
             tags = tags,
+            // Даты просмотра: основная плюс дополнительные.
+            dates = mediaDates(movie?.watchedAt, extraDates.map { it.date }),
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MovieDetailUiState(null))
 
     fun deleteMovie() {
         viewModelScope.launch {
-            // Пути файлов фото читаем ДО удаления строк: после их не узнать.
-            val photoPaths = photoRepository.observeByMedia(movieId, MediaType.MOVIES).first().map { it.path }
+            // Файлы фото удаляет репозиторий: он читает пути до удаления
+            // строк и снимает их с диска. Здесь второй раз удалять нечего —
+            // два места с одной логикой расходятся при правке.
             movieRepository.deleteById(movieId)
-            photoStorage.deletePaths(photoPaths)
             _deleted.value = true
         }
     }

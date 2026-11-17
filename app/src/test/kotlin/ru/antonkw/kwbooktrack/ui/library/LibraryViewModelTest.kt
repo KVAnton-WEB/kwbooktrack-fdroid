@@ -25,6 +25,7 @@ import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 import ru.antonkw.kwbooktrack.data.db.entity.MovieEntity
 import ru.antonkw.kwbooktrack.data.media.MediaTypeStore
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
+import ru.antonkw.kwbooktrack.data.repository.MediaDateRepository
 import ru.antonkw.kwbooktrack.data.repository.MovieRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
 import ru.antonkw.kwbooktrack.data.repository.SessionRepository
@@ -39,6 +40,7 @@ class LibraryViewModelTest {
     private lateinit var repository: BookRepository
     private lateinit var movies: MovieRepository
     private lateinit var sessionRepository: SessionRepository
+    private lateinit var mediaDates: MediaDateRepository
     private lateinit var mediaTypeStore: MediaTypeStore
     private val dispatcher = StandardTestDispatcher()
 
@@ -50,6 +52,7 @@ class LibraryViewModelTest {
         repository = BookRepository(db.bookDao(), db.tagDao(), NoOpCoverStorage, photoRepository)
         movies = MovieRepository(db.movieDao(), NoOpCoverStorage, photoRepository)
         sessionRepository = SessionRepository(db.readingSessionDao())
+        mediaDates = MediaDateRepository(db.mediaDateDao())
         mediaTypeStore = MediaTypeStore()
     }
 
@@ -62,7 +65,7 @@ class LibraryViewModelTest {
 
     private fun viewModel(
         saved: androidx.lifecycle.SavedStateHandle = androidx.lifecycle.SavedStateHandle(),
-    ) = LibraryViewModel(repository, movies, sessionRepository, mediaTypeStore, saved).also {
+    ) = LibraryViewModel(repository, movies, sessionRepository, mediaDates, mediaTypeStore, saved).also {
         TestViewModels.track(it)
     }
 

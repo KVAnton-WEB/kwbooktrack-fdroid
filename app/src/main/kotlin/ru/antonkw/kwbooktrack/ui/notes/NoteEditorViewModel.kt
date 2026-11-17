@@ -140,7 +140,16 @@ class NoteEditorViewModel @Inject constructor(
                 } else now,
                 updatedAt = now,
             )
-            val targetId = noteRepository.insert(entity)
+            // Правка существующей заметки — через update, а не insert:
+            // insert помечен REPLACE, а это в SQLite удаление старой строки
+            // плюс вставка новой. Удаление заметки срабатывает внешний ключ
+            // photos.note_id (ON DELETE SET NULL) — и привязка всех её фото
+            // обнулялась бы. Если заметки уже нет — вставляем заново.
+            val targetId = if (noteId > 0L) {
+                if (noteRepository.update(entity) == 0) noteRepository.insert(entity) else noteId
+            } else {
+                noteRepository.insert(entity)
+            }
             s.photoIdsToDelete.forEach { id ->
                 photoRepository.observeByNote(targetId).first()
                     .firstOrNull { it.id == id }
@@ -156,18 +165,19 @@ class NoteEditorViewModel @Inject constructor(
     }
 
     private suspend fun copyToFilesAndInsert(uri: Uri, targetNoteId: Long) {
-        val photosDir = File(context.filesDir, "photos").apply { mkdirs() }
         try {
-            val target = File(photosDir, "note_${targetNoteId}_${System.currentTimeMillis()}.jpg")
-            context.contentResolver.openInputStream(uri)?.use { input ->
-                target.outputStream().use { output -> input.copyTo(output) }
+            // Файл — через PhotoStorage: там имя с UUID. Собственное имя из
+            // миллисекунд давало бы двум фото, прикреплённым в одну
+            // миллисекунду, одно имя — второе перезаписало бы первое.
+            val path = context.contentResolver.openInputStream(uri)?.use { input ->
+                photoRepository.saveForNote(targetNoteId, input, "jpg")
             } ?: return
             photoRepository.insert(
                 PhotoEntity(
                     mediaId = mediaId,
                     mediaType = mediaType,
                     noteId = targetNoteId,
-                    path = target.absolutePath,
+                    path = path,
                     createdAt = System.currentTimeMillis(),
                 ),
             )

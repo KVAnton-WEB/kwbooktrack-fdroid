@@ -1,0 +1,3 @@
+Several dates: a movie can be rewatched, a book reread. An entry now keeps a list of dates: all of them show in the calendar, the statistics count viewings, Tellico gets the earliest date, and the app's own backup keeps them all.
+
+Fixes: editing a note no longer detaches its photos; note search handles Cyrillic; a duplicate ISBN-13 no longer loses the book silently or crashes the app; deleted photos are removed from disk; unpacking an archive is size-limited; movie duration reads as "2 h 12 min".

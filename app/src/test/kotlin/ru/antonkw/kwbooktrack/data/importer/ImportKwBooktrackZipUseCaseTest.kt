@@ -22,6 +22,7 @@ import ru.antonkw.kwbooktrack.data.db.entity.MediaSource
 import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
 import ru.antonkw.kwbooktrack.data.exporter.AppVersionProvider
 import ru.antonkw.kwbooktrack.data.exporter.ExportZipUseCase
+import ru.antonkw.kwbooktrack.data.repository.MediaDateRepository
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.NoteRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
@@ -84,6 +85,7 @@ class ImportKwBooktrackZipUseCaseTest {
                 sessionDao = sourceDb.readingSessionDao(),
                 photoDao = sourceDb.photoDao(),
                 tagDao = sourceDb.tagDao(),
+                mediaDateDao = sourceDb.mediaDateDao(),
             ),
             versionProvider = versionProvider,
             database = sourceDb,
@@ -111,6 +113,7 @@ class ImportKwBooktrackZipUseCaseTest {
                 sessionRepository = targetSessionRepo,
                 tagRepository = targetTagRepo,
                 photoRepository = targetPhotoRepo,
+                mediaDateRepository = MediaDateRepository(targetDb.mediaDateDao()),
                 photoStorage = NoOpPhotoStorage,
                 transcoder = CoverTranscoder(),
             ),
@@ -376,6 +379,7 @@ class ImportKwBooktrackZipUseCaseTest {
                     sessionRepository = SessionRepository(targetDb.readingSessionDao()),
                     tagRepository = TagRepository(targetDb.tagDao()),
                     photoRepository = photoRepository,
+                mediaDateRepository = MediaDateRepository(targetDb.mediaDateDao()),
                     photoStorage = NoOpPhotoStorage,
                     transcoder = CoverTranscoder(),
                 ),

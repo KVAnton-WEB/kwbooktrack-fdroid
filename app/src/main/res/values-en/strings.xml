@@ -14,7 +14,6 @@
     <string name="export_success_zip_format">Export ready: %1$d books, %2$d movies, %3$d photos</string>
     <string name="export_success_books_format">Export ready: %1$d books</string>
     <string name="export_success_movies_format">Export ready: %1$d movies</string>
-    <string name="export_success_format">Export ready: %1$d books, %2$d photos</string>
     <string name="export_failed_format">Export failed: %1$s</string>
     <string name="export_failed_unknown">Export failed: unknown error</string>
     <string name="about_total_books">Total books: %1$d</string>
@@ -72,6 +71,7 @@
     <string name="notes_no_results">Nothing found for «%1$s»</string>
     <string name="cd_clear_query">Clear search</string>
     <string name="cd_choose_period">Choose period</string>
+    <string name="cd_reset_filters">Reset filters</string>
     <string name="cd_choose_date">Choose date</string>
     <string name="cd_back">Back</string>
 
@@ -212,6 +212,7 @@
     <string name="dialog_unsaved_title">Unsaved changes</string>
     <string name="dialog_unsaved_message">Save changes or exit without saving?</string>
     <string name="error_no_camera">Camera permission denied</string>
+    <string name="error_duplicate_isbn">A book with this ISBN is already in the library</string>
 
     <!-- Notes -->
     <string name="empty_notes_detailed">No notes yet. Add quotes or thoughts from the book detail screen.</string>
@@ -260,7 +261,6 @@
     <string name="calendar_prev_month">Previous month</string>
     <string name="calendar_next_month">Next month</string>
     <string name="calendar_today">Today</string>
-    <string name="calendar_mode_books">Books</string>
     <string name="calendar_mode_pages">Pages</string>
 
     <!-- Weekdays -->
@@ -351,7 +351,14 @@
     <string name="empty_library_movies">No movies in the library yet</string>
     <string name="filter_watched">Watched</string>
     <string name="filter_unwatched">Not watched</string>
-    <string name="movie_duration_label">%1$d min</string>
+    <!-- Movie duration, human readable: hours and minutes. -->
+    <string name="duration_minutes">%1$d min</string>
+    <string name="duration_hours">%1$d h</string>
+    <string name="duration_hours_minutes">%1$d h %2$d min</string>
+    <!-- Same, short — for the narrow calendar cells. -->
+    <string name="duration_minutes_compact">%1$dm</string>
+    <string name="duration_hours_compact">%1$dh</string>
+    <string name="duration_hours_minutes_compact">%1$dh%2$dm</string>
     <string name="movie_detail_title">Movie</string>
     <string name="movie_not_found">Movie not found</string>
     <string name="movie_field_title">Title</string>
@@ -363,6 +370,12 @@
     <string name="movie_field_cast">Cast</string>
     <string name="movie_field_duration">Duration</string>
     <string name="movie_field_duration_min">Duration, min</string>
+    <!-- Movie watch dates: there may be several. -->
+    <string name="action_add_watching">Add viewing</string>
+    <string name="action_remove_watching">Remove viewing</string>
+    <!-- Book read dates: there may be several. -->
+    <string name="action_add_reading">Add reading</string>
+    <string name="action_remove_reading">Remove reading</string>
     <string name="movie_field_watched_at">Watched on</string>
     <string name="movie_field_url">Link</string>
     <string name="movie_field_plot">Plot</string>
@@ -378,14 +391,15 @@
     <string name="photos_section">Photos</string>
     <string name="action_remove_cover">Remove cover</string>
     <string name="label_rating">Rating</string>
-    <string name="stats_movies_watched">Movies: %1$d</string>
-    <string name="stats_minutes_watched">Minutes: %1$d</string>
+    <!-- Viewings counter: a rewatched movie counts twice. -->
+    <string name="stats_movies_watched">Viewings: %1$d</string>
+    <string name="stats_minutes_watched">Minutes watched: %1$s</string>
     <string name="stats_chart_movies_by_month">Movies watched by month: %1$s</string>
     <string name="stats_chart_movies_by_year">Movies watched by year</string>
     <string name="stats_chart_minutes_by_month">Minutes watched by month: %1$s</string>
     <string name="stats_chart_minutes_by_year">Minutes watched by year</string>
     <string name="calendar_mode_covers">Covers</string>
-    <string name="calendar_mode_minutes">Minutes</string>
+    <string name="calendar_mode_minutes">Time</string>
     <string name="about_total_movies">Total movies: %1$d</string>
     <string name="export_collection_label">Collection for Tellico export</string>
 </resources>

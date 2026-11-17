@@ -132,22 +132,20 @@ class NoteDetailViewModel @Inject constructor(
                 },
             )
             combine(
-                bookRepository.observeAll(),
-                movieRepository.observeAll(),
+                bookRepository.observeById(note.mediaId),
+                movieRepository.observeById(note.mediaId),
                 photoRepository.observeByNote(noteId),
-            ) { books, movies, photos ->
+            ) { book, movie, photos ->
                 // Владелец — книга или фильм: id у них считаются независимо,
                 // поэтому ищем по паре (id, тип).
                 val title: String
                 val subtitle: String
                 val cover: String?
                 if (note.mediaType == MediaType.MOVIES) {
-                    val movie = movies.firstOrNull { it.id == note.mediaId }
                     title = movie?.title ?: deletedFallback
                     subtitle = movie?.director.orEmpty()
                     cover = movie?.coverPath
                 } else {
-                    val book = books.firstOrNull { it.id == note.mediaId }
                     title = book?.title ?: deletedFallback
                     subtitle = book?.author.orEmpty()
                     cover = book?.coverPath

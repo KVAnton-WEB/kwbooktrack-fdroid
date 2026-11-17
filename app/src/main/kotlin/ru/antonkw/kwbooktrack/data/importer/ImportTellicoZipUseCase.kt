@@ -6,7 +6,6 @@ import ru.antonkw.kwbooktrack.data.tellico.TellicoCsvReader
 import ru.antonkw.kwbooktrack.data.tellico.TellicoRecord
 import ru.antonkw.kwbooktrack.data.tellico.TellicoXmlReader
 import java.io.File
-import java.util.zip.ZipFile
 import javax.inject.Inject
 
 /**
@@ -72,7 +71,7 @@ class ImportTellicoZipUseCase @Inject constructor(
         val root = if (zipped) {
             staging.deleteRecursively()
             staging.mkdirs()
-            unzip(file, staging)
+            unzipLimited(file, staging)
             staging
         } else {
             file.parentFile ?: File(".")
@@ -107,26 +106,6 @@ class ImportTellicoZipUseCase @Inject constructor(
         } else {
             file.takeIf { it.isFile }
         }
-
-    /** Распаковка архива с сохранением путей. */
-    private fun unzip(zip: File, target: File) {
-        val root = target.canonicalPath
-        ZipFile(zip).use { archive ->
-            for (entry in archive.entries()) {
-                val out = File(target, entry.name)
-                // Путь из архива не должен уводить за пределы распаковки.
-                if (!out.canonicalPath.startsWith(root + File.separator)) continue
-                if (entry.isDirectory) {
-                    out.mkdirs()
-                    continue
-                }
-                out.parentFile?.mkdirs()
-                archive.getInputStream(entry).use { input ->
-                    out.outputStream().use { output -> input.copyTo(output) }
-                }
-            }
-        }
-    }
 
     private fun isZip(file: File): Boolean =
         file.inputStream().use { input ->

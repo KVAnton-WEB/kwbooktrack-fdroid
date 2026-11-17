@@ -1,5 +1,6 @@
 package ru.antonkw.kwbooktrack.ui.notes
 
+import android.app.Application
 import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
@@ -16,6 +17,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows
 import org.robolectric.shadows.ShadowLooper
 import ru.antonkw.kwbooktrack.data.TestDb
 import ru.antonkw.kwbooktrack.data.NoOpPhotoStorage
@@ -28,6 +30,8 @@ import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.NoteRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
 import ru.antonkw.kwbooktrack.data.db.entity.MediaType
+import java.io.ByteArrayInputStream
+import java.io.InputStream
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -53,7 +57,11 @@ class NoteEditorViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun newVm(bookId: Long = 1L, noteId: Long = 0L) = NoteEditorViewModel(
+    private fun newVm(
+        bookId: Long = 1L,
+        noteId: Long = 0L,
+        photoRepository: PhotoRepository = this.photoRepository,
+    ) = NoteEditorViewModel(
         androidx.lifecycle.SavedStateHandle(
             mapOf("mediaId" to bookId, "noteId" to noteId).filterValues { it != 0L || it == bookId },
         ),
@@ -82,6 +90,46 @@ class NoteEditorViewModelTest {
         photoRepository.insert(
             PhotoEntity(mediaId = bookId, mediaType = MediaType.BOOKS, noteId = noteId, path = path, createdAt = 0L),
         )
+
+    /** Подменённый поток картинки: ContentResolver отдаст его редактору. */
+    private fun pickedImage(name: String): Uri = Uri.parse("content://test/$name").also {
+        Shadows.shadowOf(ApplicationProvider.getApplicationContext<Application>().contentResolver)
+            .registerInputStream(it, ByteArrayInputStream(byteArrayOf(1, 2, 3)))
+    }
+
+    @Test
+    fun photosAreSavedThroughPhotoStorage() = runTest(dispatcher) {
+        // Файл фото пишется через PhotoStorage: там имя с UUID. Собственное
+        // имя из миллисекунд у двух фото, прикреплённых в одну миллисекунду,
+        // совпало бы — второе перезаписало бы первое.
+        val bookId = insertBook()
+        val vm = newVm(bookId, photoRepository = PhotoRepository(db.photoDao(), CountingPhotoStorage))
+        vm.setBody("десять фото")
+        repeat(10) { index -> vm.attachPhoto(pickedImage("photo$index.jpg")) }
+        vm.save()
+        vm.state.first { it.saved }
+
+        val photos = db.photoDao().observeByMedia(bookId, MediaType.BOOKS).first()
+        assertThat(photos).hasSize(10)
+        // Путь пришёл из хранилища (а не собран вручную) и у каждого фото свой.
+        assertThat(photos.all { it.path.startsWith("/photos/stub_") }).isTrue()
+        assertThat(photos.map { it.path }.distinct()).hasSize(10)
+    }
+
+    /** Хранилище-заглушка: уникальный путь на каждый вызов. */
+    private object CountingPhotoStorage : ru.antonkw.kwbooktrack.data.storage.PhotoStorage {
+        private val counter = java.util.concurrent.atomic.AtomicInteger()
+
+        override fun saveForNote(noteId: Long, source: InputStream, extension: String): String =
+            "/photos/stub_${counter.incrementAndGet()}.$extension"
+
+        override fun saveNamed(name: String, source: InputStream, extension: String): String =
+            "/photos/$name.$extension"
+
+        override fun deleteForNote(noteId: Long) = Unit
+
+        override fun deletePaths(paths: Collection<String>) = Unit
+    }
 
     @Test
     fun saveAsNotePersists() = runTest(dispatcher) {
@@ -114,6 +162,39 @@ class NoteEditorViewModelTest {
         val quotes = db.noteDao().observeByKind(NoteKind.QUOTE).first { it.isNotEmpty() }
         assertThat(quotes).hasSize(1)
         assertThat(quotes.first().kind).isEqualTo(NoteKind.QUOTE)
+    }
+
+    @Test
+    fun editingNoteKeepsItsPhotosAttached() = runTest(dispatcher) {
+        // Правка заметки идёт через insert с REPLACE, а это удаление строки
+        // плюс вставка: внешний ключ photos.note_id (ON DELETE SET NULL)
+        // обнулял бы привязку всех её фото.
+        val bookId = insertBook()
+        val noteId = insertNote(bookId, "мысль")
+        db.photoDao().insert(
+            PhotoEntity(
+                mediaId = bookId,
+                mediaType = MediaType.BOOKS,
+                noteId = noteId,
+                path = "/files/photos/p.jpg",
+                createdAt = 0L,
+            ),
+        )
+
+        val vm = newVm(bookId = bookId, noteId = noteId)
+        advanceUntilIdle()
+        vm.setBody("мысль переписана")
+        vm.save()
+        // Запись идёт на потоке Room — реальном, который планировщик теста не
+        // двигает, поэтому advanceUntilIdle() возвращается раньше записи.
+        // Ждём состояния saved: оно выставляется после того, как запись
+        // прошла.
+        vm.state.first { it.saved }
+
+        val photos = db.photoDao().observeByNote(noteId).first()
+        assertThat(photos).hasSize(1)
+        assertThat(photos.single().noteId).isEqualTo(noteId)
+        assertThat(db.noteDao().findById(noteId)!!.bodyMd).isEqualTo("мысль переписана")
     }
 
     @Test

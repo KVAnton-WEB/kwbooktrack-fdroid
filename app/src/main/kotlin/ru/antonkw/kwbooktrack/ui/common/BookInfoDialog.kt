@@ -45,10 +45,11 @@ import ru.antonkw.kwbooktrack.data.time.toLocalDate
 @Composable
 fun BookInfoDialog(
     book: BookEntity,
+    dates: List<Long> = emptyList(),
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
-    val rows = remember(book) { buildRows(book) }
+    val rows = remember(book, dates) { buildRows(book, dates) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -117,7 +118,9 @@ private data class InfoRow(
     val value: String,
 )
 
-private fun buildRows(book: BookEntity): List<InfoRow> = buildList {
+private fun buildRows(book: BookEntity, dates: List<Long>): List<InfoRow> = buildList {
+    val finishedRows = (dates.ifEmpty { listOfNotNull(book.finishedAt) })
+        .map { InfoRow(R.string.label_finished_on, formatDate(it)) }
     // Order matters — the dialog scrolls, so put high-signal fields first.
     addAll(
         listOfNotNull(
@@ -141,7 +144,9 @@ private fun buildRows(book: BookEntity): List<InfoRow> = buildList {
             book.purchaseDate?.let { InfoRow(R.string.label_purchased_on, formatDate(it)) },
             book.purchasePrice?.let { InfoRow(R.string.label_price, "%.2f".format(it)) },
             book.startedAt?.let { InfoRow(R.string.label_started_on, formatDate(it)) },
-            book.finishedAt?.let { InfoRow(R.string.label_finished_on, formatDate(it)) },
+            // Все даты прочтения — по возрастанию; если список пуст, берём
+            // основную дату из книги.
+            *finishedRows.toTypedArray(),
             InfoRow(R.string.field_is_gift, boolLabel(book.isGift)),
             InfoRow(R.string.field_is_lent, boolLabel(book.isLent)),
             InfoRow(R.string.field_is_sold, boolLabel(book.isSold)),

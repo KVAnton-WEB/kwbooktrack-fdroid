@@ -16,6 +16,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -54,7 +55,6 @@ import java.io.File
 @Composable
 fun MovieEditScreen(
     onBack: () -> Unit = {},
-    onSaved: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: MovieEditViewModel = hiltViewModel(),
 ) {
@@ -64,8 +64,11 @@ fun MovieEditScreen(
         contract = ActivityResultContracts.PickVisualMedia(),
     ) { uri -> if (uri != null) viewModel.attachCover(uri) }
 
+    // После сохранения уходим назад — как в книжном редакторе. Свой
+    // `onSaved` здесь был бы лишним: навигация его не передавала, и после
+    // сохранения форма оставалась открытой без подтверждения.
     LaunchedEffect(state.saved) {
-        if (state.saved) onSaved()
+        if (state.saved) onBack()
     }
 
     Scaffold(
@@ -165,12 +168,29 @@ fun MovieEditScreen(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
-            DatePickerField(
-                value = state.watchedDate,
-                onValueChange = viewModel::setWatchedDate,
-                label = stringResource(R.string.movie_field_watched_at),
-                modifier = Modifier.fillMaxWidth(),
-            )
+            // Даты просмотра: их может быть несколько — фильм смотрят
+            // повторно. Основная (самая ранняя) — первая.
+            state.watchedDates.forEachIndexed { index, value ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    DatePickerField(
+                        value = value,
+                        onValueChange = { viewModel.setWatchedDate(index, it) },
+                        label = stringResource(R.string.movie_field_watched_at),
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (state.watchedDates.size > 1) {
+                        IconButton(onClick = { viewModel.removeWatchedDate(index) }) {
+                            Icon(
+                                Icons.Filled.Close,
+                                contentDescription = stringResource(R.string.action_remove_watching),
+                            )
+                        }
+                    }
+                }
+            }
+            TextButton(onClick = viewModel::addWatchedDate) {
+                Text(stringResource(R.string.action_add_watching))
+            }
             RatingPicker(
                 rating = state.rating,
                 onRating = viewModel::setRating,

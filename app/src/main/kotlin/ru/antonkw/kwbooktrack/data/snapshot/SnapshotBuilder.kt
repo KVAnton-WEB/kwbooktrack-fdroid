@@ -2,6 +2,7 @@ package ru.antonkw.kwbooktrack.data.snapshot
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import ru.antonkw.kwbooktrack.data.db.dao.MediaDateDao
 import ru.antonkw.kwbooktrack.data.db.dao.NoteDao
 import ru.antonkw.kwbooktrack.data.db.dao.PhotoDao
 import ru.antonkw.kwbooktrack.data.db.dao.ReadingSessionDao
@@ -30,6 +31,7 @@ class SnapshotBuilder @Inject constructor(
     private val sessionDao: ReadingSessionDao,
     private val photoDao: PhotoDao,
     private val tagDao: TagDao,
+    private val mediaDateDao: MediaDateDao,
 ) {
     suspend fun buildAll(): List<BookSnapshot> {
         // Suspend-запросы, а не Flow: Flow Room выполняет вне транзакции, и снимок
@@ -45,6 +47,10 @@ class SnapshotBuilder @Inject constructor(
         val photosByBook = photoDao.getAll()
             .filter { it.mediaType == MediaType.BOOKS }
             .groupBy { it.mediaId }
+        // Дополнительные даты прочтения — по id книги.
+        val extraDatesByBook = mediaDateDao.getAll()
+            .filter { it.mediaType == MediaType.BOOKS }
+            .groupBy({ it.mediaId }, { it.date })
         // Ключ — пара (id, тип): id книг и id фильмов считаются независимо
         // и могут совпадать, поэтому одного id мало.
         val tagsByOwner = tagDao.tagsForAllMedia().groupBy { it.mediaId to it.mediaType }
@@ -54,6 +60,8 @@ class SnapshotBuilder @Inject constructor(
             val noteIndexes = notes.withIndex().associate { (index, note) -> note.id to index + 1 }
             BookSnapshot(
                 book = book,
+                // Дополнительные даты прочтения: основная — в самой книге.
+                dates = extraDatesByBook[book.id].orEmpty(),
                 notes = notes.map { it.toSnapshot() },
                 sessions = sessionsByBook[book.id].orEmpty().map { it.toSnapshot() },
                 tags = tagsByOwner[book.id to MediaType.BOOKS].orEmpty().map { it.name },
@@ -87,6 +95,10 @@ class SnapshotBuilder @Inject constructor(
         val photosByMovie = photoDao.getAll()
             .filter { it.mediaType == MediaType.MOVIES }
             .groupBy { it.mediaId }
+        // Дополнительные даты просмотра — по id фильма.
+        val extraDatesByMovie = mediaDateDao.getAll()
+            .filter { it.mediaType == MediaType.MOVIES }
+            .groupBy({ it.mediaId }, { it.date })
         val tagsByOwner = tagDao.tagsForAllMedia().groupBy { it.mediaId to it.mediaType }
         return movies.map { movie ->
             val notes = notesByMovie[movie.id].orEmpty().sortedWith(NOTE_ORDER)
@@ -94,6 +106,8 @@ class SnapshotBuilder @Inject constructor(
             val noteIndexes = notes.withIndex().associate { (index, note) -> note.id to index + 1 }
             MovieSnapshot(
                 movie = movie,
+                // Дополнительные даты просмотра: основная — в самом фильме.
+                dates = extraDatesByMovie[movie.id].orEmpty(),
                 notes = notes.map { it.toSnapshot() },
                 tags = tagsByOwner[movie.id to MediaType.MOVIES].orEmpty().map { it.name },
                 photos = photosByMovie[movie.id].orEmpty().map { photo ->

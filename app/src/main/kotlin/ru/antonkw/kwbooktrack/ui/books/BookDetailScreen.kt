@@ -77,6 +77,7 @@ import ru.antonkw.kwbooktrack.data.time.toLocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import ru.antonkw.kwbooktrack.ui.common.CoverImage
+import ru.antonkw.kwbooktrack.ui.common.MediaTagsSection
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -128,6 +129,7 @@ fun BookDetailScreen(
     if (showInfoDialog && book != null) {
         ru.antonkw.kwbooktrack.ui.common.BookInfoDialog(
             book = book,
+            dates = state.dates,
             onDismiss = { showInfoDialog = false },
         )
     }
@@ -233,7 +235,8 @@ fun BookDetailScreen(
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
-                                book.finishedAt?.let { ts ->
+                                // Все даты прочтения — по возрастанию.
+                                state.dates.forEach { ts ->
                                     Text(
                                         text = stringResource(R.string.label_finished_on, formatDate(ts)),
                                         style = MaterialTheme.typography.bodySmall,
@@ -436,6 +439,15 @@ fun BookDetailScreen(
                             text = "  " + stringResource(R.string.action_write_review),
                             style = MaterialTheme.typography.labelLarge,
                         )
+                    }
+                }
+            }
+
+            // Теги — как у фильма: теги общие, различается только владелец.
+            if (state.tags.isNotEmpty()) {
+                item {
+                    Column {
+                        MediaTagsSection(state.tags)
                     }
                 }
             }

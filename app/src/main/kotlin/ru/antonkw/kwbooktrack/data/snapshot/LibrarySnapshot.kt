@@ -54,6 +54,8 @@ data class PhotoSnapshot(
 
 data class BookSnapshot(
     val book: BookEntity,
+    /** Дополнительные даты прочтения — основная лежит в самой книге. */
+    val dates: List<Long> = emptyList(),
     val notes: List<NoteSnapshot> = emptyList(),
     val sessions: List<SessionSnapshot> = emptyList(),
     val tags: List<String> = emptyList(),
@@ -70,6 +72,8 @@ data class BookSnapshot(
  */
 data class MovieSnapshot(
     val movie: MovieEntity,
+    /** Дополнительные даты просмотра — основная лежит в самом фильме. */
+    val dates: List<Long> = emptyList(),
     val notes: List<NoteSnapshot> = emptyList(),
     val tags: List<String> = emptyList(),
     val photos: List<PhotoSnapshot> = emptyList(),

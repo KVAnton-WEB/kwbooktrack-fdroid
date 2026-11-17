@@ -67,6 +67,7 @@ class AboutExportViewModelTest {
             sessionDao = db.readingSessionDao(),
             photoDao = db.photoDao(),
             tagDao = db.tagDao(),
+                mediaDateDao = db.mediaDateDao(),
         )
         useCase = ExportZipUseCase(
             snapshotBuilder = snapshotBuilder,

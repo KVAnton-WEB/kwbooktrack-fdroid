@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -71,6 +72,10 @@ class TellicoImportViewModel @Inject constructor(
                 // Определение формата и импорт — тоже не с главного потока.
                 val result = withContext(Dispatchers.IO) { importFile(tempFile) }
                 _state.value = importState(result)
+            } catch (e: CancellationException) {
+                // Отмена — не ошибка импорта: пользователь закрыл экран или
+                // ViewModel умер. Показывать ему ошибку не о чем.
+                throw e
             } catch (e: Exception) {
                 _state.value = ImportUiState(
                     inProgress = false,

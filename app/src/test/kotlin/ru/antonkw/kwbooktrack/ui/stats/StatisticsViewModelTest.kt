@@ -25,6 +25,7 @@ import ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
 import ru.antonkw.kwbooktrack.data.media.MediaTypeStore
+import ru.antonkw.kwbooktrack.data.repository.MediaDateRepository
 import ru.antonkw.kwbooktrack.data.repository.MovieRepository
 import ru.antonkw.kwbooktrack.data.repository.SessionRepository
 import ru.antonkw.kwbooktrack.data.time.toEpochMs
@@ -37,6 +38,7 @@ class StatisticsViewModelTest {
     private lateinit var bookRepository: BookRepository
     private lateinit var sessionRepository: SessionRepository
     private lateinit var movieRepository: MovieRepository
+    private lateinit var mediaDates: MediaDateRepository
     private lateinit var mediaTypeStore: MediaTypeStore
     private val dispatcher = StandardTestDispatcher()
 
@@ -53,6 +55,7 @@ class StatisticsViewModelTest {
         )
         sessionRepository = SessionRepository(db.readingSessionDao())
         movieRepository = MovieRepository(db.movieDao(), NoOpCoverStorage, photoRepository)
+        mediaDates = MediaDateRepository(db.mediaDateDao())
         mediaTypeStore = MediaTypeStore()
     }
 
@@ -64,7 +67,7 @@ class StatisticsViewModelTest {
 
     @Test
     fun emptyInputsYieldZeroStats() = runTest(dispatcher) {
-        val vm = StatisticsViewModel(bookRepository, movieRepository, sessionRepository, mediaTypeStore)
+        val vm = StatisticsViewModel(bookRepository, movieRepository, sessionRepository, mediaDates, mediaTypeStore)
         advanceUntilIdle()
         val stats = vm.stats.first { it is StatisticsData.Books && it.stats.totalSessions == 0 }
             .let { (it as StatisticsData.Books).stats }
@@ -89,7 +92,7 @@ class StatisticsViewModelTest {
             ReadingSessionEntity(bookId = 1L, startedAt = today, endPage = 100, durationSec = 600L),
         )
 
-        val vm = StatisticsViewModel(bookRepository, movieRepository, sessionRepository, mediaTypeStore)
+        val vm = StatisticsViewModel(bookRepository, movieRepository, sessionRepository, mediaDates, mediaTypeStore)
         advanceUntilIdle()
         val stats = vm.stats.first { it is StatisticsData.Books && it.stats.totalSessions == 1 }
             .let { (it as StatisticsData.Books).stats }
@@ -99,7 +102,7 @@ class StatisticsViewModelTest {
 
     @Test
     fun setModeAndStepYearRoundTrip() = runTest(dispatcher) {
-        val vm = StatisticsViewModel(bookRepository, movieRepository, sessionRepository, mediaTypeStore)
+        val vm = StatisticsViewModel(bookRepository, movieRepository, sessionRepository, mediaDates, mediaTypeStore)
         advanceUntilIdle()
 
         vm.setMode(ChartMode.BY_YEAR)

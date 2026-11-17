@@ -23,6 +23,7 @@ import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
 import ru.antonkw.kwbooktrack.data.db.entity.MovieEntity
 import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
+import ru.antonkw.kwbooktrack.data.repository.MediaDateRepository
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.NoteRepository
 import ru.antonkw.kwbooktrack.data.repository.PhotoRepository
@@ -67,6 +68,7 @@ class SnapshotApplierTest {
             sessionRepository = sessionRepository,
             tagRepository = tagRepository,
             photoRepository = photoRepository,
+                mediaDateRepository = MediaDateRepository(db.mediaDateDao()),
             photoStorage = NoOpPhotoStorage,
             transcoder = CoverTranscoder(),
         )
@@ -261,6 +263,7 @@ class SnapshotApplierTest {
             sessionRepository = sessionRepository,
             tagRepository = tagRepository,
             photoRepository = photoRepository,
+                mediaDateRepository = MediaDateRepository(db.mediaDateDao()),
             photoStorage = NoOpPhotoStorage,
             transcoder = CoverTranscoder(),
         )

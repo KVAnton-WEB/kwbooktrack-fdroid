@@ -33,7 +33,6 @@ import java.io.File
 import java.io.IOException
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-import java.util.zip.ZipFile
 import javax.inject.Inject
 
 /**
@@ -290,6 +289,7 @@ class ImportKwBooktrackZipUseCase @Inject constructor(
     /** Снимок книги: сама книга + то, что лежит в `extra.json`. */
     private fun snapshot(book: BookEntity, extras: BookExtras?): BookSnapshot = BookSnapshot(
         book = book,
+        dates = extras?.dates.orEmpty(),
         notes = extras?.notes?.noteSnapshots().orEmpty(),
         sessions = extras?.sessions?.sessionSnapshots().orEmpty(),
         tags = extras?.tags.orEmpty(),
@@ -300,6 +300,7 @@ class ImportKwBooktrackZipUseCase @Inject constructor(
     /** Снимок фильма: сам фильм + то, что лежит в `extra.json`. */
     private fun movieSnapshot(movie: MovieEntity, extras: MovieExtras?): MovieSnapshot = MovieSnapshot(
         movie = movie,
+        dates = extras?.dates.orEmpty(),
         notes = extras?.notes?.noteSnapshots().orEmpty(),
         tags = extras?.tags.orEmpty(),
         photos = extras?.photos?.photoSnapshots().orEmpty(),
@@ -402,29 +403,10 @@ class ImportKwBooktrackZipUseCase @Inject constructor(
         File(root, name).takeIf { it.isFile }
             ?: root.walkTopDown().firstOrNull { it.isFile && it.name == name }
 
-    /** Распаковка архива с защитой от выхода за пределы каталога (zip-slip). */
+    /** Распаковка архива: zip-slip защита и лимиты на размер — в unzipLimited. */
     private fun unzip(zip: File, target: File) {
-        val root = try {
-            target.canonicalPath
-        } catch (e: IOException) {
-            throw IllegalStateException("архив не распакован: ${e.message}")
-        }
         try {
-            ZipFile(zip).use { archive ->
-                for (entry in archive.entries()) {
-                    val out = File(target, entry.name)
-                    // Путь из архива не должен уводить за пределы распаковки.
-                    if (!out.canonicalPath.startsWith(root + File.separator)) continue
-                    if (entry.isDirectory) {
-                        out.mkdirs()
-                        continue
-                    }
-                    out.parentFile?.mkdirs()
-                    archive.getInputStream(entry).use { input ->
-                        out.outputStream().use { output -> input.copyTo(output) }
-                    }
-                }
-            }
+            unzipLimited(zip, target)
         } catch (e: IOException) {
             throw IllegalStateException("архив не распакован: ${e.message}")
         }

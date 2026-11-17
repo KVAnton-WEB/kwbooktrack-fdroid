@@ -23,6 +23,8 @@ data class ExtraArchive(
 /** Данные книги из `extra.json`. */
 @Serializable
 data class BookExtras(
+    /** Дополнительные даты прочтения (основная — в колонке `finished_at`). */
+    val dates: List<Long> = emptyList(),
     val notes: List<NoteJson> = emptyList(),
     val sessions: List<SessionJson> = emptyList(),
     val tags: List<String> = emptyList(),
@@ -37,6 +39,8 @@ data class BookExtras(
  */
 @Serializable
 data class MovieExtras(
+    /** Дополнительные даты просмотра (основная — в колонке `watched_at`). */
+    val dates: List<Long> = emptyList(),
     val notes: List<NoteJson> = emptyList(),
     val tags: List<String> = emptyList(),
     val photos: List<PhotoJson> = emptyList(),

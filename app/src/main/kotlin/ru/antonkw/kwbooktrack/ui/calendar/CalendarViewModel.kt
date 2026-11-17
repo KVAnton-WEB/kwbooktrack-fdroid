@@ -16,7 +16,10 @@ import kotlinx.coroutines.flow.stateIn
 import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 import ru.antonkw.kwbooktrack.data.db.entity.MovieEntity
 import ru.antonkw.kwbooktrack.data.media.MediaTypeStore
+import ru.antonkw.kwbooktrack.data.media.extrasByOwner
+import ru.antonkw.kwbooktrack.data.media.mediaDates
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
+import ru.antonkw.kwbooktrack.data.repository.MediaDateRepository
 import ru.antonkw.kwbooktrack.data.repository.MovieRepository
 import ru.antonkw.kwbooktrack.data.repository.SessionRepository
 import ru.antonkw.kwbooktrack.data.stats.StatsCalculator
@@ -66,6 +69,7 @@ class CalendarViewModel @Inject constructor(
     private val bookRepository: BookRepository,
     private val movieRepository: MovieRepository,
     private val sessionRepository: SessionRepository,
+    private val mediaDateRepository: MediaDateRepository,
     private val mediaTypeStore: MediaTypeStore,
 ) : ViewModel() {
 
@@ -102,10 +106,16 @@ class CalendarViewModel @Inject constructor(
     private fun buildStateForMonth(month: YearMonth) =
         mediaTypeStore.type.flatMapLatest { type ->
             if (type == MediaType.MOVIES) {
-                movieRepository.observeAll().map { movies -> buildMonth(month, movies) }
+                combine(movieRepository.observeAll(), mediaDateRepository.observeAll()) { movies, dates ->
+                    buildMonth(month, movies, extrasByOwner(dates))
+                }
             } else {
-                combine(bookRepository.observeAll(), sessionRepository.observeAll()) { books, sessions ->
-                    buildMonth(month, books, sessions)
+                combine(
+                    bookRepository.observeAll(),
+                    sessionRepository.observeAll(),
+                    mediaDateRepository.observeAll(),
+                ) { books, sessions, dates ->
+                    buildMonth(month, books, sessions, extrasByOwner(dates))
                 }
             }
         }
@@ -115,8 +125,13 @@ class CalendarViewModel @Inject constructor(
         month: YearMonth,
         books: List<ru.antonkw.kwbooktrack.data.db.entity.BookEntity>,
         sessions: List<ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity>,
+        extraDates: Map<Pair<Long, MediaType>, List<Long>> = emptyMap(),
     ): CalendarUiState {
-        val finishedByDate = books.mapNotNull { book -> book.finishedAt?.let { book to it } }
+        // Даты прочтения: основная плюс дополнительные (перечитывания).
+        val finishedByDate = books.flatMap { book ->
+            mediaDates(book.finishedAt, extraDates[book.id to MediaType.BOOKS].orEmpty())
+                .map { date -> book to date }
+        }
             .groupBy({ it.second.toLocalDate() }, { it.first })
         val pagesByDate = StatsCalculator.aggregateDailyPages(sessions).associate { it.date to it.pages }
         val booksById = books.associateBy { it.id }
@@ -130,14 +145,23 @@ class CalendarViewModel @Inject constructor(
     }
 
     /** Месяц фильмов: дни просмотра и минуты. */
-    private fun buildMonth(month: YearMonth, movies: List<MovieEntity>): CalendarUiState {
-        val watchedByDate = movies.mapNotNull { movie -> movie.watchedAt?.let { movie to it } }
+    private fun buildMonth(
+        month: YearMonth,
+        movies: List<MovieEntity>,
+        extraDates: Map<Pair<Long, MediaType>, List<Long>> = emptyMap(),
+    ): CalendarUiState {
+        // Просмотр — одна дата: пересмотренный фильм встаёт в обе даты.
+        val watchedByDate = movies.flatMap { movie ->
+            mediaDates(movie.watchedAt, extraDates[movie.id to MediaType.MOVIES].orEmpty())
+                .map { date -> movie to date }
+        }
             .groupBy({ it.second.toLocalDate() }, { it.first })
         return monthGrid(month) { date ->
             val watched = watchedByDate[date].orEmpty()
             CalendarDay(
                 date = date,
-                books = watched.map { it.toCalendarBook() },
+                // Одна плитка на фильм в день: два просмотра видно по минутам.
+                books = watched.distinctBy { it.id }.map { it.toCalendarBook() },
                 minutes = watched.sumOf { it.durationMin ?: 0 },
             )
         }
