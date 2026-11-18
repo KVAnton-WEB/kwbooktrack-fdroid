@@ -347,7 +347,9 @@ private fun RatingPicker(
                     tint = if (rating != null && value <= rating) {
                         MaterialTheme.colorScheme.tertiary
                     } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
+                        // Нейтральный серый: пустая звезда не должна выглядеть
+                        // ещё одним оттенком акцента.
+                        MaterialTheme.colorScheme.outline
                     },
                 )
             }

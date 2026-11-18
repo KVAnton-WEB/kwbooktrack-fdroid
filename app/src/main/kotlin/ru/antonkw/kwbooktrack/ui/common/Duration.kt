@@ -66,3 +66,15 @@ fun formatDurationCompact(minutes: Int): String {
             stringResource(R.string.duration_hours_minutes_compact, parts.hours, parts.minutes)
     }
 }
+
+/**
+ * Часы.минуты без единиц: 285 → «4.45».
+ *
+ * Для подписей графиков: «285» ничего не говорит, а «4.45» читается как
+ * 4 часа 45 минут и влезает в узкий столбик. Чистая функция, без Compose —
+ * её проверяет юнит-тест.
+ */
+fun formatDurationDot(totalMinutes: Int): String {
+    val safe = totalMinutes.coerceAtLeast(0)
+    return "${safe / 60}.${(safe % 60).toString().padStart(2, '0')}"
+}

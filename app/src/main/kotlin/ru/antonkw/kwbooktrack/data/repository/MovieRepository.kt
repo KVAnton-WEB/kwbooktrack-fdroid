@@ -34,7 +34,7 @@ class MovieRepository @Inject constructor(
      */
     suspend fun getAll(): List<MovieEntity> = movieDao.getAll()
 
-    fun search(query: String): Flow<List<MovieEntity>> {
+    fun search(query: String, extraIds: Set<Long> = emptySet()): Flow<List<MovieEntity>> {
         val tokens = query.lowercase()
             .split(Regex("\\s+"))
             .map { it.filter { ch -> ch.isLetterOrDigit() } }
@@ -49,10 +49,18 @@ class MovieRepository @Inject constructor(
             // nothing.
             "(title_search LIKE ? OR people_search LIKE ?)"
         }
-        val sql = "SELECT * FROM movies WHERE $conditions ORDER BY updated_at DESC"
+        // Теги совпадают в Kotlin (см. BookRepository.search): их id
+        // расширяют выдачу.
+        val where = if (extraIds.isEmpty()) {
+            conditions
+        } else {
+            "($conditions OR id IN (${extraIds.joinToString(",") { "?" }}))"
+        }
+        val sql = "SELECT * FROM movies WHERE $where ORDER BY updated_at DESC"
         // bindArgs removes the only way a token-derived literal could end up in
-        // the SQL string itself.
-        val args = tokens.flatMap { token -> List(2) { "%$token%" } }.toTypedArray()
+        // the SQL string itself; ids — числа из Long, не строки.
+        val args = (tokens.flatMap { token -> List(2) { "%$token%" } } + extraIds.toList())
+            .toTypedArray()
         return movieDao.rawSearch(SimpleSQLiteQuery(sql, args))
     }
 

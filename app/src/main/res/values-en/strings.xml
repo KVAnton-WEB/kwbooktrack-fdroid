@@ -67,7 +67,9 @@
     <string name="action_rate">Rate</string>
     <string name="dialog_rate_title">Rate this book</string>
     <string name="label_purchased_on">Purchased: %1$s</string>
+    <string name="label_purchased">Purchased</string>
     <string name="label_finished_on">Finished: %1$s</string>
+    <string name="label_finished">Finished</string>
     <string name="label_section_review">Review</string>
     <string name="cd_scan_isbn">Scan ISBN</string>
     <string name="cd_calendar">Calendar</string>
@@ -88,7 +90,7 @@
     <string name="action_grid">Grid</string>
     <string name="action_list">List</string>
     <string name="action_import_tellico">Import catalogue</string>
-    <string name="search_hint">Search by title, author, ISBN…</string>
+    <string name="search_hint">Title, author, ISBN, tag…</string>
     <string name="empty_library">Library is empty — add your first book</string>
     <string name="empty_search">Nothing found for «%1$s»</string>
     <string name="empty_no_matches">No books match the current filter</string>
@@ -210,6 +212,7 @@
     <string name="label_year">Year</string>
     <string name="label_price">Price</string>
     <string name="label_started_on">Started: %1$s</string>
+    <string name="label_started">Started</string>
     <string name="label_publisher">Publisher</string>
     <string name="label_genre">Genre</string>
     <string name="label_purchase_date">Purchase date (yyyy-MM-dd)</string>
@@ -369,15 +372,15 @@
     <string name="media_type_books">Books</string>
     <string name="media_type_movies">Movies</string>
     <string name="cd_add_movie">Add movie</string>
-    <string name="search_hint_movies">Search by title, director, actor…</string>
+    <string name="search_hint_movies">Title, director, actor, tag…</string>
     <string name="empty_no_matches_movies">No movies match the filter</string>
     <string name="empty_library_movies">No movies in the library yet</string>
     <string name="filter_watched">Watched</string>
     <string name="filter_unwatched">Not watched</string>
     <!-- Movie duration, human readable: hours and minutes. -->
-    <string name="duration_minutes">%1$d min</string>
-    <string name="duration_hours">%1$d h</string>
-    <string name="duration_hours_minutes">%1$d h %2$d min</string>
+    <string name="duration_minutes">%1$dmin</string>
+    <string name="duration_hours">%1$dh</string>
+    <string name="duration_hours_minutes">%1$dh %2$dmin</string>
     <!-- Same, short — for the narrow calendar cells. -->
     <string name="duration_minutes_compact">%1$dm</string>
     <string name="duration_hours_compact">%1$dh</string>
@@ -410,17 +413,22 @@
     <string name="movie_edit_title">Edit movie</string>
     <string name="movie_add_title">New movie</string>
     <string name="label_tags">Tags</string>
+    <string name="label_add_tag">Add a tag</string>
+    <string name="action_remove_tag">Remove tag %1$s</string>
+    <string name="action_add_tag">Add tag</string>
+    <string name="action_mark_watched">Mark as watched</string>
+    <string name="action_add_watching_date">Add watch date</string>
     <string name="notes_section">Notes and quotes</string>
     <string name="photos_section">Photos</string>
     <string name="action_remove_cover">Remove cover</string>
     <string name="label_rating">Rating</string>
     <!-- Viewings counter: a rewatched movie counts twice. -->
     <string name="stats_movies_watched">Viewings: %1$d</string>
-    <string name="stats_minutes_watched">Minutes watched: %1$s</string>
+    <string name="stats_minutes_watched">Time: %1$s</string>
     <string name="stats_chart_movies_by_month">Movies watched by month: %1$s</string>
     <string name="stats_chart_movies_by_year">Movies watched by year</string>
-    <string name="stats_chart_minutes_by_month">Minutes watched by month: %1$s</string>
-    <string name="stats_chart_minutes_by_year">Minutes watched by year</string>
+    <string name="stats_chart_minutes_by_month">Time by month: %1$s</string>
+    <string name="stats_chart_minutes_by_year">Time by year</string>
     <string name="calendar_mode_covers">Covers</string>
     <string name="calendar_mode_minutes">Time</string>
     <string name="about_total_movies">Total movies: %1$d</string>

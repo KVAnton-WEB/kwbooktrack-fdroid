@@ -53,6 +53,8 @@ data class BookDetailUiState(
     val sessionDeltas: Map<Long, Int> = emptyMap(),
     /** Теги книги — как у фильма, теги общие. */
     val tags: List<String> = emptyList(),
+    /** Все известные теги — подсказки при добавлении. */
+    val allTags: List<String> = emptyList(),
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -82,11 +84,13 @@ class BookDetailViewModel @Inject constructor(
                 sessionRepository.observeByBook(bookId),
                 noteRepository.observeByMedia(bookId, MediaType.BOOKS),
                 photoRepository.observeByMedia(bookId, MediaType.BOOKS),
-                // Теги и даты — одним потоком: у combine пять аргументов.
+                // Теги, их подсказки и даты — одним потоком: у combine пять
+                // аргументов.
                 combine(
                     tagRepository.observeTagsOfMedia(bookId, MediaType.BOOKS),
+                    tagRepository.observeAllNames(),
                     mediaDateRepository.observeFor(bookId, MediaType.BOOKS),
-                ) { tags, extraDates -> tags to extraDates },
+                ) { tags, allTags, extraDates -> Triple(tags, allTags, extraDates) },
             ) { book, sessions, notes, photos, tagsAndDates ->
                 val progress = computeProgress(book, sessions)
                 BookDetailUiState(
@@ -96,9 +100,10 @@ class BookDetailViewModel @Inject constructor(
                     photos,
                     progress,
                     // Даты прочтения: основная плюс дополнительные.
-                    mediaDates(book?.finishedAt, tagsAndDates.second.map { it.date }),
+                    mediaDates(book?.finishedAt, tagsAndDates.third.map { it.date }),
                     StatsCalculator.sessionDeltas(sessions),
                     tagsAndDates.first,
+                    tagsAndDates.second,
                 )
             }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyState())
         }
@@ -162,6 +167,19 @@ class BookDetailViewModel @Inject constructor(
                 ),
             )
             mediaDateRepository.replaceFor(bookId, MediaType.BOOKS, dates.drop(1))
+        }
+    }
+
+    /** Привязать тег по имени — он появится на карточке сразу. */
+    fun addTag(name: String) {
+        viewModelScope.launch {
+            tagRepository.attach(bookId, MediaType.BOOKS, name)
+        }
+    }
+
+    fun removeTag(name: String) {
+        viewModelScope.launch {
+            tagRepository.detach(bookId, MediaType.BOOKS, name)
         }
     }
 

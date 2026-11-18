@@ -3,6 +3,7 @@ package ru.antonkw.kwbooktrack.ui.movies
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.room.withTransaction
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,6 +30,8 @@ data class MovieDetailUiState(
     val notes: List<NoteEntity> = emptyList(),
     val photos: List<PhotoEntity> = emptyList(),
     val tags: List<String> = emptyList(),
+    /** Все известные теги — подсказки при добавлении. */
+    val allTags: List<String> = emptyList(),
     /** Даты просмотра — по возрастанию. */
     val dates: List<Long> = emptyList(),
 )
@@ -50,6 +53,7 @@ class MovieDetailViewModel @Inject constructor(
     private val photoRepository: PhotoRepository,
     private val tagRepository: TagRepository,
     private val mediaDateRepository: MediaDateRepository,
+    private val database: ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase,
 ) : ViewModel() {
 
     private val movieId: Long = savedStateHandle.get<Long>(KEY_MOVIE_ID) ?: -1L
@@ -61,18 +65,64 @@ class MovieDetailViewModel @Inject constructor(
         movieRepository.observeById(movieId),
         noteRepository.observeByMedia(movieId, MediaType.MOVIES),
         photoRepository.observeByMedia(movieId, MediaType.MOVIES),
-        tagRepository.observeTagsOfMedia(movieId, MediaType.MOVIES),
-        mediaDateRepository.observeFor(movieId, MediaType.MOVIES),
-    ) { movie, notes, photos, tags, extraDates ->
+        // Теги, их подсказки и даты — одним потоком: у combine пять аргументов.
+        combine(
+            tagRepository.observeTagsOfMedia(movieId, MediaType.MOVIES),
+            tagRepository.observeAllNames(),
+            mediaDateRepository.observeFor(movieId, MediaType.MOVIES),
+        ) { tags, allTags, extraDates -> Triple(tags, allTags, extraDates) },
+    ) { movie, notes, photos, tagsAndDates ->
+        val (tags, allTags, extraDates) = tagsAndDates
         MovieDetailUiState(
             movie = movie,
             notes = notes,
             photos = photos,
             tags = tags,
+            allTags = allTags,
             // Даты просмотра: основная плюс дополнительные.
             dates = mediaDates(movie?.watchedAt, extraDates.map { it.date }),
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MovieDetailUiState(null))
+
+    /** Привязать тег по имени — он появится на карточке сразу. */
+    fun addTag(name: String) {
+        viewModelScope.launch {
+            tagRepository.attach(movieId, MediaType.MOVIES, name)
+        }
+    }
+
+    fun removeTag(name: String) {
+        viewModelScope.launch {
+            tagRepository.detach(movieId, MediaType.MOVIES, name)
+        }
+    }
+
+    /**
+     * Отметить просмотр датой.
+     *
+     * Основная дата — самая ранняя (инвариант [mediaDates]): если добавляемая
+     * раньше всех, она уходит в `watched_at`, прежняя основная — в
+     * дополнительные. Транзакцией: иначе падение между записями оставило бы
+     * дату без основной.
+     */
+    fun addWatchDate(date: Long) {
+        viewModelScope.launch {
+            database.withTransaction {
+                val movie = movieRepository.findById(movieId) ?: return@withTransaction
+                val extra = mediaDateRepository.getFor(movieId, MediaType.MOVIES)
+                // distinct: повторное «отметить просмотр» тем же днём не должно
+                // добавлять вторую одинаковую дату.
+                val dates = mediaDates(movie.watchedAt, extra + date).distinct()
+                movieRepository.update(
+                    movie.copy(
+                        watchedAt = dates.first(),
+                        updatedAt = System.currentTimeMillis(),
+                    ),
+                )
+                mediaDateRepository.replaceFor(movieId, MediaType.MOVIES, dates.drop(1))
+            }
+        }
+    }
 
     fun deleteMovie() {
         viewModelScope.launch {

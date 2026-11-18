@@ -120,7 +120,7 @@ private data class InfoRow(
 
 private fun buildRows(book: BookEntity, dates: List<Long>): List<InfoRow> = buildList {
     val finishedRows = (dates.ifEmpty { listOfNotNull(book.finishedAt) })
-        .map { InfoRow(R.string.label_finished_on, formatDate(it)) }
+        .map { InfoRow(R.string.label_finished, formatDate(it)) }
     // Order matters — the dialog scrolls, so put high-signal fields first.
     addAll(
         listOfNotNull(
@@ -141,9 +141,9 @@ private fun buildRows(book: BookEntity, dates: List<Long>): List<InfoRow> = buil
             book.printYear?.toString()?.let { InfoRow(R.string.field_print_year, it) },
             book.pageCount?.toString()?.let { InfoRow(R.string.label_page_count, it) },
             book.printPages?.let { InfoRow(R.string.field_print_pages, formatDecimal(it)) },
-            book.purchaseDate?.let { InfoRow(R.string.label_purchased_on, formatDate(it)) },
+            book.purchaseDate?.let { InfoRow(R.string.label_purchased, formatDate(it)) },
             book.purchasePrice?.let { InfoRow(R.string.label_price, "%.2f".format(it)) },
-            book.startedAt?.let { InfoRow(R.string.label_started_on, formatDate(it)) },
+            book.startedAt?.let { InfoRow(R.string.label_started, formatDate(it)) },
             // Все даты прочтения — по возрастанию; если список пуст, берём
             // основную дату из книги.
             *finishedRows.toTypedArray(),

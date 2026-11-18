@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
@@ -28,11 +29,13 @@ import ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity
 import ru.antonkw.kwbooktrack.data.media.MediaTypeStore
 import ru.antonkw.kwbooktrack.data.media.extrasOfType
 import ru.antonkw.kwbooktrack.data.media.mediaDates
+import ru.antonkw.kwbooktrack.data.media.tagMatchedOwners
 import ru.antonkw.kwbooktrack.data.progress.ReadingProgress
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.MediaDateRepository
 import ru.antonkw.kwbooktrack.data.repository.MovieRepository
 import ru.antonkw.kwbooktrack.data.repository.SessionRepository
+import ru.antonkw.kwbooktrack.data.repository.TagRepository
 import ru.antonkw.kwbooktrack.data.time.toDayDate
 import ru.antonkw.kwbooktrack.ui.common.PeriodOption
 import ru.antonkw.kwbooktrack.ui.common.PeriodOptions
@@ -128,6 +131,7 @@ class LibraryViewModel @Inject constructor(
     private val mediaDateRepository: MediaDateRepository,
     private val mediaTypeStore: MediaTypeStore,
     private val savedStateHandle: SavedStateHandle,
+    private val tagRepository: TagRepository,
 ) : ViewModel() {
 
     private val query = MutableStateFlow(savedStateHandle.get<String>(KEY_QUERY) ?: "")
@@ -263,21 +267,27 @@ class LibraryViewModel @Inject constructor(
     /** Содержимое списка — по текущему типу носителя. */
     private fun load(filters: Filters): Flow<LibraryUiState> =
         currentMediaType.flatMapLatest { type ->
+            // Поиск по тегам: совпадения ищутся в Kotlin, а сюда приходят
+            // готовые id — SQLite не складывает регистр кириллицы. Пустой
+            // запрос тегов не касается: библиотека и так видна целиком.
+            val tagIds = if (filters.query.isBlank()) {
+                flowOf(emptySet<Long>())
+            } else {
+                tagRepository.observeAll().map { tags ->
+                    tagMatchedOwners(tags, filters.query, type)
+                }
+            }
             if (type == MediaType.MOVIES) {
                 combine(
-                    if (filters.query.isBlank()) {
-                        movieRepository.observeAll()
-                    } else {
-                        movieRepository.search(filters.query.trim())
+                    tagIds.flatMapLatest { ids ->
+                        movieRepository.search(filters.query.trim(), ids)
                     },
                     mediaDateRepository.observeAll(),
                 ) { movies, dates -> movieItems(filters, movies, dates) }
             } else {
                 combine(
-                    if (filters.query.isBlank()) {
-                        bookRepository.observeAll()
-                    } else {
-                        bookRepository.search(filters.query.trim())
+                    tagIds.flatMapLatest { ids ->
+                        bookRepository.search(filters.query.trim(), ids)
                     },
                     sessionRepository.observeAll(),
                     mediaDateRepository.observeAll(),

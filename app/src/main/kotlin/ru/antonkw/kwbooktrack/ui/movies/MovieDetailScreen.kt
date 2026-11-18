@@ -16,12 +16,15 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.NoteAdd
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.RateReview
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -32,7 +35,9 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,6 +55,7 @@ import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 import ru.antonkw.kwbooktrack.data.db.entity.NoteEntity
 import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
 import ru.antonkw.kwbooktrack.data.time.toDayDate
+import ru.antonkw.kwbooktrack.data.time.toDayMs
 import ru.antonkw.kwbooktrack.data.time.toLocalDay
 import ru.antonkw.kwbooktrack.ui.common.CoverImage
 import ru.antonkw.kwbooktrack.ui.common.ExtraFieldsSection
@@ -61,6 +67,9 @@ import ru.antonkw.kwbooktrack.ui.common.MediaTagsSection
 import ru.antonkw.kwbooktrack.ui.common.PhotoGalleryDialog
 import ru.antonkw.kwbooktrack.ui.common.PhotoSource
 import java.io.File
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
 
 /**
  * Карточка фильма: обложка, поля, рецензия, заметки, цитаты, теги и фото.
@@ -84,11 +93,15 @@ fun MovieDetailScreen(
     var confirmDelete by remember { mutableStateOf(false) }
     var showCoverViewer by remember { mutableStateOf(false) }
     var galleryIndex by remember { mutableStateOf(-1) }
+    var showWatchPicker by remember { mutableStateOf(false) }
 
-    if (deleted) {
-        onDeleted()
-        return
+    // Навигацию зовём из эффекта, а не из тела композиции: popBackStack во
+    // время композиции оставлял NavHost с пустым экраном — чёрный кадр без
+    // падения. У книги это уже было сделано через LaunchedEffect.
+    LaunchedEffect(deleted) {
+        if (deleted) onDeleted()
     }
+    if (deleted) return
 
     Scaffold(
         modifier = modifier,
@@ -215,6 +228,22 @@ fun MovieDetailScreen(
                 // Все даты просмотра — по возрастанию, по одной на строку.
                 state.dates.map { it.toDayDate().toString() },
             )
+            // Отметка просмотра — здесь же, без входа в редактор: дата по
+            // умолчанию сегодняшняя, повторный просмотр добавляет ещё одну.
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    onClick = { showWatchPicker = true },
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Icon(Icons.Filled.Check, contentDescription = null)
+                    Text(
+                        text = "  " + stringResource(
+                            if (state.dates.isEmpty()) R.string.action_mark_watched else R.string.action_add_watching_date,
+                        ),
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                }
+            }
             MovieFieldRow(R.string.movie_field_url, movie.url)
 
             ExtraFieldsSection(movie.extraFields)
@@ -247,7 +276,12 @@ fun MovieDetailScreen(
                 MarkdownText(markdown = movie.comments)
             }
 
-            MediaTagsSection(state.tags)
+            MediaTagsSection(
+                tags = state.tags,
+                suggestions = state.allTags,
+                onAddTag = viewModel::addTag,
+                onRemoveTag = viewModel::removeTag,
+            )
 
             if (otherNotes.isNotEmpty()) {
                 Text(stringResource(R.string.notes_section), style = MaterialTheme.typography.titleMedium)
@@ -274,7 +308,7 @@ fun MovieDetailScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(64.dp))
+            Spacer(modifier = Modifier.height(96.dp))
         }
     }
 
@@ -284,6 +318,33 @@ fun MovieDetailScreen(
             initialIndex = galleryIndex,
             onDismiss = { galleryIndex = -1 },
         )
+    }
+
+    // Дата просмотра: сегодняшняя по умолчанию — чаще всего отмечают «сейчас».
+    if (showWatchPicker) {
+        val pickerState = rememberDatePickerState(
+            initialSelectedDateMillis = LocalDate.now().atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
+        )
+        DatePickerDialog(
+            onDismissRequest = { showWatchPicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    pickerState.selectedDateMillis?.let { millis ->
+                        viewModel.addWatchDate(
+                            Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate().toDayMs(),
+                        )
+                    }
+                    showWatchPicker = false
+                }) { Text(stringResource(R.string.action_save)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showWatchPicker = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+        ) {
+            DatePicker(state = pickerState)
+        }
     }
 
     if (confirmDelete) {

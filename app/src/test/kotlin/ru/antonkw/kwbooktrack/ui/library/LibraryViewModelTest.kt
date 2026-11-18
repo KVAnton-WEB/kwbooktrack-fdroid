@@ -65,7 +65,10 @@ class LibraryViewModelTest {
 
     private fun viewModel(
         saved: androidx.lifecycle.SavedStateHandle = androidx.lifecycle.SavedStateHandle(),
-    ) = LibraryViewModel(repository, movies, sessionRepository, mediaDates, mediaTypeStore, saved).also {
+    ) = LibraryViewModel(
+        repository, movies, sessionRepository, mediaDates, mediaTypeStore, saved,
+        ru.antonkw.kwbooktrack.data.repository.TagRepository(db.tagDao()),
+    ).also {
         TestViewModels.track(it)
     }
 
@@ -243,6 +246,39 @@ class LibraryViewModelTest {
         assertThat(viewModel.currentBookFilter.value).isEqualTo(BookFilterType.PURCHASED)
         viewModel.setMediaType(MediaType.MOVIES)
         assertThat(viewModel.currentMovieFilter.value).isEqualTo(MovieFilterType.WATCHED)
+    }
+
+    @Test
+    fun searchFindsBookByTag() = runTest(dispatcher) {
+        val id = repository.insert(purchased("Дюна", LocalDate.of(2026, 1, 1)))
+        repository.insert(purchased("Чужак", LocalDate.of(2026, 1, 2)))
+        val tags = ru.antonkw.kwbooktrack.data.repository.TagRepository(db.tagDao())
+        tags.attach(id, MediaType.BOOKS, "Сага")
+        val viewModel = viewModel()
+
+        viewModel.setQuery("сага")
+        val loaded = viewModel.uiState.first {
+            it is LibraryUiState.Loaded && it.query == "сага"
+        } as LibraryUiState.Loaded
+        assertThat(loaded.titles()).containsExactly("Дюна")
+    }
+
+    @Test
+    fun searchFindsMovieByTagAndKeepsBookTagsOut() = runTest(dispatcher) {
+        val bookId = repository.insert(purchased("Книга", LocalDate.of(2026, 1, 1)))
+        val movieId = movies.insert(watched("Фильм", LocalDate.of(2026, 1, 2)))
+        val tags = ru.antonkw.kwbooktrack.data.repository.TagRepository(db.tagDao())
+        tags.attach(bookId, MediaType.BOOKS, "нуар")
+        tags.attach(movieId, MediaType.MOVIES, "нуар")
+        val viewModel = viewModel()
+        viewModel.setMediaType(MediaType.MOVIES)
+
+        viewModel.setQuery("нуар")
+        val loaded = viewModel.uiState.first {
+            it is LibraryUiState.Loaded && it.mediaType == MediaType.MOVIES && it.query == "нуар"
+        } as LibraryUiState.Loaded
+        // Теги общие, но владельцы разные: книга в режим фильмов не попадает.
+        assertThat(loaded.titles()).containsExactly("Фильм")
     }
 
     /** Названия записей списка — книги и фильмы вместе. */

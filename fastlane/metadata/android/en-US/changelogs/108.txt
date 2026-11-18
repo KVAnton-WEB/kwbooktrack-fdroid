@@ -1,0 +1,1 @@
+Fixed labels in the book info dialog: "Purchased", "Started" and "Finished" no longer show the raw placeholder "%1$s" — the date is displayed normally.

@@ -2,6 +2,7 @@ package ru.antonkw.kwbooktrack.data.repository
 
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Before
@@ -71,5 +72,39 @@ class TagRepositoryTest {
         // without IGNORE; this asserts the contract.)
         assertThat(tagDao.findByName("thriller")).isNotNull()
         assertThat(tagDao.tagsOfMedia(1L, MediaType.BOOKS)).containsExactly("thriller")
+    }
+
+    @Test
+    fun attachByNameCreatesAndLinks() = runTest {
+        db.bookDao().insert(
+            ru.antonkw.kwbooktrack.data.db.entity.BookEntity(
+                title = "Sample",
+                author = "Anon",
+                createdAt = 0L,
+                updatedAt = 0L,
+            ),
+        )
+
+        assertThat(repo.attach(1L, MediaType.BOOKS, "  #фэнтези ")).isTrue()
+        assertThat(tagDao.tagsOfMedia(1L, MediaType.BOOKS)).containsExactly("фэнтези")
+        assertThat(repo.observeAllNames().first()).containsExactly("фэнтези")
+    }
+
+    @Test
+    fun detachByNameKeepsTagRowForOtherOwners() = runTest {
+        db.bookDao().insert(
+            ru.antonkw.kwbooktrack.data.db.entity.BookEntity(
+                title = "Sample",
+                author = "Anon",
+                createdAt = 0L,
+                updatedAt = 0L,
+            ),
+        )
+        repo.attach(1L, MediaType.BOOKS, "сага")
+
+        assertThat(repo.detach(1L, MediaType.BOOKS, "сага")).isEqualTo(1)
+        assertThat(tagDao.tagsOfMedia(1L, MediaType.BOOKS)).isEmpty()
+        // Строка тега остаётся: её может использовать другой владелец.
+        assertThat(tagDao.findByName("сага")).isNotNull()
     }
 }

@@ -109,6 +109,7 @@ class LibraryPeriodFilterTest {
             mediaDates,
             mediaTypeStore,
             androidx.lifecycle.SavedStateHandle(),
+            ru.antonkw.kwbooktrack.data.repository.TagRepository(db.tagDao()),
         )
         TestViewModels.track(vm)
         return vm

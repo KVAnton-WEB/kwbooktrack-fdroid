@@ -46,6 +46,7 @@ import ru.antonkw.kwbooktrack.data.stats.ReadingStats
 import ru.antonkw.kwbooktrack.data.stats.StatsCalculator
 import ru.antonkw.kwbooktrack.data.stats.YearlyPages
 import ru.antonkw.kwbooktrack.ui.common.formatDuration
+import ru.antonkw.kwbooktrack.ui.common.formatDurationDot
 import kotlin.math.max
 import ru.antonkw.kwbooktrack.R
 
@@ -222,6 +223,8 @@ private fun MovieCharts(stats: MovieStats, selection: ChartSelection) {
             ChartMode.BY_MONTH -> monthlyMinutesChartValues(stats.monthlyMinutes, selection.year)
             ChartMode.BY_YEAR -> stats.yearlyMinutes.associate { it.year to it.pages }
         },
+        // Минуты в подписи столбика не читаются: 285 → «4.45».
+        format = ::formatDurationDot,
     )
 }
 
@@ -230,6 +233,7 @@ private fun ChartCard(
     title: String,
     labels: List<String>,
     values: Map<Int, Int>,
+    format: (Int) -> String = { it.toString() },
 ) {
     Card {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -237,7 +241,7 @@ private fun ChartCard(
                 text = title,
                 style = MaterialTheme.typography.titleMedium,
             )
-            BarChartWithLabels(labels = labels, values = values)
+            BarChartWithLabels(labels = labels, values = values, format = format)
         }
     }
 }
@@ -330,6 +334,7 @@ private fun monthLabels(): List<String> = stringArrayResource(R.array.months_sho
 private fun BarChartWithLabels(
     labels: List<String>,
     values: Map<Int, Int>,
+    format: (Int) -> String = { it.toString() },
 ) {
     val barColor = MaterialTheme.colorScheme.primary
     val emptyColor = MaterialTheme.colorScheme.surfaceVariant
@@ -373,7 +378,7 @@ private fun BarChartWithLabels(
                         ) {
                             if (v > 0) {
                                 Text(
-                                    text = v.toString(),
+                                    text = format(v),
                                     color = barValueColor,
                                     style = MaterialTheme.typography.labelSmall,
                                     maxLines = 1,

@@ -33,7 +33,7 @@ class BookRepository @Inject constructor(
      */
     suspend fun getAll(): List<BookEntity> = bookDao.getAll()
 
-    fun search(query: String): Flow<List<BookEntity>> {
+    fun search(query: String, extraIds: Set<Long> = emptySet()): Flow<List<BookEntity>> {
         val tokens = query.lowercase()
             .split(Regex("\\s+"))
             .map { it.filter { ch -> ch.isLetterOrDigit() } }
@@ -50,11 +50,19 @@ class BookRepository @Inject constructor(
                 " OR REPLACE(IFNULL(isbn13, ''), '-', '') LIKE ?" +
                 " OR series_search LIKE ?)"
         }
-        val sql = "SELECT * FROM books WHERE $conditions ORDER BY updated_at DESC"
+        // Теги совпадают в Kotlin (SQLite не складывает регистр кириллицы):
+        // их id приходят готовым набором и расширяют выдачу.
+        val where = if (extraIds.isEmpty()) {
+            conditions
+        } else {
+            "($conditions OR id IN (${extraIds.joinToString(",") { "?" }}))"
+        }
+        val sql = "SELECT * FROM books WHERE $where ORDER BY updated_at DESC"
         // Bind the same argument 4× per token — one per LIKE position.
         // bindArgs removes the only way a token-derived literal could end up in the
-        // SQL string itself.
-        val args = tokens.flatMap { token -> List(4) { "%$token%" } }.toTypedArray()
+        // SQL string itself. Ids — числа из Long, не строки.
+        val args = (tokens.flatMap { token -> List(4) { "%$token%" } } + extraIds.toList())
+            .toTypedArray()
         return bookDao.rawSearch(SimpleSQLiteQuery(sql, args))
     }
 

@@ -1,0 +1,1 @@
+Fixed the blank screen after deleting a movie: the app now returns to the list.

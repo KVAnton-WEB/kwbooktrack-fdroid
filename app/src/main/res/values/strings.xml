@@ -67,7 +67,9 @@
     <string name="action_rate">Оценить</string>
     <string name="dialog_rate_title">Оцените книгу</string>
     <string name="label_purchased_on">Куплено: %1$s</string>
+    <string name="label_purchased">Куплено</string>
     <string name="label_finished_on">Прочитано: %1$s</string>
+    <string name="label_finished">Прочитано</string>
     <string name="label_section_review">Рецензия</string>
     <string name="cd_scan_isbn">Сканировать ISBN</string>
     <string name="cd_calendar">Календарь</string>
@@ -88,7 +90,7 @@
     <string name="notes_search_hint">Поиск по заметкам…</string>
     <string name="notes_no_results">Ничего не найдено по «%1$s»</string>
     <string name="action_import_tellico">Импорт каталога</string>
-    <string name="search_hint">Поиск по названию, автору, ISBN…</string>
+    <string name="search_hint">Название, автор, ISBN, тег…</string>
     <string name="empty_library">Библиотека пуста — добавьте первую книгу</string>
     <string name="empty_search">Ничего не найдено по «%1$s»</string>
     <string name="empty_no_matches">Нет книг, подходящих под фильтр</string>
@@ -210,6 +212,7 @@
     <string name="label_year">Год</string>
     <string name="label_price">Цена</string>
     <string name="label_started_on">Начато: %1$s</string>
+    <string name="label_started">Начато</string>
     <string name="label_publisher">Издательство</string>
     <string name="label_genre">Жанр</string>
     <string name="label_purchase_date">Дата покупки (dd.MM.yyyy)</string>
@@ -372,15 +375,15 @@
     <string name="media_type_books">Книги</string>
     <string name="media_type_movies">Фильмы</string>
     <string name="cd_add_movie">Добавить фильм</string>
-    <string name="search_hint_movies">Поиск по названию, режиссёру, актёру…</string>
+    <string name="search_hint_movies">Название, режиссёр, актёр, тег…</string>
     <string name="empty_no_matches_movies">Нет фильмов, подходящих под фильтр</string>
     <string name="empty_library_movies">В библиотеке пока нет фильмов</string>
     <string name="filter_watched">Просмотрено</string>
     <string name="filter_unwatched">Не просмотрено</string>
     <!-- Длительность фильма человекочитаемо: часы и минуты. -->
-    <string name="duration_minutes">%1$d мин</string>
-    <string name="duration_hours">%1$d ч</string>
-    <string name="duration_hours_minutes">%1$d ч %2$d мин</string>
+    <string name="duration_minutes">%1$dмин</string>
+    <string name="duration_hours">%1$dч</string>
+    <string name="duration_hours_minutes">%1$dч %2$dмин</string>
     <!-- То же коротко — для узких ячеек календаря. -->
     <string name="duration_minutes_compact">%1$dм</string>
     <string name="duration_hours_compact">%1$dч</string>
@@ -413,17 +416,22 @@
     <string name="movie_edit_title">Редактирование фильма</string>
     <string name="movie_add_title">Новый фильм</string>
     <string name="label_tags">Теги</string>
+    <string name="label_add_tag">Добавить тег</string>
+    <string name="action_remove_tag">Убрать тег %1$s</string>
+    <string name="action_add_tag">Добавить тег</string>
+    <string name="action_mark_watched">Отметить просмотр</string>
+    <string name="action_add_watching_date">Добавить дату просмотра</string>
     <string name="notes_section">Заметки и цитаты</string>
     <string name="photos_section">Фото</string>
     <string name="action_remove_cover">Убрать обложку</string>
     <string name="label_rating">Рейтинг</string>
     <!-- Счётчик просмотров: пересмотренный фильм считается дважды. -->
     <string name="stats_movies_watched">Просмотров: %1$d</string>
-    <string name="stats_minutes_watched">Минут просмотра: %1$s</string>
+    <string name="stats_minutes_watched">Время: %1$s</string>
     <string name="stats_chart_movies_by_month">Просмотрено фильмов по месяцам: %1$s</string>
     <string name="stats_chart_movies_by_year">Просмотрено фильмов по годам</string>
-    <string name="stats_chart_minutes_by_month">Минут просмотра по месяцам: %1$s</string>
-    <string name="stats_chart_minutes_by_year">Минут просмотра по годам</string>
+    <string name="stats_chart_minutes_by_month">Время по месяцам: %1$s</string>
+    <string name="stats_chart_minutes_by_year">Время по годам</string>
     <string name="calendar_mode_covers">Обложки</string>
     <string name="calendar_mode_minutes">Время</string>
     <string name="about_total_movies">Всего фильмов: %1$d</string>

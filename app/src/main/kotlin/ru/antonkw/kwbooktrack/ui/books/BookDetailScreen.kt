@@ -388,7 +388,11 @@ fun BookDetailScreen(
                                                             tint = MaterialTheme.colorScheme.tertiary,
                                                         )
                                                     } else {
-                                                        Icon(Icons.Outlined.Star, contentDescription = null)
+                                                        Icon(
+                                                            Icons.Outlined.Star,
+                                                            contentDescription = null,
+                                                            tint = MaterialTheme.colorScheme.outline,
+                                                        )
                                                     }
                                                 }
                                             }
@@ -456,11 +460,15 @@ fun BookDetailScreen(
             }
 
             // Теги — как у фильма: теги общие, различается только владелец.
-            if (state.tags.isNotEmpty()) {
-                item {
-                    Column {
-                        MediaTagsSection(state.tags)
-                    }
+            // Секция видна всегда: без неё некуда добавить первый тег.
+            item {
+                Column {
+                    MediaTagsSection(
+                        tags = state.tags,
+                        suggestions = state.allTags,
+                        onAddTag = viewModel::addTag,
+                        onRemoveTag = viewModel::removeTag,
+                    )
                 }
             }
 

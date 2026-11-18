@@ -55,4 +55,15 @@ class DurationTest {
         assertThat(parts.hours).isEqualTo(0)
         assertThat(parts.minutes).isEqualTo(0)
     }
+
+    @Test
+    fun dotFormatPadsMinutes() {
+        // Подписи графиков: 285 минут — это «4.45», а не «285».
+        assertThat(formatDurationDot(285)).isEqualTo("4.45")
+        assertThat(formatDurationDot(132)).isEqualTo("2.12")
+        assertThat(formatDurationDot(120)).isEqualTo("2.00")
+        assertThat(formatDurationDot(45)).isEqualTo("0.45")
+        assertThat(formatDurationDot(0)).isEqualTo("0.00")
+        assertThat(formatDurationDot(-5)).isEqualTo("0.00")
+    }
 }

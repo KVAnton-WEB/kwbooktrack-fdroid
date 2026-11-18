@@ -360,7 +360,11 @@ fun AddBookScreen(
                         if ((state.rating ?: 0) >= star) {
                             Icon(Icons.Filled.Star, contentDescription = null, tint = MaterialTheme.colorScheme.tertiary)
                         } else {
-                            Icon(Icons.Outlined.Star, contentDescription = null)
+                            Icon(
+                                Icons.Outlined.Star,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.outline,
+                            )
                         }
                     }
                 }

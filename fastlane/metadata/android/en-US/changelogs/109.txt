@@ -1,0 +1,1 @@
+Movie card: mark a viewing with a date picker right on the card. Tags on book and movie cards can now be added and removed, with suggestions from existing tags; library search finds items by tag. Durations are shown as "40h 45min", statistics say "Time", and chart labels use the "4.45" format. Empty rating stars are grey so they stand out less than the selected ones.
