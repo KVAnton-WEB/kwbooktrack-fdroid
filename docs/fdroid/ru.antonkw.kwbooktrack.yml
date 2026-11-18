@@ -27,7 +27,7 @@ Builds:
       - yes
 
 AutoUpdateMode: Version
-UpdateCheckMode: Tags ^v[0-9.]+(-fdroid)?$
+UpdateCheckMode: Tags ^v[0-9.]+(-fdroid(\.[0-9]+)?)?$
 CurrentVersion: 0.9.5-fdroid.2
 CurrentVersionCode: 115
 
@@ -41,12 +41,11 @@ MaintainerNotes: |-
   Descriptions, changelogs and screenshots live in the app repository under
   fastlane/metadata/android/{en-US,ru}; do not duplicate them here.
 
-  The release build type is signed with a local keystore when
-  keystore.properties exists. fdroidserver strips the signingConfigs block and
-  the signingConfig assignment, so the build server produces an unsigned APK
-  and signs it with the F-Droid key. Verified with a local `fdroid build --test`
-  from this very repository: APK is unsigned, versionName 0.9.5-fdroid.2,
-  versionCode 115.
+  The release build type is signed with the debug key, but fdroidserver strips
+  the signingConfigs block and the signingConfig assignment, so the build
+  server produces an unsigned APK and signs it with the F-Droid key. Verified
+  with a local `fdroid build --test` against this repository: the APK is
+  unsigned, versionName 0.9.5-fdroid.2, versionCode 115.
 
   The app has no INTERNET permission and no network dependencies; all data is
   stored locally in Room.
