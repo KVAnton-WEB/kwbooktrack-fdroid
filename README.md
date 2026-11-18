@@ -89,9 +89,6 @@ F-Droid builds from the [kwbooktrack-fdroid](https://github.com/KVAnton-WEB/kwbo
 mirror: the steps are in [docs/fdroid.md](docs/fdroid.md) and the ready metadata file for
 `fdroiddata` is [docs/fdroid/ru.antonkw.kwbooktrack.yml](docs/fdroid/ru.antonkw.kwbooktrack.yml).
 
-For RuStore — requirements, a separate icon and screenshot set, and the submission
-order — see [docs/rustore.md](docs/rustore.md).
-
 ## Build
 
     ./gradlew assembleDebug

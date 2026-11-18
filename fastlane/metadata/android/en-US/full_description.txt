@@ -1,18 +1,30 @@
-<p><b>kwbooktrack</b> is an offline tracker for your personal book and movie collection. No account, no ads, no analytics: everything stays on your device and the app never asks for internet access.</p>
+<p><b>kwbooktrack</b> is an offline manager for your personal book and movie collection: a home library catalogue, reading log, notes and statistics. No account, no ads, no analytics, no internet permission — everything stays on your device.</p>
 
-<p><b>Book library</b></p>
+<p>More than a reading tracker: it is a full collection catalogue, so what sits on your shelves can be described as thoroughly as in library software and exported to a desktop catalogue.</p>
+
+<p><b>Collection catalogue</b></p>
 <ul>
-<li>Author, ISBN, page count, publisher, year, genre, language, series, binding, condition, annotation</li>
-<li>Cover from the gallery or camera, purchase date and price, gift / lent / sold flags</li>
-<li>Search by title, author, ISBN and tag, filters by status and purchase period, grid or list view</li>
-<li>Scan an ISBN barcode with the camera to fill the card quickly</li>
+<li>Books: author, original title, subtitle, ISBN, page count, publisher, year, print year, print pages, genre, language and original language, translator, series and series number, binding, condition, annotation</li>
+<li>Owner flags: gift, lent out, sold; purchase date, price and place</li>
+<li>Movies: director, cast, country, year, genres, duration, link to the movie page, downloaded flag</li>
+<li>Cover from the gallery or camera, rating, arbitrary extra fields</li>
+<li>Tags for books and movies, shared across the collection</li>
 </ul>
 
-<p><b>Movie collection</b></p>
+<p><b>Search and filters</b></p>
 <ul>
-<li>Director, cast, country, year, genres, duration, link to the movie page</li>
-<li>Watch date, rating, comments, tags</li>
-<li>The same search, filters and grid/list switch as for books</li>
+<li>Search by title, author, ISBN, director, actor and tags</li>
+<li>Filters by status (to read, unread, reading, finished, abandoned, purchased) and by purchase period</li>
+<li>Grid or list view with covers, match counter</li>
+<li>ISBN barcode scanning with the camera to fill a card quickly</li>
+</ul>
+
+<p><b>Tellico compatibility</b></p>
+<ul>
+<li>Import and export in the native Tellico format (.tc) — move a collection between the phone and the Tellico desktop catalogue in both directions</li>
+<li>Import of tellico.xml and Tellico CSV exports</li>
+<li>Migrate libraries from other book trackers without losing fields: covers, notes and photos come along with the records</li>
+<li>Choose which collection to export — books or movies</li>
 </ul>
 
 <p><b>Reading log and progress</b></p>
@@ -23,8 +35,8 @@
 
 <p><b>Notes, quotes and reviews</b></p>
 <ul>
-<li>Notes, quotes and reviews with optional page reference and attached photos</li>
-<li>One notes list with search and a type filter</li>
+<li>Notes, quotes and reviews with an optional page reference and attached photos</li>
+<li>One list with search and a type filter</li>
 <li>Markdown in reviews and notes</li>
 </ul>
 
@@ -35,11 +47,9 @@
 <li>Reading calendar by day: book covers or pages per day</li>
 </ul>
 
-<p><b>Import and export</b></p>
+<p><b>Backups</b></p>
 <ul>
-<li>Backup and restore as a ZIP archive with CSV, covers and photos</li>
-<li>Native Tellico format (.tc) import and export</li>
-<li>Import of Tellico XML and CSV exports and of libraries from other book trackers</li>
+<li>Export and restore as a ZIP archive with CSV, covers and photos</li>
 </ul>
 
 <p><b>Look and feel</b></p>
@@ -48,4 +58,6 @@
 <li>Russian and English interface</li>
 </ul>
 
-<p>Free software, licensed under the GNU General Public License v3. Source code on GitHub; you can support the author via Boosty, Dalink or cryptocurrency.</p>
+<p>Suited to cataloguing a home library, second-hand and antiquarian books, a film collection, keeping a reading diary, and moving a Tellico catalogue onto a phone.</p>
+
+<p>Free software, licensed under the GNU General Public License v3. Source code is open; you can support the author via Boosty, Dalink or cryptocurrency.</p>

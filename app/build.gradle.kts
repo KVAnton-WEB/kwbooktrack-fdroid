@@ -1,5 +1,4 @@
 import org.gradle.api.JavaVersion
-import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
@@ -8,14 +7,6 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.hilt.android)
 }
-
-// Release-ключ: keystore.properties в корне репозитория (не в git). Если файла
-// нет — берём стандартный debug-ключ, чтобы локальная сборка ставилась поверх debug.
-// F-Droid вырезает блок signingConfigs и строку его присвоения, поэтому там
-// получается unsigned APK, который он подписывает своим ключом.
-val releaseKeystore = rootProject.file("keystore.properties")
-    .takeIf { it.isFile }
-    ?.let { file -> Properties().apply { file.inputStream().use { load(it) } } }
 
 android {
     namespace = "ru.antonkw.kwbooktrack"
@@ -30,28 +21,14 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
-    signingConfigs {
-        create("release") {
-            if (releaseKeystore != null) {
-                storeFile = rootProject.file(releaseKeystore.getProperty("storeFile"))
-                storePassword = releaseKeystore.getProperty("storePassword")
-                keyAlias = releaseKeystore.getProperty("keyAlias")
-                keyPassword = releaseKeystore.getProperty("keyPassword")
-            } else {
-                storeFile = File(System.getProperty("user.home"), ".android/debug.keystore")
-                storePassword = "android"
-                keyAlias = "androiddebugkey"
-                keyPassword = "android"
-            }
-        }
-    }
-
     buildTypes {
         debug {
             isMinifyEnabled = false
         }
         release {
-            signingConfig = signingConfigs.getByName("release")
+            // Локальный «условный релиз»: подписываем debug-ключом, чтобы APK
+            // ставился поверх debug-сборки без настройки keystore.
+            signingConfig = signingConfigs.getByName("debug")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(

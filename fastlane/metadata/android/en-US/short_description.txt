@@ -1,1 +1,1 @@
-Offline book and movie tracker: library, notes, statistics
+Book & movie collection manager: Tellico, notes, statistics
