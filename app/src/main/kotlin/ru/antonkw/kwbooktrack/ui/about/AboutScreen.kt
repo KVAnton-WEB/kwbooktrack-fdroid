@@ -69,7 +69,10 @@ import ru.antonkw.kwbooktrack.ui.common.mediaLabelRes
 
 /** Автор и каналы связи: подпись + ссылка, открывается в браузере. */
 private val AUTHOR_LINKS = listOf(
-    R.string.about_link_github to "https://github.com/KVAnton-WEB/kwbooktrack",
+    // F-Droid собирает из зеркала kwbooktrack-fdroid: там лежат исходники той
+    // самой версии, которую устанавливает пользователь. Ссылка на основной
+    // репозиторий сбивала бы с толку, если версии разойдутся.
+    R.string.about_link_github to "https://github.com/KVAnton-WEB/kwbooktrack-fdroid",
     R.string.about_link_telegram to "https://t.me/AntonKw",
 )
 

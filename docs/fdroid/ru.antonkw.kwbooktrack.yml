@@ -19,16 +19,17 @@ RepoType: git
 Repo: https://github.com/KVAnton-WEB/kwbooktrack-fdroid.git
 
 Builds:
-  - versionName: 0.9.5-fdroid
-    versionCode: 114
+  - versionName: 0.9.5-fdroid.2
+    versionCode: 115
     commit: __COMMIT__
+    subdir: app
     gradle:
       - yes
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags ^v[0-9.]+(-fdroid)?$
-CurrentVersion: 0.9.5-fdroid
-CurrentVersionCode: 114
+CurrentVersion: 0.9.5-fdroid.2
+CurrentVersionCode: 115
 
 MaintainerNotes: |-
   This builds from the mirror repository kwbooktrack-fdroid, whose main branch

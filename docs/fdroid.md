@@ -2,7 +2,7 @@
 
 F-Droid собирает из **отдельного репозитория**
 [KVAnton-WEB/kwbooktrack-fdroid](https://github.com/KVAnton-WEB/kwbooktrack-fdroid):
-там ветка `main` — это релизная ветка F-Droid, а теги `v*-fdroid` ставятся
+там ветка `main` — это релизная ветка F-Droid, а теги `v*-fdroid*` ставятся
 только на ней. Основной репозиторий `kwbooktrack` продолжает жить своей жизнью,
 и его `main` для F-Droid не используется.
 
@@ -24,16 +24,16 @@ F-Droid собирает из **отдельного репозитория**
 
 - `LICENSE` — полный текст GNU GPL v3.
 - `fastlane/metadata/android/{en-US,ru}` — название, короткое и полное описание,
-  changelog сборки 114, иконка 512×512 и по 8 скриншотов на язык.
-- Ветка `fdroid`: `versionName = 0.9.5-fdroid`, `versionCode = 114`.
+  changelog сборки 115, иконка 512×512 и по 8 скриншотов на язык.
+- Ветка `fdroid`: `versionName = 0.9.5-fdroid.2`, `versionCode = 115`.
   Суффикс нужен, чтобы сборка из F-Droid отличалась от собственных APK
   и от сборок рабочих веток.
-- Тег `v0.9.5-fdroid` на коммите с этой версией.
+- Тег `v0.9.5-fdroid.2` на коммите с этой версией.
 - Ветка и тег уже запушены в `kwbooktrack-fdroid` (`main`).
 - `docs/fdroid/ru.antonkw.kwbooktrack.yml` — метаданные для `fdroiddata`.
-- Проверено локально: если вырезать из `app/build.gradle.kts` блок `signingConfigs`
-  и строку `signingConfig = ...` (именно это делает fdroidserver), сборка выдаёт
-  `app-release-unsigned.apk`. F-Droid подпишет его своим ключом.
+- Проверено локально: `fdroid build` с этими метаданными проходит успешно —
+  собирается unsigned APK `versionName=0.9.5-fdroid.2`, `versionCode=115`,
+  который F-Droid подпишет своим ключом.
 
 ## Что нужно сделать (по порядку)
 
@@ -45,7 +45,7 @@ F-Droid собирает из **отдельного репозитория**
    Тег аннотированный, поэтому `^{commit}` обязателен: без него получится SHA
    самого объекта тега, а не коммита.
 
-       git rev-parse v0.9.5-fdroid^{commit}
+       git rev-parse v0.9.5-fdroid.2^{commit}
 
 3. **Форк `fdroiddata`**: <https://gitlab.com/fdroid/fdroiddata> → Fork, затем:
 
@@ -54,7 +54,7 @@ F-Droid собирает из **отдельного репозитория**
        git checkout -b ru.antonkw.kwbooktrack
        mkdir -p metadata
        cp /path/to/kwbooktrack/docs/fdroid/ru.antonkw.kwbooktrack.yml metadata/
-       SHA=$(git -C /path/to/kwbooktrack rev-parse v0.9.5-fdroid^{commit})
+       SHA=$(git -C /path/to/kwbooktrack rev-parse v0.9.5-fdroid.2^{commit})
        sed -i "s/__COMMIT__/$SHA/" metadata/ru.antonkw.kwbooktrack.yml
 
 4. **Проверить метаданные и сборку** (нужен [fdroidserver](https://gitlab.com/fdroid/fdroidserver)):
@@ -84,7 +84,7 @@ F-Droid собирает из **отдельного репозитория**
     git commit -am "v <version>-fdroid — ..."
     git tag -a v<version>-fdroid
     git push fdroid HEAD:refs/heads/main
-    git push fdroid refs/tags/v<version>-fdroid
+    git push fdroid refs/tags/v<version>-fdroid.2
 
 `AutoUpdateMode: Version` + `UpdateCheckMode: Tags` подхватят новый тег сами.
 В `fastlane/metadata/android/<locale>/changelogs/` положить `<versionCode>.txt`,
@@ -92,9 +92,11 @@ F-Droid собирает из **отдельного репозитория**
 
 ## Подводные камни
 
-- **`subdir` указывать не нужно.** Gradle-корень проекта — корень репозитория
-  (`settings.gradle.kts` там же), а не `app/`. `subdir: app` в старой версии
-  метаданных был ошибкой: fdroidserver запускал бы сборку не в том каталоге.
+- **`subdir: app` обязателен.** fdroidserver запускает Gradle в `subdir` и там же
+  ищет результат по пути `build/outputs/apk/release`. Наш APK появляется
+  в `app/build/outputs/apk/release`, поэтому без `subdir: app` сборка
+  завершается ошибкой `Failed to find any output apks`.
+  Проверено: `fdroid build` с `subdir: app` проходит, без него — падает.
 - **fdroidserver клонирует ветку по умолчанию**, поэтому в зеркале `main`
   должен быть именно релизной веткой. Не заливать туда `main` основного
   репозитория.
