@@ -111,7 +111,18 @@ fun KwBooktrackNavHost() {
             StatisticsScreen(onBack = { navController.popBackStack() })
         }
         composable(Routes.CALENDAR) {
-            CalendarScreen(onBack = { navController.popBackStack() })
+            CalendarScreen(
+                onBack = { navController.popBackStack() },
+                onOpenMedia = { mediaType, mediaId ->
+                    navController.navigate(
+                        if (mediaType == MediaType.MOVIES) {
+                            Routes.movieDetail(mediaId)
+                        } else {
+                            Routes.bookDetail(mediaId)
+                        },
+                    )
+                },
+            )
         }
         composable(Routes.IMPORT) {
             TellicoImportScreen(onBack = { navController.popBackStack() })

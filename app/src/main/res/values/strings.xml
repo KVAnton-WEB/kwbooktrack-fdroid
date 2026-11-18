@@ -181,6 +181,7 @@
     <string name="photos_attached">Прикреплено фото: %1$d</string>
     <string name="action_save_note">Сохранить как заметку</string>
     <string name="action_save_quote">Сохранить как цитату</string>
+    <string name="note_photos_failed">Заметка сохранена, но фото не прикрепились: %1$d</string>
     <string name="note_kind_note">Заметка</string>
     <string name="note_kind_quote">Цитата</string>
     <string name="note_kind_review">Рецензия</string>
@@ -252,7 +253,7 @@
     <string name="tellico_import_done">Импорт завершён</string>
     <string name="tellico_import_done_with_errors">Импорт завершён с ошибками</string>
     <string name="tellico_import_total_format">Записей в файле: %1$d</string>
-    <string name="tellico_import_imported_format">Импортировано книг: %1$d</string>
+    <string name="tellico_import_imported_format">Импортировано записей: %1$d</string>
     <string name="tellico_import_skipped_format">Пропущено: %1$d</string>
     <string name="tellico_import_label_covers">Обложек скопировано: %1$d</string>
     <string name="tellico_import_label_notes">Заметок/цитат/рецензий: %1$d</string>
@@ -364,7 +365,6 @@
     <string name="tellico_import_result_format">Импортировано: %1$d, пропущено: %2$d</string>
     <string name="tellico_import_covers_format">Обложек скопировано: %1$d</string>
     <string name="tellico_import_notes_format">Заметок, сессий, тегов и фото добавлено: %1$d</string>
-    <string name="tellico_import_dry_run">Пробный прогон (без записи)</string>
     <string name="tellico_import_error">Ошибка импорта</string>
 
     <!-- Common errors -->

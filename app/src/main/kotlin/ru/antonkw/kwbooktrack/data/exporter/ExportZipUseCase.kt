@@ -100,9 +100,13 @@ class ExportZipUseCase @Inject constructor(
         // Снимок целиком и в одной транзакции: книги, фильмы и всё, что к ним
         // относится, должны быть из одного состояния БД — иначе манифест
         // разойдётся с содержимым архива.
-        val (snapshots, movieSnapshots) = database.withTransaction {
+        val (bookSnapshots, movieRows) = database.withTransaction {
             snapshotBuilder.buildAll() to snapshotBuilder.buildMovies()
         }
+        // Имена файлов фото — MD5 их содержимого: чтение каждого файла идёт
+        // снаружи транзакции, иначе блокировка записи держалась бы всё время
+        // хеширования библиотеки.
+        val (snapshots, movieSnapshots) = snapshotBuilder.namePhotos(bookSnapshots, movieRows)
         // Подготовка — stat по каждой книге, фильму и каждому фото: это файловый I/O,
         // из `viewModelScope` он шёл бы на главном потоке.
         val prepared = withContext(Dispatchers.IO) { prepare(snapshots, movieSnapshots) }

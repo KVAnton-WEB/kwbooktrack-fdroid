@@ -25,7 +25,7 @@ import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
  * запустится. Сверить схему может только сам Room.
  *
  * Схема версии 1 — как её создавал Room на той версии приложения
- * (`app/schemas/.../1.json`).
+ * (снята с `1.json`, который тогда экспортировал Room).
  */
 @RunWith(RobolectricTestRunner::class)
 class MigrationsFromV1Test {
@@ -101,8 +101,8 @@ class MigrationsFromV1Test {
             FOREIGN KEY(`tag_id`) REFERENCES `tags`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
         )
         """.trimIndent(),
-        // Индексы версии 1 — из `app/schemas/.../1.json`: без них Room при
-        // открытии не сойдётся с описанием сущностей.
+        // Индексы версии 1 — из той же схемы: без них Room при открытии
+        // не сойдётся с описанием сущностей.
         "CREATE UNIQUE INDEX IF NOT EXISTS `index_books_isbn13` ON `books` (`isbn13`)",
         "CREATE INDEX IF NOT EXISTS `index_books_status` ON `books` (`status`)",
         "CREATE INDEX IF NOT EXISTS `index_books_started_at` ON `books` (`started_at`)",
@@ -152,7 +152,7 @@ class MigrationsFromV1Test {
             .addMigrations(
                 Migrate1To2, Migrate2To3, Migrate3To4, Migrate4To5, Migrate5To6,
                 Migrate6To7, Migrate7To8, Migrate8To9, Migrate9To10, Migrate10To11,
-                Migrate11To12, Migrate12To13,
+                Migrate11To12, Migrate12To13, Migrate13To14,
             )
             .build()
         try {

@@ -16,8 +16,8 @@ android {
         applicationId = "ru.antonkw.kwbooktrack"
         minSdk = 31
         targetSdk = 34
-        versionCode = 87
-        versionName = "0.8.0"
+        versionCode = 88
+        versionName = "0.8.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -77,9 +77,8 @@ android {
     }
 }
 
-ksp {
-    arg("room.schemaLocation", "$projectDir/schemas")
-}
+// Схемы Room не экспортируются: `exportSchema = false` в KwBooktrackDatabase,
+// все переходы — рукописные миграции в DatabaseModule.
 
 // KSP-вывод нельзя брать из build cache: ключ задачи не меняется при удалении
 // исходников, поэтому из кэша возвращаются сгенерированные файлы уже

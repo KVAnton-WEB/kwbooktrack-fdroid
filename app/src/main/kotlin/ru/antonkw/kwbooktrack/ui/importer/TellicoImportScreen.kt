@@ -111,7 +111,6 @@ fun TellicoImportScreen(
                         Text(stringResource(R.string.tellico_import_skipped_format, r.skipped))
                         Text(stringResource(R.string.tellico_import_covers_format, r.coversCopied))
                         Text(stringResource(R.string.tellico_import_notes_format, r.notesImported))
-                        if (r.dryRun) Text(stringResource(R.string.tellico_import_dry_run))
                         // Предупреждения — импорт прошёл, но что-то перенести не удалось.
                         r.warnings.forEach { warning ->
                             Text(

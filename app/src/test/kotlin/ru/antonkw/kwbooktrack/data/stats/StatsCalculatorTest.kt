@@ -95,6 +95,25 @@ class StatsCalculatorTest {
     }
 
     @Test
+    fun totalPagesMatchesTheJournalWhenAPageIsRereadBackwards() {
+        // Откат назад (endPage меньше предыдущего) — не повод выбрасывать
+        // запись: сумма дневных страниц должна совпасть с суммой дельт журнала,
+        // иначе «Страниц» на экране статистики расходится с журналом чтения.
+        val day = LocalDate.of(2026, 9, 15)
+        val ts = day.toLocalDayStartMs()
+        val sessions = listOf(
+            ReadingSessionEntity(id = 1, bookId = 1, startedAt = ts, endPage = 100),
+            ReadingSessionEntity(id = 2, bookId = 1, startedAt = ts + 1000L, endPage = 80),
+            ReadingSessionEntity(id = 3, bookId = 1, startedAt = ts + 2000L, endPage = 120),
+        )
+        val stats = StatsCalculator.compute(sessions, emptyList())
+        val journalSum = StatsCalculator.sessionDeltas(sessions).values.sum()
+        // 100 вперёд, 20 назад, 40 вперёд — итог 120.
+        assertThat(journalSum).isEqualTo(120)
+        assertThat(stats.totalPages).isEqualTo(journalSum)
+    }
+
+    @Test
     fun sessionDeltasCountPagesSinceThePreviousSession() {
         // Журнал чтения показывает, сколько страниц прочитано с прошлой записи.
         val day = LocalDate.of(2026, 9, 15)

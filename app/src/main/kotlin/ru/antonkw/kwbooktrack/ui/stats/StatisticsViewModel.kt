@@ -109,7 +109,7 @@ class StatisticsViewModel @Inject constructor(
         // so keep it off the main thread — it re-runs on every book/session
         // write anywhere in the app, not just when this screen is visible.
         .flowOn(Dispatchers.Default)
-        .stateIn(viewModelScope, SharingStarted.Eagerly, StatisticsData.Books(ReadingStats()))
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), StatisticsData.Books(ReadingStats()))
 
     fun setMode(mode: ChartMode) {
         _selection.value = _selection.value.copy(mode = mode)

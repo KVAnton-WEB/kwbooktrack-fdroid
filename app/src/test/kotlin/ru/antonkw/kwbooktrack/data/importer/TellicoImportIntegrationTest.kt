@@ -61,7 +61,6 @@ class TellicoImportIntegrationTest {
             photoRepository,
         )
         useCase = ImportTellicoUseCase(
-            csvReader = TellicoCsvReader(),
             mapper = TellicoBookMapper(),
                 movieMapper = TellicoMovieMapper(),
             applier = SnapshotApplier(
@@ -88,19 +87,13 @@ class TellicoImportIntegrationTest {
     }
 
     @Test
-    fun dryRunReportsWithoutWriting() = runTest {
-        val result = FileReader(tellicoCsv).use { reader ->
-            useCase(
-                input = reader,
-                options = ImportTellicoOptions(dryRun = true),
-            )
-        }
+    fun importReadsEveryRecordAndWrites() = runTest {
+        val records = TellicoCsvReader().read(FileReader(tellicoCsv))
+        val result = useCase(records)
 
         assertThat(result.total).isGreaterThan(600)
         assertThat(result.imported).isGreaterThan(600)
-        assertThat(result.dryRun).isTrue()
-        assertThat(result.coversCopied).isEqualTo(0)
-        assertThat(repo.count()).isEqualTo(0)
+        assertThat(result.errors).isEmpty()
     }
 
     @Test
@@ -109,15 +102,10 @@ class TellicoImportIntegrationTest {
         // when covers aren't available (env var not set).
         assumeTrue("covers dir present (set KWBOOKTRACK_TELLICO_COVERS to enable)", coversDir.exists() && coversDir.isDirectory)
 
-        val result = FileReader(tellicoCsv).use { reader ->
-            useCase(
-                input = reader,
-                options = ImportTellicoOptions(
-                    assetRoot = coversDir,
-                    coverOutputDir = tempOut,
-                ),
-            )
-        }
+        val result = useCase(
+            TellicoCsvReader().read(FileReader(tellicoCsv)),
+            ImportTellicoOptions(assetRoot = coversDir, coverOutputDir = tempOut),
+        )
 
         assertThat(result.total).isGreaterThan(600)
         assertThat(result.imported).isGreaterThan(600)
@@ -136,20 +124,10 @@ class TellicoImportIntegrationTest {
     fun secondImportIsIdempotent() = runBlocking {
         assumeTrue("covers dir present (set KWBOOKTRACK_TELLICO_COVERS to enable)", coversDir.exists() && coversDir.isDirectory)
 
-        FileReader(tellicoCsv).use { reader ->
-            useCase(
-                input = reader,
-                options = ImportTellicoOptions(assetRoot = coversDir, coverOutputDir = tempOut),
-            )
-        }
+        useCase(TellicoCsvReader().read(FileReader(tellicoCsv)), ImportTellicoOptions(assetRoot = coversDir, coverOutputDir = tempOut))
         val countAfterFirst = repo.count()
 
-        FileReader(tellicoCsv).use { reader ->
-            useCase(
-                input = reader,
-                options = ImportTellicoOptions(assetRoot = coversDir, coverOutputDir = tempOut),
-            )
-        }
+        useCase(TellicoCsvReader().read(FileReader(tellicoCsv)), ImportTellicoOptions(assetRoot = coversDir, coverOutputDir = tempOut))
 
         assertThat(repo.count()).isEqualTo(countAfterFirst)
     }

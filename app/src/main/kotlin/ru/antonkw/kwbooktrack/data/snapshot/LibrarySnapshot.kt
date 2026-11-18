@@ -46,10 +46,13 @@ data class SessionSnapshot(
  * (при импорте вычисляется апплиером).
  */
 data class PhotoSnapshot(
-    val archivePath: String,
+    /** Путь в архиве (`photos/{md5}.{ext}`); заполняет [SnapshotBuilder.namePhotos]. */
+    val archivePath: String = "",
     val localPath: String = archivePath,
     val noteIndex: Int? = null,
     val createdAt: Long? = null,
+    /** id строки в БД — запасное имя, если файла на диске нет. */
+    val photoId: Long = 0,
 )
 
 data class BookSnapshot(

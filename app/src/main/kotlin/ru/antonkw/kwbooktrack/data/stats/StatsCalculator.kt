@@ -146,10 +146,11 @@ object StatsCalculator {
     // pages. Deltas telescope, so their sum is exactly the total and
     // totalPages can keep summing the daily buckets.
     private fun pageDeltas(sessions: List<ReadingSessionEntity>): List<Pair<LocalDate, Int>> {
-        return deltaPairs(sessions).mapNotNull { (s, pages) ->
-            if (pages <= 0) null
-            else s.startedAt.toLocalDay() to pages
-        }
+        // Отрицательную дельту не выбрасываем: она значит, что страницу
+        // перечитали заново, и сумма дневных страниц должна сходиться с суммой
+        // дельт журнала (sessionDeltas). Раньше здесь стоял фильтр `> 0`, и
+        // при откате назад итог «Страниц» был больше правды.
+        return deltaPairs(sessions).map { (s, pages) -> s.startedAt.toLocalDay() to pages }
     }
 
     /**

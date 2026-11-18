@@ -69,6 +69,7 @@ class TagRepositoryTest {
         // INSERT OR IGNORE on the cross-ref table — duplicates are no-ops, no
         // crash, no double-row. (Room throws on a real dup PK violation
         // without IGNORE; this asserts the contract.)
-        assertThat(tagDao.count()).isEqualTo(1)
+        assertThat(tagDao.findByName("thriller")).isNotNull()
+        assertThat(tagDao.tagsOfMedia(1L, MediaType.BOOKS)).containsExactly("thriller")
     }
 }

@@ -2,6 +2,7 @@ package ru.antonkw.kwbooktrack.data.db.dao
 
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -44,38 +45,12 @@ class ReadingSessionDaoTest {
     }
 
     @Test
-    fun insertAndLatestRoundTrip() = runTest {
+    fun insertAndObserveRoundTrip() = runTest {
         val id = sessionDao.insert(session(startedAt = 100, endPage = 50, durationSec = 1800))
         assertThat(id).isGreaterThan(0L)
-        val latest = sessionDao.latestForBook(bookId)
-        assertThat(latest).isNotNull()
-        assertThat(latest!!.endPage).isEqualTo(50)
-    }
-
-    @Test
-    fun maxEndPageReturnsHighest() = runTest {
-        sessionDao.insert(session(startedAt = 100, endPage = 30))
-        sessionDao.insert(session(startedAt = 200, endPage = 80))
-        sessionDao.insert(session(startedAt = 300, endPage = 120))
-        val max = sessionDao.maxEndPage(bookId)
-        assertThat(max).isEqualTo(120)
-    }
-
-    @Test
-    fun totalDurationSumsAcrossSessions() = runTest {
-        sessionDao.insert(session(startedAt = 100, durationSec = 600))
-        sessionDao.insert(session(startedAt = 200, durationSec = 1200))
-        sessionDao.insert(session(startedAt = 300, durationSec = 1800))
-        val total = sessionDao.totalDurationSec(bookId)
-        assertThat(total).isEqualTo(3600)
-    }
-
-    @Test
-    fun deleteForBookCascades() = runTest {
-        sessionDao.insert(session(startedAt = 100))
-        sessionDao.insert(session(startedAt = 200))
-        val deleted = sessionDao.deleteForBook(bookId)
-        assertThat(deleted).isEqualTo(2)
+        val sessions = sessionDao.observeByBook(bookId).first()
+        assertThat(sessions.single().endPage).isEqualTo(50)
+        assertThat(sessions.single().durationSec).isEqualTo(1800)
     }
 
     private fun session(

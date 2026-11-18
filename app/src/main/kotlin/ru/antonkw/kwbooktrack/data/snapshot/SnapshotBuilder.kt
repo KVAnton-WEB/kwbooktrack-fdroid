@@ -66,10 +66,14 @@ class SnapshotBuilder @Inject constructor(
                 tags = tagsByOwner[book.id to MediaType.BOOKS].orEmpty().map { it.name },
                 photos = photosByBook[book.id].orEmpty().map { photo ->
                     PhotoSnapshot(
-                        archivePath = photo.archivePath(),
+                        // Имя файла в архиве — MD5 его содержимого; считается
+                        // отдельным проходом (см. namePhotos), чтобы не читать
+                        // файлы внутри транзакции БД.
+                        archivePath = "",
                         localPath = photo.path,
                         noteIndex = photo.noteId?.let { noteIndexes[it] },
                         createdAt = photo.createdAt,
+                        photoId = photo.id,
                     )
                 },
                 // Чужие поля Tellico — из колонки books.extra_fields.
@@ -109,10 +113,12 @@ class SnapshotBuilder @Inject constructor(
                 tags = tagsByOwner[movie.id to MediaType.MOVIES].orEmpty().map { it.name },
                 photos = photosByMovie[movie.id].orEmpty().map { photo ->
                     PhotoSnapshot(
-                        archivePath = photo.archivePath(),
+                        // Как у книг: имя файла считается отдельным проходом.
+                        archivePath = "",
                         localPath = photo.path,
                         noteIndex = photo.noteId?.let { noteIndexes[it] },
                         createdAt = photo.createdAt,
+                        photoId = photo.id,
                     )
                 },
                 extraFields = movie.extraFields,
@@ -121,26 +127,31 @@ class SnapshotBuilder @Inject constructor(
     }
 
     /**
-     * Имя файла фото в архиве — MD5 от содержимого: устойчиво между экспортом
-     * и импортом (повторный импорт не плодит дубли). Файла нет или он нечитаем —
-     * откатываемся на id, чтобы экспорт не ронялся.
+     * Имена файлов фото в архиве — MD5 от содержимого: устойчиво между
+     * экспортом и импортом (повторный импорт не плодит дубли).
+     *
+     * Отдельный проход, а не часть [buildAll]/[buildMovies]: чтение файлов —
+     * блокирующий I/O, и внутри транзакции БД он держал бы блокировку записи
+     * на всё время хеширования библиотеки.
      */
-    private suspend fun PhotoEntity.archivePath(): String {
-        val file = File(path)
-        val ext = file.extension.ifEmpty { "jpg" }
-        val name = if (file.isFile) {
-            // Чтение файла — блокирующий I/O, поэтому уводим его с вызывающего
-            // потока (вызов может прийти из viewModelScope, то есть с Main).
-            // Файл мог исчезнуть или оказаться нечитаемым между проверкой и
-            // чтением — тогда откатываемся на id.
-            val digest = withContext(Dispatchers.IO) {
-                runCatching { md5(file.readBytes()) }.getOrNull()
+    suspend fun namePhotos(
+        snapshots: List<BookSnapshot>,
+        movieSnapshots: List<MovieSnapshot>,
+    ): Pair<List<BookSnapshot>, List<MovieSnapshot>> = withContext(Dispatchers.IO) {
+        fun name(photo: PhotoSnapshot): PhotoSnapshot {
+            val file = File(photo.localPath)
+            val ext = file.extension.ifEmpty { "jpg" }
+            val name = if (file.isFile) {
+                // Файл мог исчезнуть между проверкой и чтением — откатываемся
+                // на id, чтобы экспорт не ронялся.
+                runCatching { md5(file.readBytes()) }.getOrNull() ?: photo.photoId.toString()
+            } else {
+                photo.photoId.toString()
             }
-            digest ?: id.toString()
-        } else {
-            id.toString()
+            return photo.copy(archivePath = "photos/$name.$ext")
         }
-        return "photos/$name.$ext"
+        snapshots.map { it.copy(photos = it.photos.map(::name)) } to
+            movieSnapshots.map { it.copy(photos = it.photos.map(::name)) }
     }
 
     private fun NoteEntity.toSnapshot() = NoteSnapshot(

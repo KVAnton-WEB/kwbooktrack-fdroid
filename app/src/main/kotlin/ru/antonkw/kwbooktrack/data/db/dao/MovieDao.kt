@@ -1,7 +1,6 @@
 package ru.antonkw.kwbooktrack.data.db.dao
 
 import androidx.room.Dao
-import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
@@ -54,9 +53,6 @@ interface MovieDao {
 
     @Update
     suspend fun update(movie: MovieEntity): Int
-
-    @Delete
-    suspend fun delete(movie: MovieEntity): Int
 
     @Query("DELETE FROM movies WHERE id = :id")
     suspend fun deleteById(id: Long): Int

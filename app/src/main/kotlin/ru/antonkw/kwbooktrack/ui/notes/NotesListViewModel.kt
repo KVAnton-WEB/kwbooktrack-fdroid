@@ -92,7 +92,7 @@ class NotesListViewModel @Inject constructor(
             Log.e(TAG, "не удалось прочитать заметки", e)
             emit(NotesListUiState.Loaded(emptyList()))
         }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, NotesListUiState.Loading)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), NotesListUiState.Loading)
 
     val currentQuery: StateFlow<String> = query
 

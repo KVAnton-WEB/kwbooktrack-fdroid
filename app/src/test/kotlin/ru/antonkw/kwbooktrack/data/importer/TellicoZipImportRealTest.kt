@@ -25,7 +25,9 @@ import ru.antonkw.kwbooktrack.data.snapshot.SnapshotApplier
 import ru.antonkw.kwbooktrack.data.storage.CoverTranscoder
 import ru.antonkw.kwbooktrack.data.tellico.TellicoCsvReader
 import ru.antonkw.kwbooktrack.data.tellico.TellicoXmlReader
+import java.io.ByteArrayOutputStream
 import java.io.File
+import java.nio.charset.Charset
 import java.nio.file.Files
 import ru.antonkw.kwbooktrack.data.repository.MovieRepository
 import ru.antonkw.kwbooktrack.data.importer.TellicoMovieMapper
@@ -55,8 +57,8 @@ class TellicoZipImportRealTest {
             photoRepository,
         )
         useCase = ImportTellicoZipUseCase(
+            csvReader = TellicoCsvReader(),
             importUseCase = ImportTellicoUseCase(
-                csvReader = TellicoCsvReader(),
                 mapper = TellicoBookMapper(),
                     movieMapper = TellicoMovieMapper(),
                 applier = SnapshotApplier(
@@ -73,7 +75,6 @@ class TellicoZipImportRealTest {
                     transcoder = CoverTranscoder(),
                 ),
             ),
-            csvReader = TellicoCsvReader(),
             xmlReader = TellicoXmlReader(),
         )
         tempOut = Files.createTempDirectory("kwbooktrack-zip-").toFile()
@@ -107,14 +108,33 @@ class TellicoZipImportRealTest {
     }
 
     @Test
+    fun importsCp1251CsvWhoseFirstBytesAreAscii() = runBlocking {
+        // Tellico с английскими заголовками: первые 64 КБ файла — ASCII,
+        // кириллица начинается позже. По голове файла кодировка не определялась,
+        // а InputStreamReader подставлял U+FFFD — названия приходили битыми.
+        val dir = Files.createTempDirectory("kwbooktrack-cp1251-").toFile()
+        val csv = File(dir, "books.csv")
+        val cp1251 = Charset.forName("windows-1251")
+        val out = ByteArrayOutputStream()
+        out.write("Title;Author\n".toByteArray(cp1251))
+        repeat(9) { out.write(("A".repeat(8000) + ";Someone\n").toByteArray(cp1251)) }
+        out.write("Мастер и Маргарита;Михаил Булгаков\n".toByteArray(cp1251))
+        csv.writeBytes(out.toByteArray())
+
+        val result = useCase(csv, ImportFormat.TELLICO_CSV, tempOut)
+
+        assertThat(result.imported).isEqualTo(10)
+        val books = db.bookDao().observeAll().first()
+        assertThat(books.map { it.title }).contains("Мастер и Маргарита")
+        assertThat(books.map { it.author }).contains("Михаил Булгаков")
+    }
+
+    @Test
     fun importsQuotesAndReviewsFromRealZip() = runBlocking {
         val result = useCase(zipFile, ImportFormat.TELLICO_CSV, tempOut)
         assertThat(result.notesImported).isGreaterThan(0)
 
-        val notes = db.noteDao().observeByKind(NoteKind.QUOTE)
-            .first() + db.noteDao()
-            .observeByKind(NoteKind.REVIEW)
-            .first()
+        val notes = db.noteDao().observeAll().first()
         assertThat(notes).isNotEmpty()
 
         val quotes = notes.filter { it.kind == NoteKind.QUOTE }

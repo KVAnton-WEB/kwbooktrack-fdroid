@@ -85,7 +85,7 @@ class CalendarViewModel @Inject constructor(
     val mediaType: StateFlow<MediaType> = mediaTypeStore.type
 
     val uiState: StateFlow<CalendarUiState> = _month.flatMapLatest { buildStateForMonth(it) }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyState(_month.value))
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyState(_month.value))
 
     fun setMode(mode: CalendarMode) {
         _mode.value = mode

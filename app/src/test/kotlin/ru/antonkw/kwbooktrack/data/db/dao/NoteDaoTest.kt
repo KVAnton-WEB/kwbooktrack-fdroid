@@ -66,8 +66,9 @@ class NoteDaoTest {
         noteDao.insert(
             NoteEntity(mediaId = bookId, mediaType = MediaType.BOOKS, bodyMd = "b", kind = NoteKind.REVIEW, createdAt = 0L, updatedAt = 0L),
         )
-        val quotes = noteDao.observeByKind(NoteKind.QUOTE).first()
-        val reviews = noteDao.observeByKind(NoteKind.REVIEW).first()
+        val all = noteDao.observeAll().first()
+        val quotes = all.filter { it.kind == NoteKind.QUOTE }
+        val reviews = all.filter { it.kind == NoteKind.REVIEW }
         assertThat(quotes).hasSize(1)
         assertThat(reviews).hasSize(1)
     }

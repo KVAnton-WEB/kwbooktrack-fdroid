@@ -58,7 +58,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
 import ru.antonkw.kwbooktrack.R
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
@@ -82,6 +81,7 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import ru.antonkw.kwbooktrack.ui.common.CoverImage
 import ru.antonkw.kwbooktrack.ui.common.MediaTagsSection
+import ru.antonkw.kwbooktrack.ui.common.NotePhotoTile
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -208,7 +208,7 @@ fun BookDetailScreen(
                         ) {
                             CoverImage(
                                 path = coverPath,
-                                sizeDp = 96,
+                                heightDp = 96,
                                 modifier = Modifier.padding(end = 4.dp),
                                 contentDescription = stringResource(R.string.label_cover),
                                 onClick = if (!coverPath.isNullOrBlank()) {
@@ -563,15 +563,7 @@ private fun NoteRow(note: NoteEntity, photoPath: String?, onOpen: (Long) -> Unit
             .padding(vertical = 8.dp),
     ) {
         if (photoPath != null) {
-            AsyncImage(
-                model = java.io.File(photoPath),
-                contentDescription = null,
-                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(160.dp)
-                    .padding(vertical = 4.dp),
-            )
+            NotePhotoTile(photoPath, modifier = Modifier.padding(vertical = 4.dp))
         }
         note.page?.let {
             Text(stringResource(R.string.session_end_page, it), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -609,15 +601,7 @@ private fun QuoteRow(quote: NoteEntity, photoPath: String?, onOpen: (Long) -> Un
         )
         Column(modifier = Modifier.padding(start = 8.dp)) {
             if (photoPath != null) {
-                AsyncImage(
-                    model = java.io.File(photoPath),
-                    contentDescription = null,
-                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(140.dp)
-                        .padding(vertical = 4.dp),
-                )
+                NotePhotoTile(photoPath, modifier = Modifier.padding(vertical = 4.dp))
             }
             Text(
                 text = quote.bodyMd,

@@ -58,10 +58,14 @@ class ExportTellicoTcUseCase @Inject constructor(
         // в приложении вставали бы на это время.
         val prepared = if (mediaType == MediaType.MOVIES) {
             val snapshots = database.withTransaction { snapshotBuilder.buildMovies() }
-            withContext(Dispatchers.IO) { prepareMovies(snapshots) }
+            // Имена файлов фото — вне транзакции: чтение и хеширование файлов
+            // не должно держать блокировку записи БД.
+            val (_, named) = snapshotBuilder.namePhotos(emptyList(), snapshots)
+            withContext(Dispatchers.IO) { prepareMovies(named) }
         } else {
             val snapshots = database.withTransaction { snapshotBuilder.buildAll() }
-            withContext(Dispatchers.IO) { prepareBooks(snapshots) }
+            val (named, _) = snapshotBuilder.namePhotos(snapshots, emptyList())
+            withContext(Dispatchers.IO) { prepareBooks(named) }
         }
         return withContext(Dispatchers.IO) { writeArchive(prepared, output) }
     }

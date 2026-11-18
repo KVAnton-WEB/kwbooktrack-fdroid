@@ -14,8 +14,9 @@ import ru.antonkw.kwbooktrack.data.snapshot.ExtraField
         Index(value = ["started_at"]),
         Index(value = ["finished_at"]),
         Index(value = ["purchase_date"]),
-        Index(value = ["title_search"]),
-        Index(value = ["author_search"]),
+        // Индексов по `title_search`/`author_search` нет: поиск идёт как
+        // `LIKE '%слово%'`, а такой LIKE индекс не использует — индексы
+        // только платили бы за собой на каждой записи.
     ],
 )
 data class BookEntity(

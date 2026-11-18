@@ -118,7 +118,7 @@ class SnapshotBuilderTest {
             ),
         )
 
-        val snapshots = builder.buildAll()
+        val (snapshots, _) = builder.namePhotos(builder.buildAll(), emptyList())
 
         assertThat(snapshots).hasSize(1)
         val snapshot = snapshots.single()
@@ -174,7 +174,8 @@ class SnapshotBuilderTest {
             ),
         )
 
-        val photo = builder.buildAll().single().photos.single()
+        val (snapshots, _) = builder.namePhotos(builder.buildAll(), emptyList())
+        val photo = snapshots.single().photos.single()
 
         assertThat(photo.archivePath).isEqualTo("photos/$photoId.jpg")
         assertThat(photo.noteIndex).isNull()
@@ -225,7 +226,7 @@ class SnapshotBuilderTest {
             ),
         )
 
-        val snapshots = builder.buildMovies()
+        val (_, snapshots) = builder.namePhotos(emptyList(), builder.buildMovies())
 
         assertThat(snapshots).hasSize(1)
         val snapshot = snapshots.single()

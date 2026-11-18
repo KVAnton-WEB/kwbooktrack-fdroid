@@ -29,6 +29,4 @@ class MediaDateRepository @Inject constructor(
     /** Заменить список дат владельца — одной транзакцией. */
     suspend fun replaceFor(mediaId: Long, mediaType: MediaType, dates: List<Long>) =
         dao.replaceFor(mediaId, mediaType, dates)
-
-    suspend fun deleteFor(mediaId: Long, mediaType: MediaType): Int = dao.deleteFor(mediaId, mediaType)
 }

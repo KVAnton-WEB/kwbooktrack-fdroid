@@ -72,6 +72,7 @@ class BookDetailViewModelTest {
             photoRepository,
             tagRepository,
             mediaDates,
+            db,
         )
         TestViewModels.track(viewModel)
         assertThat(viewModel.uiState.value.book).isNull()
@@ -89,6 +90,7 @@ class BookDetailViewModelTest {
             photoRepository,
             tagRepository,
             mediaDates,
+            db,
         )
         TestViewModels.track(viewModel)
         viewModel.setCurrentPage(150)
@@ -110,6 +112,7 @@ class BookDetailViewModelTest {
             photoRepository,
             tagRepository,
             mediaDates,
+            db,
         )
         TestViewModels.track(viewModel)
         viewModel.setCurrentPage(50)
@@ -117,6 +120,23 @@ class BookDetailViewModelTest {
         val updated = bookRepository.findById(bookId)!!
         assertThat(updated.status).isEqualTo(BookStatus.READING)
         assertThat(updated.startedAt).isNotNull()
+    }
+
+    @Test
+    fun setCurrentPageTransitionsToReadingEvenWhenThePageIsUnchanged() = runBlocking {
+        // Книга с импортированными сессиями может быть ещё не «читаю»:
+        // сохранение той же страницы не создаёт сессию, но статус обновляет.
+        val bookId = bookRepository.insert(sampleBook("Dune", pageCount = 500, status = BookStatus.WISHLIST))
+        sessionRepository.insert(
+            ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity(
+                bookId = bookId, startedAt = 1000L, endPage = 50,
+            ),
+        )
+
+        viewModelForBook(bookId).setCurrentPage(50)
+
+        assertThat(bookRepository.findById(bookId)!!.status).isEqualTo(BookStatus.READING)
+        assertThat(db.readingSessionDao().observeByBook(bookId).first()).hasSize(1)
     }
 
     @Test
@@ -131,6 +151,7 @@ class BookDetailViewModelTest {
             photoRepository,
             tagRepository,
             mediaDates,
+            db,
         )
         TestViewModels.track(viewModel)
         viewModel.markFinished(rating = 5)
@@ -215,6 +236,7 @@ class BookDetailViewModelTest {
             photoRepository,
             tagRepository,
             mediaDates,
+            db,
         )
         TestViewModels.track(vm)
         return vm

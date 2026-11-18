@@ -55,8 +55,8 @@ class TellicoTcImportTest {
         val photoRepository = PhotoRepository(db.photoDao(), FilePhotoStorage(ApplicationProvider.getApplicationContext()))
         val bookRepository = BookRepository(db.bookDao(), db.tagDao(), NoOpCoverStorage, photoRepository)
         useCase = ImportTellicoZipUseCase(
+            csvReader = TellicoCsvReader(),
             importUseCase = ImportTellicoUseCase(
-                csvReader = TellicoCsvReader(),
                 mapper = TellicoBookMapper(),
                     movieMapper = TellicoMovieMapper(),
                 applier = SnapshotApplier(
@@ -73,7 +73,6 @@ class TellicoTcImportTest {
                     transcoder = CoverTranscoder(),
                 ),
             ),
-            csvReader = TellicoCsvReader(),
             xmlReader = TellicoXmlReader(),
         )
         tempDir = Files.createTempDirectory("kwbooktrack-tc-").toFile()

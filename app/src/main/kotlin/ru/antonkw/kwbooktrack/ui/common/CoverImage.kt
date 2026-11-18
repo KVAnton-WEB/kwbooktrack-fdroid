@@ -3,7 +3,8 @@ package ru.antonkw.kwbooktrack.ui.common
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material3.Icon
@@ -25,13 +26,14 @@ import java.io.File
 @Composable
 internal fun CoverImage(
     path: String?,
-    sizeDp: Int? = null,
+    heightDp: Int? = null,
     modifier: Modifier = Modifier,
     contentDescription: String? = null,
     onClick: (() -> Unit)? = null,
 ) {
     val base = when {
-        sizeDp != null -> modifier.size(sizeDp.dp)
+        // heightDp — высота; ширина 2:3 (типичная обложка), чтобы Crop не резал верх/низ.
+        heightDp != null -> modifier.height(heightDp.dp).aspectRatio(2f / 3f, matchHeightConstraintsFirst = true)
         else -> modifier
     }
     // clickable last in the chain → it inherits the size constraint, so the

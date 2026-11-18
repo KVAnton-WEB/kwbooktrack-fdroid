@@ -23,6 +23,7 @@ import ru.antonkw.kwbooktrack.data.db.entity.BookEntity
 import ru.antonkw.kwbooktrack.data.db.entity.BookStatus
 import ru.antonkw.kwbooktrack.data.db.entity.MovieEntity
 import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
+import ru.antonkw.kwbooktrack.data.db.entity.PhotoEntity
 import ru.antonkw.kwbooktrack.data.repository.MediaDateRepository
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
 import ru.antonkw.kwbooktrack.data.repository.NoteRepository
@@ -120,7 +121,6 @@ class SnapshotApplierTest {
         applier.apply(snapshot(), assets)
         applier.apply(snapshot(), assets)
 
-        assertThat(tagRepository.observeAll().first()).hasSize(1)
         assertThat(db.tagDao().tagsOf(bookId())).hasSize(1)
     }
 
@@ -134,7 +134,80 @@ class SnapshotApplierTest {
 
         val photos = photoRepository.observeByMedia(bookId(), MediaType.BOOKS).first()
         assertThat(photos).hasSize(1)
-        assertThat(File(photos.single().path).name).isEqualTo("${PHOTO_MD5}_books_${bookId()}.jpg")
+        // Индекс фото в снимке — в имени: у своего бэкапа файлы названы по
+        // md5 содержимого, и одна картинка к двум заметкам лежит под одним
+        // именем.
+        assertThat(File(photos.single().path).name).isEqualTo("${PHOTO_MD5}_books_${bookId()}_0.jpg")
+    }
+
+    @Test
+    fun reimportRecognizesLocallySavedPhotoByContent() = runTest {
+        applier.apply(snapshot(), assets)
+        val noteId = noteRepository.observeByMedia(bookId(), MediaType.BOOKS).first().first().id
+        // Фото из редактора заметки называется note_{id}_{uuid}, а не md5 —
+        // путь с импортным именем не совпадёт никогда.
+        val local = File(outputDir, "note_${noteId}_local.jpg").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+        photoRepository.insert(
+            PhotoEntity(
+                mediaId = bookId(),
+                mediaType = MediaType.BOOKS,
+                noteId = noteId,
+                path = local.absolutePath,
+                createdAt = 1_000L,
+            ),
+        )
+        archivePhoto(PHOTO_MD5, "jpg")
+        val snap = snapshot(photos = listOf(PhotoSnapshot(archivePath = "photos/$PHOTO_MD5.jpg", noteIndex = 1)))
+
+        val stats = applier.apply(snap, assets)
+
+        val photos = photoRepository.observeByMedia(bookId(), MediaType.BOOKS).first()
+        assertThat(photos).hasSize(1)
+        assertThat(stats.photos).isEqualTo(0)
+        assertThat(photos.single().path).isEqualTo(local.absolutePath)
+    }
+
+    @Test
+    fun twoArchivePhotosWithSameContentAreBothLinkedToTheirNotes() = runTest {
+        // Два файла в архиве Tellico с одинаковым содержимым, но разными именами:
+        // одно и то же фото к двум заметкам. Второе отбрасывалось по хешу, и
+        // у второй заметки фото не оставалось навсегда.
+        File(staging, "photos/aaa.jpg").apply { parentFile?.mkdirs(); writeBytes(byteArrayOf(1, 2, 3)) }
+        File(staging, "photos/bbb.jpg").apply { parentFile?.mkdirs(); writeBytes(byteArrayOf(1, 2, 3)) }
+        val snap = snapshot(
+            photos = listOf(
+                PhotoSnapshot(archivePath = "photos/aaa.jpg", noteIndex = 1),
+                PhotoSnapshot(archivePath = "photos/bbb.jpg", noteIndex = 2),
+            ),
+        )
+
+        applier.apply(snap, assets)
+
+        val notes = noteRepository.observeByMedia(bookId(), MediaType.BOOKS).first().sortedBy { it.id }
+        val photos = photoRepository.observeByMedia(bookId(), MediaType.BOOKS).first()
+        assertThat(photos).hasSize(2)
+        assertThat(photos.mapNotNull { it.noteId }.sorted()).containsExactly(notes[0].id, notes[1].id)
+    }
+
+    @Test
+    fun twoPhotosWithTheSameArchivePathAreBothLinkedToTheirNotes() = runTest {
+        // Свой бэкап называет файлы фото по md5 содержимого: одна картинка,
+        // прикреплённая к двум заметкам, лежит в архиве под ОДНИМ именем —
+        // и вторая заметка теряла фото.
+        archivePhoto(PHOTO_MD5, "jpg")
+        val snap = snapshot(
+            photos = listOf(
+                PhotoSnapshot(archivePath = "photos/$PHOTO_MD5.jpg", noteIndex = 1),
+                PhotoSnapshot(archivePath = "photos/$PHOTO_MD5.jpg", noteIndex = 2),
+            ),
+        )
+
+        applier.apply(snap, assets)
+
+        val notes = noteRepository.observeByMedia(bookId(), MediaType.BOOKS).first().sortedBy { it.id }
+        val photos = photoRepository.observeByMedia(bookId(), MediaType.BOOKS).first()
+        assertThat(photos).hasSize(2)
+        assertThat(photos.mapNotNull { it.noteId }.sorted()).containsExactly(notes[0].id, notes[1].id)
     }
 
     @Test

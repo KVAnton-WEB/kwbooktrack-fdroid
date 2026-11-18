@@ -432,7 +432,7 @@ private fun BookListCard(item: LibraryItem.Book, onClick: () -> Unit) {
         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             CoverImage(
                 path = book.coverPath,
-                sizeDp = 64,
+                heightDp = 64,
                 modifier = Modifier.padding(end = 12.dp),
             )
             Column(modifier = Modifier.weight(1f)) {
@@ -507,7 +507,7 @@ private fun BookCoverCard(
                 path = book.coverPath,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(3f / 4f),
+                    .aspectRatio(2f / 3f),
             )
             Column(modifier = Modifier.padding(8.dp)) {
                 Text(
@@ -609,7 +609,7 @@ private fun MovieListCard(item: LibraryItem.Movie, onClick: () -> Unit) {
         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             CoverImage(
                 path = movie.coverPath,
-                sizeDp = 64,
+                heightDp = 64,
                 modifier = Modifier.padding(end = 12.dp),
             )
             Column(modifier = Modifier.weight(1f)) {
@@ -673,7 +673,7 @@ private fun MovieCoverCard(
                 path = movie.coverPath,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(3f / 4f),
+                    .aspectRatio(2f / 3f),
             )
             Column(modifier = Modifier.padding(8.dp)) {
                 Text(

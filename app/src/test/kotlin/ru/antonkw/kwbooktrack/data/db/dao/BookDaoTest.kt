@@ -84,8 +84,7 @@ class BookDaoTest {
     @Test
     fun deleteRemovesBook() = runTest {
         val id = dao.insert(sampleBook(createdAt = 0L, updatedAt = 0L))
-        val book = dao.findById(id)!!
-        dao.delete(book)
+        dao.deleteById(id)
         assertThat(dao.findById(id)).isNull()
     }
 

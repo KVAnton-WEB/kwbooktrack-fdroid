@@ -44,6 +44,7 @@ import ru.antonkw.kwbooktrack.data.stats.MonthlyPages
 import ru.antonkw.kwbooktrack.data.stats.MovieStats
 import ru.antonkw.kwbooktrack.data.stats.ReadingStats
 import ru.antonkw.kwbooktrack.data.stats.StatsCalculator
+import ru.antonkw.kwbooktrack.data.stats.YearlyPages
 import ru.antonkw.kwbooktrack.ui.common.formatDuration
 import kotlin.math.max
 import ru.antonkw.kwbooktrack.R
@@ -155,8 +156,8 @@ private fun BookCharts(stats: ReadingStats, selection: ChartSelection) {
         },
         labels = chartLabels,
         values = when (selection.mode) {
-            ChartMode.BY_MONTH -> monthlyChartValues(stats, selection.year)
-            ChartMode.BY_YEAR -> stats.yearlyPages.associate { it.year to it.pages }
+            ChartMode.BY_MONTH -> chartPagesByMonth(stats.monthlyPages, selection.year)
+            ChartMode.BY_YEAR -> chartPagesByYear(stats.yearlyPages)
         },
     )
 
@@ -293,13 +294,21 @@ private fun PeriodSelector(
 @Composable
 private fun rememberScrollState0() = androidx.compose.foundation.rememberScrollState()
 
-private fun monthlyChartValues(
-    stats: ReadingStats,
-    year: Int,
-): Map<Int, Int> {
-    val byMonth = stats.monthlyPages.filter { it.year == year }.associate { it.month to it.pages }
-    return (1..12).associateWith { byMonth[it] ?: 0 }
+/**
+ * Страниц по месяцам — для графика.
+ *
+ * Отрицательным месяц быть не может: дельта закрепляется за днём поздней
+ * сессии, и при переходе границы месяца месяц получал отрицательное число
+ * прочитанных страниц.
+ */
+internal fun chartPagesByMonth(monthly: List<MonthlyPages>, year: Int): Map<Int, Int> {
+    val byMonth = monthly.filter { it.year == year }.associate { it.month to it.pages }
+    return (1..12).associateWith { (byMonth[it] ?: 0).coerceAtLeast(0) }
 }
+
+/** Страниц по годам — для графика. */
+internal fun chartPagesByYear(yearly: List<YearlyPages>): Map<Int, Int> =
+    yearly.associate { it.year to it.pages.coerceAtLeast(0) }
 
 /** Сколько книг (прочитанных или купленных) приходится на каждый месяц года. */
 private fun monthlyCountsChartValues(monthly: List<MonthlyBooks>, year: Int): Map<Int, Int> {

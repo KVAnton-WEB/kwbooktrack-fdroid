@@ -49,14 +49,12 @@ class ImportTellicoUseCaseTest {
         val photoRepository = PhotoRepository(db.photoDao(), NoOpPhotoStorage)
         val bookRepository = BookRepository(db.bookDao(), db.tagDao(), NoOpCoverStorage, photoRepository)
         useCase = ImportTellicoUseCase(
-            csvReader = TellicoCsvReader(),
             mapper = TellicoBookMapper(),
             movieMapper = TellicoMovieMapper(),
             applier = applierFor(bookRepository, photoRepository),
         )
         // Тот же импорт, но книга «отменяется» на чтении.
         cancellingUseCase = ImportTellicoUseCase(
-            csvReader = TellicoCsvReader(),
             mapper = TellicoBookMapper(),
             movieMapper = TellicoMovieMapper(),
             applier = applierFor(

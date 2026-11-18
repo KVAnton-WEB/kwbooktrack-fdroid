@@ -62,7 +62,15 @@ class ImportKwBooktrackZipUseCase @Inject constructor(
         if (!zipFile.exists()) {
             return failure(IllegalStateException("файл не найден: ${zipFile.absolutePath}"))
         }
-        val staging = File(outputDir, ".import-staging")
+        // Каталог распаковки — свой на каждый импорт, как у Tellico-импортёра:
+        // два параллельных импорта (или импорт, прерванный пользователем)
+        // делили бы один каталог, и `deleteRecursively()` в `finally` сносил
+        // бы чужую распаковку. Заодно удаляем хвост прерванного импорта:
+        // до 512 МБ распакованных файлов иначе лежали бы в filesDir навсегда.
+        // Префикс — только своего импортёра: чужой staging может быть ещё
+        // активен (отмена кооперативная, распаковка ещё идёт).
+        val staging = StagingDirs.create(outputDir, "kw")
+        StagingDirs.cleanOrphans(outputDir, "kw")
         try {
             val prepared = withContext(Dispatchers.IO) { prepare(zipFile, staging) }
             // Корень ассетов — распакованный архив; обложки кладутся в outputDir.
@@ -121,7 +129,6 @@ class ImportKwBooktrackZipUseCase @Inject constructor(
                 skipped = skipped,
                 coversCopied = coversCopied,
                 notesImported = notesImported,
-                dryRun = false,
                 movies = movies,
                 errors = errors,
                 warnings = prepared.warnings,
@@ -133,6 +140,7 @@ class ImportKwBooktrackZipUseCase @Inject constructor(
             // Архив не тот или не читается — это результат импорта, а не падение.
             return failure(e)
         } finally {
+            StagingDirs.release(staging)
             staging.deleteRecursively()
         }
     }
@@ -438,7 +446,6 @@ class ImportKwBooktrackZipUseCase @Inject constructor(
         skipped = 0,
         coversCopied = 0,
         notesImported = 0,
-        dryRun = false,
         errors = listOf(error),
     )
 

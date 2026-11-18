@@ -11,9 +11,6 @@ import ru.antonkw.kwbooktrack.data.db.entity.PhotoEntity
 
 @Dao
 interface PhotoDao {
-    @Query("SELECT * FROM photos ORDER BY created_at DESC")
-    fun observeAll(): Flow<List<PhotoEntity>>
-
     /** Все фото разом — для снимка библиотеки (внутри транзакции). */
     @Query("SELECT * FROM photos ORDER BY created_at DESC")
     suspend fun getAll(): List<PhotoEntity>
@@ -30,11 +27,4 @@ interface PhotoDao {
 
     @Delete
     suspend fun delete(photo: PhotoEntity): Int
-
-    @Query("SELECT COUNT(*) FROM photos")
-    suspend fun count(): Int
-
-    /** Пути файлов, привязанных к владельцу, — чтобы удалить их перед удалением строк. */
-    @Query("SELECT path FROM photos WHERE media_id = :mediaId AND media_type = :mediaType")
-    suspend fun pathsForMedia(mediaId: Long, mediaType: MediaType): List<String>
 }

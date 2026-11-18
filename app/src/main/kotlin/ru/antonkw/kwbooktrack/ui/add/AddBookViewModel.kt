@@ -395,7 +395,7 @@ class AddBookViewModel @Inject constructor(
             val isbn = Isbn.normalize(s.isbn)
             val duplicate = isbn?.let { bookRepository.findByIsbn(it) }
             if (duplicate != null && duplicate.id != editingBookId) {
-                _state.value = s.copy(error = AddBookError.DUPLICATE_ISBN)
+                _state.value = _state.value.copy(error = AddBookError.DUPLICATE_ISBN)
                 return@launch
             }
             // Дополнительные даты прочтения: основная — в finished_at.
@@ -463,7 +463,7 @@ class AddBookViewModel @Inject constructor(
                     // Запись не прошла (занятый ISBN) — новый файл обложки
                     // убираем, старый на месте.
                     if (newCover != null) coverStorage.delete(newCover)
-                    _state.value = s.copy(error = AddBookError.DUPLICATE_ISBN)
+                    _state.value = _state.value.copy(error = AddBookError.DUPLICATE_ISBN)
                     return@launch
                 }
                 if (removedCover) {
@@ -510,12 +510,12 @@ class AddBookViewModel @Inject constructor(
                 val newId = saveBookUseCase(tempBook, extraDates)
                 if (newId <= 0L) {
                     if (newCover != null) coverStorage.delete(newCover)
-                    _state.value = s.copy(error = AddBookError.DUPLICATE_ISBN)
+                    _state.value = _state.value.copy(error = AddBookError.DUPLICATE_ISBN)
                     return@launch
                 }
                 originalCoverPath = newCover
             }
-            _state.value = s.copy(saved = true, error = null)
+            _state.value = _state.value.copy(saved = true, error = null)
         }
     }
 

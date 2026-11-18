@@ -258,7 +258,7 @@ class LibraryViewModel @Inject constructor(
                 ),
             )
         }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, LibraryUiState.Loading)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LibraryUiState.Loading)
 
     /** Содержимое списка — по текущему типу носителя. */
     private fun load(filters: Filters): Flow<LibraryUiState> =
@@ -336,7 +336,7 @@ class LibraryViewModel @Inject constructor(
     val currentFilter: StateFlow<LibraryFilterState> =
         combine(period, bookFilter, movieFilter, currentMediaType) { p, bf, mf, mt ->
             LibraryFilterState(p, bf, mf, mt)
-        }.stateIn(viewModelScope, SharingStarted.Eagerly, LibraryFilterState())
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LibraryFilterState())
 
     fun setQuery(value: String) {
         query.value = value

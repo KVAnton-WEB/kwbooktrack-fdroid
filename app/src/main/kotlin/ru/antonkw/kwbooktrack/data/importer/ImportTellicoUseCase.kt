@@ -6,11 +6,9 @@ import kotlinx.coroutines.withContext
 import ru.antonkw.kwbooktrack.data.snapshot.ApplyStats
 import ru.antonkw.kwbooktrack.data.snapshot.ImportAssets
 import ru.antonkw.kwbooktrack.data.snapshot.SnapshotApplier
-import ru.antonkw.kwbooktrack.data.tellico.TellicoCsvReader
 import ru.antonkw.kwbooktrack.data.tellico.TellicoFields
 import ru.antonkw.kwbooktrack.data.tellico.TellicoRecord
 import java.io.File
-import java.io.Reader
 import javax.inject.Inject
 
 /**
@@ -29,7 +27,6 @@ data class ImportTellicoResult(
     val skipped: Int,
     val coversCopied: Int,
     val notesImported: Int,
-    val dryRun: Boolean,
     /** Сколько из импортированных записей — фильмы. */
     val movies: Int = 0,
     val errors: List<Throwable> = emptyList(),
@@ -48,7 +45,6 @@ data class ImportTellicoResult(
 data class ImportTellicoOptions(
     val assetRoot: File? = null,
     val coverOutputDir: File? = null,
-    val dryRun: Boolean = false,
 )
 
 /**
@@ -61,7 +57,6 @@ data class ImportTellicoOptions(
  * фильмы. Остальные типы ридер не отдаёт.
  */
 class ImportTellicoUseCase @Inject constructor(
-    private val csvReader: TellicoCsvReader,
     private val mapper: TellicoBookMapper,
     private val movieMapper: TellicoMovieMapper,
     private val applier: SnapshotApplier,
@@ -90,11 +85,6 @@ class ImportTellicoUseCase @Inject constructor(
                     continue
                 }
                 coverPath = snapshot.movie.coverPath
-                if (options.dryRun) {
-                    imported++
-                    movies++
-                    continue
-                }
                 try {
                     // Файловый I/O апплиера — не на потоке вызывающего.
                     stats = withContext(Dispatchers.IO) { applier.apply(snapshot, assets) }
@@ -115,10 +105,6 @@ class ImportTellicoUseCase @Inject constructor(
                     continue
                 }
                 coverPath = snapshot.book.coverPath
-                if (options.dryRun) {
-                    imported++
-                    continue
-                }
                 try {
                     stats = withContext(Dispatchers.IO) { applier.apply(snapshot, assets) }
                     imported++
@@ -140,10 +126,9 @@ class ImportTellicoUseCase @Inject constructor(
             skipped = skipped,
             coversCopied = coversCopied,
             notesImported = notesImported,
-            dryRun = options.dryRun,
             movies = movies,
             errors = errors,
-            warnings = warnings(coversReferenced, coversCopied, options.dryRun),
+            warnings = warnings(coversReferenced, coversCopied),
         )
     }
 
@@ -157,19 +142,14 @@ class ImportTellicoUseCase @Inject constructor(
      * двух — тоже потеря, и про это своё сообщение: «обложки не найдены» при
      * половине перенесённых обложек вводит в заблуждение.
      */
-    private fun warnings(coversReferenced: Int, coversCopied: Int, dryRun: Boolean): List<String> {
-        if (dryRun || coversReferenced == 0 || coversCopied >= coversReferenced) return emptyList()
+    private fun warnings(coversReferenced: Int, coversCopied: Int): List<String> {
+        if (coversReferenced == 0 || coversCopied >= coversReferenced) return emptyList()
         return if (coversCopied == 0) {
             listOf(NO_COVERS_WARNING)
         } else {
             listOf(PARTIAL_COVERS_WARNING.format(coversCopied, coversReferenced))
         }
     }
-
-    suspend operator fun invoke(
-        input: Reader,
-        options: ImportTellicoOptions = ImportTellicoOptions(),
-    ): ImportTellicoResult = invoke(csvReader.read(input), options)
 
     private companion object {
         /**

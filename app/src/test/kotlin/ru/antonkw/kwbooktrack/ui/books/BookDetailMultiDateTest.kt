@@ -138,6 +138,7 @@ class BookDetailMultiDateTest {
             PhotoRepository(db.photoDao(), NoOpPhotoStorage),
             ru.antonkw.kwbooktrack.data.repository.TagRepository(db.tagDao()),
             mediaDates,
+            db,
         )
         TestViewModels.track(vm)
         return vm

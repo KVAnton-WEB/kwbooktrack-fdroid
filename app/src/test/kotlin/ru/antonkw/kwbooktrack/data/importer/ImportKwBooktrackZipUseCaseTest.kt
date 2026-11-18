@@ -253,7 +253,7 @@ class ImportKwBooktrackZipUseCaseTest {
             assertThat(sessions).hasSize(1)
             assertThat(sessions.single().durationSec).isEqualTo(600)
 
-            assertThat(targetTagRepo.observeAll().first().map { it.name }).containsExactly("фэнтези")
+            assertThat(targetDb.tagDao().tagsOfMedia(book.id, MediaType.BOOKS)).containsExactly("фэнтези")
 
             val photos = targetPhotoRepo.observeByMedia(book.id, MediaType.BOOKS).first()
             assertThat(photos).hasSize(1)
@@ -360,6 +360,26 @@ class ImportKwBooktrackZipUseCaseTest {
             assertThat(targetPhotoRepo.observeByMedia(book.id, MediaType.BOOKS).first()).hasSize(1)
             assertThat(targetDb.tagDao().tagsOf(book.id)).hasSize(1)
         }
+    }
+
+    @Test
+    fun importCleansOwnStagingLeftoversButNotForeignOnes() = runBlocking {
+        // Хвост прерванного своего импорта убираем, а чужой (Tellico) staging
+        // может быть ещё активен: отмена кооперативная, распаковка ещё идёт.
+        val own = File(outputDir, ".import-staging-kw-old").apply {
+            mkdirs()
+            File(this, "leftover.txt").writeText("x")
+        }
+        val foreign = File(outputDir, ".import-staging-tellico-active").apply {
+            mkdirs()
+            File(this, "cover.jpg").writeText("x")
+        }
+
+        val result = importer(backupZip(), outputDir)
+
+        assertThat(result.isSuccess).isTrue()
+        assertThat(own.exists()).isFalse()
+        assertThat(foreign.exists()).isTrue()
     }
 
     @Test

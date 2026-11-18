@@ -155,11 +155,7 @@ class TellicoBookMapper @Inject constructor() {
     }
 
     private companion object {
-        val TRUE_VALUES = TellicoFields.TRUE_VALUES
-        val DATE_PATTERNS = listOf("yyyy-MM-dd", "yyyy-MM", "yyyy", "dd.MM.yyyy")
         val FIRST_NUMBER = Regex("\\d+")
-        /** Страница цитаты: `1:текст` или `1::текст`. */
-        val QUOTE_PAGE = Regex("(\\d+)(::?)(.*)")
         /** Валюта в цене: «275 ₽», «275 руб.», «275р» — число без них. */
         val PRICE_NOISE = Regex("[\\s₽\\$]|руб\\.?|RUB|USD|EUR|р\\b")
     }

@@ -108,6 +108,21 @@ class MovieEditViewModelTest {
         assertThat(movies.getAll()).hasSize(1)
     }
 
+    @Test
+    fun doubleSaveWithoutWaitingDoesNotDuplicateMovie() = runTest(dispatcher) {
+        // Между save() и saved=true — окно, в котором второй вызов проходил
+        // проверку и вставлял вторую строку: у фильма нет уникального индекса.
+        val vm = newVm()
+        vm.setTitle("Новый фильм")
+        vm.save()
+        vm.save()
+        advanceUntilIdle()
+        // Вставки идут в потоке Room'а — дожидаемся их конца.
+        TestDb.drain()
+
+        assertThat(movies.getAll()).hasSize(1)
+    }
+
     private fun editVm(movieId: Long) = MovieEditViewModel(
         SavedStateHandle(mapOf("movieId" to movieId)),
         movies,

@@ -181,6 +181,7 @@
     <string name="photos_attached">Photos attached: %1$d</string>
     <string name="action_save_note">Save as note</string>
     <string name="action_save_quote">Save as quote</string>
+    <string name="note_photos_failed">Note saved, but photos were not attached: %1$d</string>
     <string name="note_kind_note">Note</string>
     <string name="note_kind_quote">Quote</string>
     <string name="note_kind_review">Review</string>
@@ -252,7 +253,7 @@
     <string name="tellico_import_done">Import complete</string>
     <string name="tellico_import_done_with_errors">Import finished with errors</string>
     <string name="tellico_import_total_format">Records in file: %1$d</string>
-    <string name="tellico_import_imported_format">Books imported: %1$d</string>
+    <string name="tellico_import_imported_format">Records imported: %1$d</string>
     <string name="tellico_import_skipped_format">Skipped: %1$d</string>
     <string name="tellico_import_label_covers">Covers copied: %1$d</string>
     <string name="tellico_import_label_notes">Notes / quotes / reviews: %1$d</string>
@@ -361,7 +362,6 @@
     <string name="tellico_import_result_format">Imported: %1$d, skipped: %2$d</string>
     <string name="tellico_import_covers_format">Covers copied: %1$d</string>
     <string name="tellico_import_notes_format">Notes, sessions, tags and photos added: %1$d</string>
-    <string name="tellico_import_dry_run">Dry run (no writes)</string>
     <string name="tellico_import_error">Import error</string>
 
     <!-- Common errors -->

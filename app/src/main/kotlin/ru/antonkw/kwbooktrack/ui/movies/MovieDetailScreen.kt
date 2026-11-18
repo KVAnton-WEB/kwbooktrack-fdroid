@@ -82,6 +82,7 @@ fun MovieDetailScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val deleted by viewModel.deleted.collectAsStateWithLifecycle()
     var confirmDelete by remember { mutableStateOf(false) }
+    var showCoverViewer by remember { mutableStateOf(false) }
     var galleryIndex by remember { mutableStateOf(-1) }
 
     if (deleted) {
@@ -143,6 +144,16 @@ fun MovieDetailScreen(
         val review = state.notes.firstOrNull { it.kind == NoteKind.REVIEW }
         val otherNotes = state.notes.filter { it.kind != NoteKind.REVIEW }
 
+        // Полноэкранный просмотр обложки — как в детали книги.
+        val coverPath = movie.coverPath
+        if (showCoverViewer && !coverPath.isNullOrBlank()) {
+            PhotoGalleryDialog(
+                photos = listOf(PhotoSource(-1L, coverPath)),
+                initialIndex = 0,
+                onDismiss = { showCoverViewer = false },
+            )
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -154,8 +165,14 @@ fun MovieDetailScreen(
             Row(verticalAlignment = Alignment.Top) {
                 CoverImage(
                     path = movie.coverPath,
-                    sizeDp = 110,
+                    heightDp = 110,
                     modifier = Modifier.padding(end = 12.dp),
+                    contentDescription = stringResource(R.string.label_cover),
+                    onClick = if (!movie.coverPath.isNullOrBlank()) {
+                        { showCoverViewer = true }
+                    } else {
+                        null
+                    },
                 )
                 Column(modifier = Modifier.weight(1f)) {
                     Text(

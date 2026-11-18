@@ -84,8 +84,8 @@ class TellicoImportViewModelTest {
             transcoder = CoverTranscoder(),
         )
         useCase = ImportTellicoZipUseCase(
-            importUseCase = ImportTellicoUseCase(TellicoCsvReader(), TellicoBookMapper(), TellicoMovieMapper(), applier),
             csvReader = TellicoCsvReader(),
+            importUseCase = ImportTellicoUseCase(TellicoBookMapper(), TellicoMovieMapper(), applier),
             xmlReader = TellicoXmlReader(),
         )
         vm = TellicoImportViewModel(
@@ -203,6 +203,35 @@ class TellicoImportViewModelTest {
         assertThat(state.result).isNotNull()
         assertThat(state.result!!.imported).isEqualTo(1)
         assertThat(db.bookDao().observeAll().first().single().title).isEqualTo("Дюна")
+    }
+
+    @Test
+    fun tellicoImportCleansOwnStagingLeftoversButNotForeignOnes() = runTest(dispatcher) {
+        // Хвосты прерванных Tellico-импортов убираем, а kw-staging может быть
+        // ещё активен — его трогать нельзя.
+        val outputDir = java.nio.file.Files.createTempDirectory("tellico-out-").toFile()
+        try {
+            val own = File(outputDir, ".import-staging-tellico-old").apply {
+                mkdirs()
+                File(this, "leftover.txt").writeText("x")
+            }
+            val foreign = File(outputDir, ".import-staging-kw-active").apply {
+                mkdirs()
+                File(this, "cover.jpg").writeText("x")
+            }
+
+            val result = useCase(
+                zip("books.tc", "tellico.xml" to TELLICO_XML),
+                ru.antonkw.kwbooktrack.data.importer.ImportFormat.TELLICO_XML,
+                outputDir,
+            )
+
+            assertThat(result.isSuccess).isTrue()
+            assertThat(own.exists()).isFalse()
+            assertThat(foreign.exists()).isTrue()
+        } finally {
+            outputDir.deleteRecursively()
+        }
     }
 
     @Test

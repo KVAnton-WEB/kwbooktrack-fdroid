@@ -9,7 +9,6 @@ import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 import ru.antonkw.kwbooktrack.data.db.entity.NoteEntity
-import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
 
 @Dao
 interface NoteDao {
@@ -24,30 +23,6 @@ interface NoteDao {
     @Query("SELECT * FROM notes WHERE media_id = :mediaId AND media_type = :mediaType ORDER BY created_at DESC")
     fun observeByMedia(mediaId: Long, mediaType: MediaType): Flow<List<NoteEntity>>
 
-    @Query("SELECT * FROM notes WHERE kind = :kind ORDER BY created_at DESC")
-    fun observeByKind(kind: NoteKind): Flow<List<NoteEntity>>
-
-    @Query("SELECT * FROM notes WHERE id = :id LIMIT 1")
-    suspend fun findByIdRange(id: Long): NoteEntity?
-
-    /**
-     * Random note — pick an id uniformly in [1, count], retry a few times on
-     * miss (gaps after deletes), fall back to ORDER BY RANDOM() as a safety
-     * net. Avoids the O(n) scan + sort of ORDER BY RANDOM() on every call.
-     */
-    suspend fun randomOne(): NoteEntity? {
-        val total = count()
-        if (total == 0) return null
-        repeat(8) {
-            val candidate = (1..total).random()
-            findByIdRange(candidate.toLong())?.let { return it }
-        }
-        return fallbackRandomOne()
-    }
-
-    @Query("SELECT * FROM notes ORDER BY RANDOM() LIMIT 1")
-    suspend fun fallbackRandomOne(): NoteEntity?
-
     @Query("SELECT * FROM notes WHERE id = :id LIMIT 1")
     suspend fun findById(id: Long): NoteEntity?
 
@@ -59,11 +34,4 @@ interface NoteDao {
 
     @Delete
     suspend fun delete(note: NoteEntity): Int
-
-
-    @Query("SELECT COUNT(*) FROM notes")
-    suspend fun count(): Int
-
-    @Query("SELECT COUNT(*) FROM notes WHERE kind = :kind")
-    suspend fun countByKind(kind: NoteKind): Int
 }

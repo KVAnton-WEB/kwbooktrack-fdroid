@@ -33,12 +33,12 @@ import ru.antonkw.kwbooktrack.data.db.migration.Migrate1To2
         MediaDateEntity::class,
         MovieEntity::class,
     ],
-    version = 13,
+    version = 14,
     // Schema export is disabled: all transitions are explicit Migrations
     // wired into DatabaseModule via .addMigrations(...), so Room doesn't
-    // need a checked-in json file per step. The previous
-    // 1.json / 2.json / 3.json / 4.json stay around for reference but
-    // aren't read by the build.
+    // need a checked-in json file per step. The old 1.json / 2.json /
+    // 3.json / 4.json were removed; MigrationsFromV1Test rebuilds the v1
+    // schema with inline SQL instead of reading them.
     exportSchema = false,
     // No autoMigrations — every step is a hand-written ALTER TABLE.
     autoMigrations = [],

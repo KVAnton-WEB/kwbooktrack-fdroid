@@ -31,8 +31,6 @@ class NoteRepository @Inject constructor(
     fun observeByMedia(mediaId: Long, mediaType: MediaType): Flow<List<NoteEntity>> =
         noteDao.observeByMedia(mediaId, mediaType)
 
-    fun observeByKind(kind: NoteKind): Flow<List<NoteEntity>> = noteDao.observeByKind(kind)
-
     fun search(query: String): Flow<List<NoteEntity>> {
         val tokens = query
             .split(Regex("\\s+"))
@@ -48,8 +46,6 @@ class NoteRepository @Inject constructor(
             notes.filter { note -> noteMatchesTokens(note.bodyMd, tokens) }
         }
     }
-
-    suspend fun randomOne(): NoteEntity? = noteDao.randomOne()
 
     suspend fun findById(id: Long): NoteEntity? = noteDao.findById(id)
 

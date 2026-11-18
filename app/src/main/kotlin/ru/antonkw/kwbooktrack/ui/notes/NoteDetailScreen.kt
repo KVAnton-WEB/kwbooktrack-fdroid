@@ -1,7 +1,6 @@
 package ru.antonkw.kwbooktrack.ui.notes
 
 import android.content.Intent
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,8 +16,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ContentCopy
@@ -80,6 +77,7 @@ import ru.antonkw.kwbooktrack.data.time.toLocalDateTime
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 import ru.antonkw.kwbooktrack.R
+import ru.antonkw.kwbooktrack.ui.common.NotePhotoTile
 import ru.antonkw.kwbooktrack.ui.common.PhotoGalleryDialog
 import ru.antonkw.kwbooktrack.ui.common.PhotoSource
 
@@ -350,20 +348,7 @@ private fun NoteDetailContent(state: NoteDetailUiState.Loaded, onOpenMedia: (Med
             ) {
                 items(state.photos, key = { it.id }) { photo ->
                     val idx = state.photos.indexOf(photo)
-                    Box(
-                        modifier = Modifier
-                            .size(120.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                            .clickable { viewerIndex = idx },
-                    ) {
-                        AsyncImage(
-                            model = java.io.File(photo.path),
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    }
+                    NotePhotoTile(photo.path, onClick = { viewerIndex = idx })
                 }
             }
             viewerIndex?.let { idx ->

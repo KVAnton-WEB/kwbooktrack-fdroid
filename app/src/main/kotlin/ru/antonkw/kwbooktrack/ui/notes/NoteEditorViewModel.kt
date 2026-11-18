@@ -10,6 +10,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import ru.antonkw.kwbooktrack.data.db.entity.MediaType
@@ -29,6 +30,8 @@ data class NoteEditorState(
     val photoIdsToDelete: Set<Long> = emptySet(),
     val loaded: Boolean = false,
     val saved: Boolean = false,
+    /** Сколько приложенных фото не удалось сохранить при последнем сохранении. */
+    val failedPhotos: Int = 0,
 ) {
     val totalPhotos: Int get() = (existingPhotos.size - photoIdsToDelete.size) + pendingPhotos.size
 
@@ -155,23 +158,27 @@ class NoteEditorViewModel @Inject constructor(
                     .firstOrNull { it.id == id }
                     ?.let { photoRepository.delete(it) }
             }
-            s.pendingPhotos.forEach { uri -> copyToFilesAndInsert(uri, targetId) }
+            var failedPhotos = 0
+            s.pendingPhotos.forEach { uri ->
+                if (!copyToFilesAndInsert(uri, targetId)) failedPhotos++
+            }
             _state.value = s.copy(
                 saved = true,
                 pendingPhotos = emptyList(),
                 photoIdsToDelete = emptySet(),
+                failedPhotos = failedPhotos,
             )
         }
     }
 
-    private suspend fun copyToFilesAndInsert(uri: Uri, targetNoteId: Long) {
-        try {
+    private suspend fun copyToFilesAndInsert(uri: Uri, targetNoteId: Long): Boolean {
+        return try {
             // Файл — через PhotoStorage: там имя с UUID. Собственное имя из
             // миллисекунд давало бы двум фото, прикреплённым в одну
             // миллисекунду, одно имя — второе перезаписало бы первое.
             val path = context.contentResolver.openInputStream(uri)?.use { input ->
                 photoRepository.saveForNote(targetNoteId, input, "jpg")
-            } ?: return
+            } ?: return false
             photoRepository.insert(
                 PhotoEntity(
                     mediaId = mediaId,
@@ -181,8 +188,13 @@ class NoteEditorViewModel @Inject constructor(
                     createdAt = System.currentTimeMillis(),
                 ),
             )
-        } catch (_: Exception) {
-            // best-effort
+            true
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // Молча потерять фото нельзя: заметка сохранится, а экран скажет,
+            // сколько не прикрепилось.
+            false
         }
     }
 

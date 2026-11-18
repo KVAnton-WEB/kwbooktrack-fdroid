@@ -87,6 +87,40 @@ class MovieEditDatesTest {
     }
 
     @Test
+    fun invalidDateIsReportedAndSavesNothing() = runTest(dispatcher) {
+        // Мусор в поле даты: молча выбросить его нельзя — пользователь
+        // не узнает, что дата не сохранилась.
+        val vm = newVm()
+        vm.setTitle("Малхолланд Драйв")
+        vm.setWatchedDate(0, "вчера")
+        vm.save()
+        advanceUntilIdle()
+
+        assertThat(vm.state.value.error).isEqualTo(MovieEditError.INVALID_DATE)
+        assertThat(movies.getAll()).isEmpty()
+    }
+
+    @Test
+    fun repeatedSaveWithTheSameInvalidDateChangesStateSoTheSnackbarShowsAgain() = runTest(dispatcher) {
+        // StateFlow склеивает равные значения: если повторный Save не меняет
+        // состояние, LaunchedEffect(state.error) на экране не перезапустится
+        // и snackbar не покажется второй раз.
+        val vm = newVm()
+        vm.setTitle("Малхолланд Драйв")
+        vm.setWatchedDate(0, "вчера")
+        vm.save()
+        advanceUntilIdle()
+        val afterFirst = vm.state.value
+        assertThat(afterFirst.error).isEqualTo(MovieEditError.INVALID_DATE)
+
+        vm.save()
+        advanceUntilIdle()
+
+        assertThat(vm.state.value).isNotEqualTo(afterFirst)
+        assertThat(vm.state.value.error).isEqualTo(MovieEditError.INVALID_DATE)
+    }
+
+    @Test
     fun editingMovieLoadsAllWatchDates() = runTest(dispatcher) {
         val id = movies.insert(
             ru.antonkw.kwbooktrack.data.db.entity.MovieEntity(

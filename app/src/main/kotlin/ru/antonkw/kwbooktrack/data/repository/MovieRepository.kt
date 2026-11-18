@@ -91,17 +91,6 @@ class MovieRepository @Inject constructor(
     suspend fun upsertFromImport(movie: MovieEntity, snapshotId: Long = 0L): Long =
         movieDao.upsertFromImport(withSearchKeys(movie), snapshotId)
 
-    suspend fun delete(movie: MovieEntity): Int {
-        // Пути файлов фото читаем ДО удаления строк: после их уже не узнать.
-        val photoPaths = photoRepository.observeByMedia(movie.id, MediaType.MOVIES).first().map { it.path }
-        val rows = movieDao.deleteWithContent(movie.id)
-        if (rows > 0) {
-            photoRepository.deleteFiles(photoPaths)
-            coverStorage.delete(movie.coverPath)
-        }
-        return rows
-    }
-
     suspend fun deleteById(id: Long): Int {
         val coverPath = movieDao.findById(id)?.coverPath
         val photoPaths = photoRepository.observeByMedia(id, MediaType.MOVIES).first().map { it.path }
@@ -112,8 +101,6 @@ class MovieRepository @Inject constructor(
         }
         return rows
     }
-
-    suspend fun count(): Int = movieDao.count()
 
     /** Счётчик фильмов потоком — без загрузки строк. */
     fun observeCount(): Flow<Int> = movieDao.observeCount()

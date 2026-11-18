@@ -1,0 +1,3 @@
+Lossless import: re-importing Tellico/ZIP no longer creates duplicates or drops photos with identical content, and Cyrillic in CSV reads correctly. Library covers now use a 2:3 ratio, notes get a photo tile, the photo viewer supports zoom, and the calendar can open a book or movie.
+
+Fixes: book fields you typed no longer vanish on a save error; a movie's invalid date shows an error and Back asks about unsaved changes; temporary covers are removed from disk; statistics no longer show negative months and count a day's pages correctly.

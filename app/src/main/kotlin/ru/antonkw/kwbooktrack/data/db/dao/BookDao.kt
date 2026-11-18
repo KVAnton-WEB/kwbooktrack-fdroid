@@ -1,7 +1,6 @@
 package ru.antonkw.kwbooktrack.data.db.dao
 
 import androidx.room.Dao
-import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
@@ -37,6 +36,13 @@ interface BookDao {
     @Query("SELECT * FROM books WHERE isbn13 = :isbn13 LIMIT 1")
     suspend fun findByIsbn(isbn13: String): BookEntity?
 
+    /**
+     * Слабый ключ слияния при импорте — название и автор.
+     *
+     * Уникальности нет: так совпадают и две разные книги (два экземпляра без
+     * ISBN), поэтому по совпадению заполненные поля не затираются
+     * ([mergeIntoExisting]).
+     */
     @Query(
         """
         SELECT * FROM books WHERE title = :title AND author = :author 
@@ -44,9 +50,6 @@ interface BookDao {
         """,
     )
     suspend fun findByTitleAndAuthor(title: String, author: String): BookEntity?
-
-    @Query("SELECT * FROM books WHERE status = :status ORDER BY updated_at DESC")
-    fun observeByStatus(status: BookStatus): Flow<List<BookEntity>>
 
     @RawQuery(observedEntities = [BookEntity::class])
     fun rawSearch(query: SupportSQLiteQuery): Flow<List<BookEntity>>
@@ -56,9 +59,6 @@ interface BookDao {
 
     @Update
     suspend fun update(book: BookEntity): Int
-
-    @Delete
-    suspend fun delete(book: BookEntity): Int
 
     @Query("DELETE FROM books WHERE id = :id")
     suspend fun deleteById(id: Long): Int
@@ -82,24 +82,6 @@ interface BookDao {
     fun observeCounts(status: BookStatus): Flow<BookCounts>
 
     /**
-     * Upsert by ISBN, merging non-null fields so manual user data
-     * (purchaseDate, custom genre, rating) is not wiped by an import.
-     * Wrapped in @Transaction to prevent two concurrent calls both
-     * passing findByIsbn with null and double-inserting.
-     */
-    @Transaction
-    suspend fun upsertByIsbn(book: BookEntity): Long {
-        val existing = book.isbn13?.let { findByIsbn(it) }
-        return if (existing != null) {
-            val merged = book.mergeWith(existing)
-            update(merged)
-            existing.id
-        } else {
-            insert(book)
-        }
-    }
-
-    /**
      * Upsert by ISBN first, then by title+author.
      *
      * @param snapshotId id строки в архиве (свой zip-бэкап). По нему запись
@@ -111,7 +93,9 @@ interface BookDao {
         // Точное совпадение по id архива: та же самая строка, её надо обновить.
         if (snapshotId > 0L) {
             val byId = findById(snapshotId)
-            if (byId != null && byId.title == book.title) {
+            // Пробелы по краям не в счёт: CSV-парсер импортёра их обрезает,
+            // а в БД название могло попасть с пробелом (ручной ввод).
+            if (byId != null && byId.title.trim() == book.title.trim()) {
                 update(book.mergeWith(byId))
                 return byId.id
             }

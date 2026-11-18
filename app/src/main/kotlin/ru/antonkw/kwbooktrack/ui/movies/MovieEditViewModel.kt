@@ -25,6 +25,12 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
+/** Ошибка сохранения фильма — текст подставляет экран, как у книги. */
+enum class MovieEditError {
+    /** Дата введена, но не разобралась — молча терять её нельзя. */
+    INVALID_DATE,
+}
+
 /** Состояние формы редактирования фильма. */
 data class MovieEditState(
     val title: String = "",
@@ -44,6 +50,12 @@ data class MovieEditState(
     val coverPath: String? = null,
     val saved: Boolean = false,
     val loading: Boolean = false,
+    val error: MovieEditError? = null,
+    /**
+     * Растёт с каждой ошибкой сохранения: StateFlow склеивает равные
+     * значения, и без него повторный Save не показал бы snackbar снова.
+     */
+    val errorNonce: Int = 0,
 )
 
 /**
@@ -71,6 +83,30 @@ class MovieEditViewModel @Inject constructor(
     /** Обложка, сохранённая в БД до правки: её надо убрать, если её заменили. */
     private var originalCoverPath: String? = null
 
+    /**
+     * Снимок формы до правки — для вопроса «отменить изменения?».
+     *
+     * В режиме правки перезаписывается после загрузки фильма: пустая форма
+     * делала бы её «грязной» сразу.
+     */
+    private var initialSnapshot: MovieEditState = MovieEditState(loading = isEditing)
+
+    /** Идёт запись фильма: повторное «Сохранить» до её конца — no-op. */
+    private var saving = false
+
+    val isDirty: Boolean
+        get() = _state.value.copy(saved = false, loading = false, error = null, errorNonce = 0) !=
+            initialSnapshot.copy(saved = false, loading = false, error = null, errorNonce = 0)
+
+    val hasInput: Boolean
+        get() = _state.value.title.isNotBlank() || _state.value.originalTitle.isNotBlank() ||
+            _state.value.year.isNotBlank() || _state.value.genre.isNotBlank() ||
+            _state.value.nationality.isNotBlank() || _state.value.director.isNotBlank() ||
+            _state.value.cast.isNotBlank() || _state.value.duration.isNotBlank() ||
+            _state.value.url.isNotBlank() || _state.value.plot.isNotBlank() ||
+            _state.value.rating != null || _state.value.isDownloaded ||
+            _state.value.coverPath != null || _state.value.watchedDates.any { it.isNotBlank() }
+
     init {
         if (isEditing) {
             viewModelScope.launch {
@@ -93,6 +129,7 @@ class MovieEditViewModel @Inject constructor(
                     coverPath = movie.coverPath,
                     loading = false,
                 )
+                initialSnapshot = _state.value
             }
         }
     }
@@ -144,16 +181,27 @@ class MovieEditViewModel @Inject constructor(
     /** Обложка из галереи: файл сохраняется, путь — в состояние. */
     fun attachCover(uri: Uri) {
         viewModelScope.launch {
+            val previous = _state.value.coverPath
             val path = runCatching {
                 context.contentResolver.openInputStream(uri)?.use { input ->
                     coverStorage.saveTemp(input, "jpg")
                 }
             }.getOrNull() ?: return@launch
+            // Прошлую временную обложку убираем: иначе выбор A, потом B
+            // оставит A в covers/ навсегда. Сохранённую в БД — не трогаем.
+            if (previous != null && previous != path && previous != originalCoverPath) {
+                runCatching { File(previous).delete() }
+            }
             update { copy(coverPath = path) }
         }
     }
 
     fun clearCover() {
+        // Временный файл удаляем сразу, сохранённый — только после успешного
+        // save(): «Отменить» не должно стирать обложку фильма.
+        _state.value.coverPath
+            ?.takeIf { it != originalCoverPath }
+            ?.let { runCatching { File(it).delete() } }
         update { copy(coverPath = null) }
     }
 
@@ -163,56 +211,71 @@ class MovieEditViewModel @Inject constructor(
         // Повторное нажатие «Сохранить» не должно вставлять второй фильм:
         // у нового фильма isEditing = false, и save() идёт в insert.
         if (s.saved) return
+        // Пока идёт запись, повторное нажатие — no-op. Флаг `saved` ставится
+        // после транзакции, и в окне между ними второй вызов вставлял вторую
+        // строку: у фильма нет уникального индекса, как у ISBN у книги.
+        if (saving) return
+        // Неразобранная дата — не «нет даты»: молча потерять введённое
+        // значение нельзя, показываем ошибку (как в книжной форме).
+        if (s.watchedDates.any { it.isNotBlank() && parseDate(it) == null }) {
+            _state.value = s.copy(error = MovieEditError.INVALID_DATE, errorNonce = s.errorNonce + 1)
+            return
+        }
+        saving = true
         viewModelScope.launch {
-            val coverPath = s.coverPath
-            // Основная дата — самая ранняя: из неё Tellico берёт первую дату.
-            // Остальные — дополнительные.
-            val dates = s.watchedDates.mapNotNull { parseDate(it) }.sorted()
-            val form = MovieEntity(
-                id = if (isEditing) editingMovieId else 0L,
-                title = s.title.trim(),
-                originalTitle = s.originalTitle.trim().takeIf { it.isNotEmpty() },
-                year = s.year.toIntOrNull(),
-                genre = s.genre.trim().takeIf { it.isNotEmpty() },
-                nationality = s.nationality.trim().takeIf { it.isNotEmpty() },
-                director = s.director.trim().takeIf { it.isNotEmpty() },
-                cast = s.cast.trim().takeIf { it.isNotEmpty() },
-                durationMin = s.duration.toIntOrNull(),
-                rating = s.rating,
-                watchedAt = dates.firstOrNull(),
-                coverPath = coverPath,
-                plot = s.plot.trim().takeIf { it.isNotEmpty() },
-                comments = null,
-                url = s.url.trim().takeIf { it.isNotEmpty() },
-                isDownloaded = s.isDownloaded,
-                createdAt = 0L,
-                updatedAt = System.currentTimeMillis(),
-                source = MediaSource.MANUAL,
-            )
-            val movieId = if (isEditing) {
-                val existing = movieRepository.findById(editingMovieId) ?: return@launch
-                // Поля, которых в форме нет (комментарии Tellico, чужие
-                // поля, источник), сохраняем: правка названия не должна
-                // стирать то, что приехало из импорта.
-                saveMovieUseCase(
-                    form.copy(
-                        comments = existing.comments,
-                        extraFields = existing.extraFields,
-                        source = existing.source,
-                        createdAt = existing.createdAt,
-                    ),
-                    dates.drop(1),
+            try {
+                val coverPath = s.coverPath
+                // Основная дата — самая ранняя: из неё Tellico берёт первую дату.
+                // Остальные — дополнительные.
+                val dates = s.watchedDates.mapNotNull { parseDate(it) }.sorted()
+                val form = MovieEntity(
+                    id = if (isEditing) editingMovieId else 0L,
+                    title = s.title.trim(),
+                    originalTitle = s.originalTitle.trim().takeIf { it.isNotEmpty() },
+                    year = s.year.toIntOrNull(),
+                    genre = s.genre.trim().takeIf { it.isNotEmpty() },
+                    nationality = s.nationality.trim().takeIf { it.isNotEmpty() },
+                    director = s.director.trim().takeIf { it.isNotEmpty() },
+                    cast = s.cast.trim().takeIf { it.isNotEmpty() },
+                    durationMin = s.duration.toIntOrNull(),
+                    rating = s.rating,
+                    watchedAt = dates.firstOrNull(),
+                    coverPath = coverPath,
+                    plot = s.plot.trim().takeIf { it.isNotEmpty() },
+                    comments = null,
+                    url = s.url.trim().takeIf { it.isNotEmpty() },
+                    isDownloaded = s.isDownloaded,
+                    createdAt = 0L,
+                    updatedAt = System.currentTimeMillis(),
+                    source = MediaSource.MANUAL,
                 )
-            } else {
-                saveMovieUseCase(form, dates.drop(1))
+                val movieId = if (isEditing) {
+                    val existing = movieRepository.findById(editingMovieId) ?: return@launch
+                    // Поля, которых в форме нет (комментарии Tellico, чужие
+                    // поля, источник), сохраняем: правка названия не должна
+                    // стирать то, что приехало из импорта.
+                    saveMovieUseCase(
+                        form.copy(
+                            comments = existing.comments,
+                            extraFields = existing.extraFields,
+                            source = existing.source,
+                            createdAt = existing.createdAt,
+                        ),
+                        dates.drop(1),
+                    )
+                } else {
+                    saveMovieUseCase(form, dates.drop(1))
+                }
+                if (movieId <= 0L) return@launch
+                // Прежняя обложка больше не нужна: путь новой — с UUID-именем.
+                originalCoverPath
+                    ?.takeIf { it != coverPath }
+                    ?.let { coverStorage.delete(it) }
+                originalCoverPath = coverPath
+                _state.value = _state.value.copy(saved = true)
+            } finally {
+                saving = false
             }
-            if (movieId <= 0L) return@launch
-            // Прежняя обложка больше не нужна: путь новой — с UUID-именем.
-            originalCoverPath
-                ?.takeIf { it != coverPath }
-                ?.let { coverStorage.delete(it) }
-            originalCoverPath = coverPath
-            _state.value = _state.value.copy(saved = true)
         }
     }
 
@@ -224,7 +287,8 @@ class MovieEditViewModel @Inject constructor(
     }
 
     private fun update(block: MovieEditState.() -> MovieEditState) {
-        _state.value = _state.value.block()
+        // Правка любого поля снимает прошлую ошибку «неверная дата».
+        _state.value = _state.value.block().copy(error = null)
     }
 
     private fun parseDate(raw: String): Long? {

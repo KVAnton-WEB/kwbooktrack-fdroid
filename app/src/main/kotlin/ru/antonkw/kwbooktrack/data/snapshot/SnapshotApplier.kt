@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.first
 import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 import ru.antonkw.kwbooktrack.data.db.entity.NoteEntity
+import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
 import ru.antonkw.kwbooktrack.data.db.entity.PhotoEntity
 import ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity
 import ru.antonkw.kwbooktrack.data.repository.BookRepository
@@ -21,6 +22,7 @@ import ru.antonkw.kwbooktrack.data.storage.CoverTranscoder
 import ru.antonkw.kwbooktrack.data.storage.PhotoStorage
 import java.io.File
 import java.io.IOException
+import java.security.MessageDigest
 import java.util.UUID
 import javax.inject.Inject
 
@@ -45,7 +47,7 @@ data class ApplyStats(
  * добавляется, существующее не трогается, повторный импорт не плодит дубли.
  *
  * Совпадение: заметка — по (`kind`, `body`, `page`), сессия — по `startedAt`,
- * фото — по локальному пути файла, тег — по имени.
+ * фото — по содержимому файла (md5) и локальному пути, тег — по имени.
  */
 class SnapshotApplier @Inject constructor(
     private val database: KwBooktrackDatabase,
@@ -247,13 +249,15 @@ class SnapshotApplier @Inject constructor(
         mediaType: MediaType,
         now: Long,
     ): NotesApplied {
-        val existing = noteRepository.observeByMedia(mediaId, mediaType).first().toMutableList()
+        val existing = noteRepository.observeByMedia(mediaId, mediaType).first()
+        // Индекс по ключу совпадения: линейный поиск на каждую заметку — это
+        // O(n²) на книге с тысячами цитат.
+        val byKey = existing.associateByTo(mutableMapOf()) { it.matchKey() }
         val ids = ArrayList<Long>(notes.size)
         var added = 0
         for (note in notes) {
-            val match = existing.firstOrNull {
-                it.kind == note.kind && it.bodyMd == note.body && it.page == note.page
-            }
+            val key = NoteKey(note.kind, note.body, note.page)
+            val match = byKey[key]
             if (match != null) {
                 ids += match.id
                 continue
@@ -268,7 +272,7 @@ class SnapshotApplier @Inject constructor(
                 updatedAt = now,
             )
             val id = noteRepository.insert(entity)
-            existing += entity.copy(id = id)
+            byKey[key] = entity.copy(id = id)
             ids += id
             added++
         }
@@ -315,8 +319,8 @@ class SnapshotApplier @Inject constructor(
 
     /**
      * Фото: файл из архива → локальный файл `{md5}_{тип}_{id}.{ext}` → строка в БД.
-     * Имя в архиве — MD5 от содержимого, поэтому повторный импорт узнаёт
-     * уже сохранённое фото и не плодит дубли.
+     * Уже сохранённое узнаётся по md5 содержимого (имена локальных и импортных
+     * файлов разные), поэтому повторный импорт не плодит дубли.
      */
     private suspend fun applyPhotos(
         photos: List<PhotoSnapshot>,
@@ -326,9 +330,18 @@ class SnapshotApplier @Inject constructor(
         assets: ImportAssets,
         now: Long,
     ): Int {
-        val paths = photoRepository.observeByMedia(mediaId, mediaType).first().map { it.path }.toMutableSet()
+        val existing = photoRepository.observeByMedia(mediaId, mediaType).first()
+        val paths = existing.map { it.path }.toMutableSet()
+        // Локальное фото называется note_{id}_{uuid}, импортное — {md5}_…:
+        // пути не совпадут никогда, то же содержимое узнаём по хешу.
+        // Набор НЕ пополняется импортированными: два файла архива с одинаковым
+        // содержимым, но разными именами — это одно фото к двум заметкам, и
+        // второе не должно выпадать (оно не было бы привязано к своей заметке).
+        val hashes = existing.mapNotNullTo(mutableSetOf()) { photo ->
+            runCatching { md5(File(photo.path).readBytes()) }.getOrNull()
+        }
         var added = 0
-        for (photo in photos) {
+        for ((photoIndex, photo) in photos.withIndex()) {
             val src = assets.find(photo.archivePath) ?: continue
             val archive = File(photo.archivePath)
             val ext = archive.extension.ifEmpty { "jpg" }
@@ -338,11 +351,16 @@ class SnapshotApplier @Inject constructor(
                 Log.w(TAG, "photo read failed for mediaId=$mediaId src=$src", e)
                 continue
             }
+            if (md5(bytes) in hashes) continue
             // Тип носителя в имени: id книг и id фильмов считаются независимо
             // и могут совпасть, а одинаковое содержимое даёт одинаковый md5 —
             // без типа два разных файла получили бы одно имя.
+            // Имя локального файла — с индексом фото в снимке: у своего бэкапа
+            // файлы названы по md5 содержимого, и одна картинка к двум заметкам
+            // лежит в архиве под одним именем. Без индекса второе фото получило
+            // бы тот же путь и было отброшено — заметка осталась бы без фото.
             val path = photoStorage.saveNamed(
-                "${archive.nameWithoutExtension}_${mediaType.name.lowercase()}_$mediaId",
+                "${archive.nameWithoutExtension}_${mediaType.name.lowercase()}_${mediaId}_$photoIndex",
                 bytes.inputStream(),
                 ext,
             )
@@ -365,7 +383,15 @@ class SnapshotApplier @Inject constructor(
     /** Id заметок снимка в БД (по порядку) и сколько из них вставлено. */
     private class NotesApplied(val ids: List<Long>, val added: Int)
 
+    /** Ключ совпадения заметки при слиянии: вид, текст и страница. */
+    private data class NoteKey(val kind: NoteKind, val body: String, val page: Int?)
+
+    private fun NoteEntity.matchKey() = NoteKey(kind, bodyMd, page)
+
     private companion object {
         const val TAG = "SnapshotApplier"
+
+        fun md5(bytes: ByteArray): String =
+            MessageDigest.getInstance("MD5").digest(bytes).joinToString("") { "%02x".format(it) }
     }
 }

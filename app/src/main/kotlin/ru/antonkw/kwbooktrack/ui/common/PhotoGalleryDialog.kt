@@ -2,7 +2,13 @@ package ru.antonkw.kwbooktrack.ui.common
 
 import android.net.Uri
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -14,12 +20,22 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.toIntSize
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
@@ -41,6 +57,15 @@ fun PhotoGalleryDialog(
         return
     }
     val pagerState = rememberPagerState(initialPage = initialIndex.coerceIn(0, photos.lastIndex)) { photos.size }
+    // Один зум на видимую страницу; при смене страницы сбрасывается.
+    var zoom by remember { mutableStateOf(Zoom()) }
+    // Intrinsic размер фото каждой страницы: клампинг pan считается по нему.
+    // Per-page: соседняя страница догружается во время свайпа, раньше чем
+    // currentPage сменится — общий сброс размера стёр бы уже готовый размер.
+    val imageSizes = remember { mutableStateMapOf<Int, IntSize>() }
+    LaunchedEffect(pagerState.currentPage) {
+        zoom = Zoom()
+    }
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false),
@@ -52,15 +77,54 @@ fun PhotoGalleryDialog(
         ) {
             HorizontalPager(
                 state = pagerState,
+                // Пока фото зумнуто, свайп двигает картинку, а не листает страницы.
+                userScrollEnabled = zoom.scale == 1f,
                 modifier = Modifier.fillMaxSize(),
             ) { page ->
                 val path = photos[page].path
-                AsyncImage(
-                    model = remember(path) { photoImageModel(path) },
-                    contentDescription = null,
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.fillMaxSize(),
-                )
+                BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                    val size = IntSize(constraints.maxWidth, constraints.maxHeight)
+                    AsyncImage(
+                        model = remember(path) { photoImageModel(path) },
+                        contentDescription = null,
+                        contentScale = ContentScale.Fit,
+                        onSuccess = { state ->
+                            val intrinsic = state.painter.intrinsicSize
+                            if (intrinsic.isSpecified) imageSizes[page] = intrinsic.toIntSize()
+                        },
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                scaleX = zoom.scale
+                                scaleY = zoom.scale
+                                translationX = zoom.offsetX
+                                translationY = zoom.offsetY
+                            }
+                            // Tap снаружи, трансформация внутри: в Main-проходе события
+                            // сначала получает внутренний детектор, а detectTapGestures
+                            // потребляет down — внешний цикл трансформации не увидел бы
+                            // ни одного жеста.
+                            .pointerInput(Unit) {
+                                detectTapGestures(onDoubleTap = { zoom = zoom.doubleTap(size) })
+                            }
+                            .pointerInput(Unit) {
+                                // Свой цикл вместо detectTransformGestures: тот забирает
+                                // drag даже при scale=1, и пейджер перестаёт листать.
+                                awaitEachGesture {
+                                    awaitFirstDown()
+                                    do {
+                                        val event = awaitPointerEvent()
+                                        val pan = event.calculatePan()
+                                        val zoomFactor = event.calculateZoom()
+                                        if (zoom.applies(pan, zoomFactor)) {
+                                            zoom = zoom.transform(pan, zoomFactor, size, imageSizes[page] ?: IntSize.Zero)
+                                            event.changes.forEach { it.consume() }
+                                        }
+                                    } while (event.changes.any { it.pressed })
+                                }
+                            },
+                    )
+                }
             }
             IconButton(
                 onClick = onDismiss,

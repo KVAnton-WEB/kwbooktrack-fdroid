@@ -1,5 +1,6 @@
 package ru.antonkw.kwbooktrack.ui.movies
 
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -25,13 +26,19 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.AlertDialog
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
@@ -60,6 +67,20 @@ fun MovieEditScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
+    var showDiscardDialog by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Введённое не должно исчезать без вопроса: у книги такой диалог есть,
+    // а у фильма «назад» молча выбрасывал правку.
+    val handleBack: () -> Unit = {
+        if (viewModel.isDirty && (viewModel.isEditing || viewModel.hasInput)) {
+            showDiscardDialog = true
+        } else {
+            onBack()
+        }
+    }
+    BackHandler(enabled = true, onBack = handleBack)
+
     val coverPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
     ) { uri -> if (uri != null) viewModel.attachCover(uri) }
@@ -71,8 +92,46 @@ fun MovieEditScreen(
         if (state.saved) onBack()
     }
 
+    // Неверная дата — показываем и не закрываем форму: фильм не записан.
+    val errorMessage = when (state.error) {
+        MovieEditError.INVALID_DATE -> stringResource(R.string.error_invalid_date)
+        null -> null
+    }
+    // Ключ — и nonce: повторный Save с той же ошибкой обязан показать
+    // snackbar снова, а StateFlow равные значения склеивает.
+    LaunchedEffect(state.error, state.errorNonce) {
+        val message = errorMessage ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(message)
+    }
+
+    if (showDiscardDialog) {
+        AlertDialog(
+            onDismissRequest = { showDiscardDialog = false },
+            title = { Text(stringResource(R.string.dialog_unsaved_title)) },
+            text = { Text(stringResource(R.string.dialog_unsaved_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDiscardDialog = false
+                    viewModel.save()
+                }) { Text(stringResource(R.string.action_save)) }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = { showDiscardDialog = false }) {
+                        Text(stringResource(R.string.action_cancel))
+                    }
+                    TextButton(onClick = {
+                        showDiscardDialog = false
+                        onBack()
+                    }) { Text(stringResource(R.string.action_discard)) }
+                }
+            },
+        )
+    }
+
     Scaffold(
         modifier = modifier,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
@@ -83,7 +142,7 @@ fun MovieEditScreen(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = handleBack) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(R.string.cd_back),

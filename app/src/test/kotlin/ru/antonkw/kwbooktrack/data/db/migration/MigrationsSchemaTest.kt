@@ -86,7 +86,7 @@ class MigrationsSchemaTest {
         createV9Database()
 
         val db = Room.databaseBuilder(ctx, KwBooktrackDatabase::class.java, dbName)
-            .addMigrations(Migrate9To10, Migrate10To11, Migrate11To12, Migrate12To13)
+            .addMigrations(Migrate9To10, Migrate10To11, Migrate11To12, Migrate12To13, Migrate13To14)
             .build()
         try {
             // Первый запрос открывает базу: Room проверяет схему и, если она

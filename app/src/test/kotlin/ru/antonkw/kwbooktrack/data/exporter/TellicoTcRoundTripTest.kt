@@ -108,8 +108,8 @@ class TellicoTcRoundTripTest {
         val targetPhotos = PhotoRepository(targetDb.photoDao(), FilePhotoStorage(context))
         val targetBooks = BookRepository(targetDb.bookDao(), targetDb.tagDao(), NoOpCoverStorage, targetPhotos)
         importUseCase = ImportTellicoZipUseCase(
+            csvReader = TellicoCsvReader(),
             importUseCase = ImportTellicoUseCase(
-                csvReader = TellicoCsvReader(),
                 mapper = TellicoBookMapper(),
                     movieMapper = TellicoMovieMapper(),
                 applier = SnapshotApplier(
@@ -126,7 +126,6 @@ class TellicoTcRoundTripTest {
                     transcoder = CoverTranscoder(),
                 ),
             ),
-            csvReader = TellicoCsvReader(),
             xmlReader = TellicoXmlReader(),
         )
 

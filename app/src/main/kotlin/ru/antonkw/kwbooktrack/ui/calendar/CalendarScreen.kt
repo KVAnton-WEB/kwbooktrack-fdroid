@@ -1,6 +1,8 @@
 package ru.antonkw.kwbooktrack.ui.calendar
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -60,6 +62,7 @@ import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 @Composable
 fun CalendarScreen(
     onBack: () -> Unit,
+    onOpenMedia: (MediaType, Long) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: CalendarViewModel = hiltViewModel(),
 ) {
@@ -180,7 +183,7 @@ fun CalendarScreen(
                     key = { idx -> uiState.days[idx]?.date?.toString() ?: "pad_$idx" },
                 ) { idx ->
                     val day = uiState.days[idx]
-                    DayCell(day = day, mode = mode, isMovies = mediaType == MediaType.MOVIES)
+                    DayCell(day = day, mode = mode, isMovies = mediaType == MediaType.MOVIES, onOpenMedia = onOpenMedia)
                 }
             }
         }
@@ -239,11 +242,18 @@ private fun CalendarModeSelector(
 }
 
 @Composable
-private fun DayCell(day: CalendarDay?, mode: CalendarMode, isMovies: Boolean) {
+private fun DayCell(
+    day: CalendarDay?,
+    mode: CalendarMode,
+    isMovies: Boolean,
+    onOpenMedia: (MediaType, Long) -> Unit,
+) {
+    val mediaType = if (isMovies) MediaType.MOVIES else MediaType.BOOKS
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .height(140.dp)
+            .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
             .padding(2.dp),
         verticalArrangement = Arrangement.Top,
         horizontalAlignment = Alignment.Start,
@@ -294,7 +304,7 @@ private fun DayCell(day: CalendarDay?, mode: CalendarMode, isMovies: Boolean) {
                                 .weight(1f, fill = true)
                                 .padding(vertical = 1.dp),
                         ) {
-                            CoverTile(book, fillHeight = true)
+                            CoverTile(book, fillHeight = true, mediaType = mediaType, onOpenMedia = onOpenMedia)
                         }
                     }
                     else -> {
@@ -306,7 +316,7 @@ private fun DayCell(day: CalendarDay?, mode: CalendarMode, isMovies: Boolean) {
                                     .height(perTileHeight)
                                     .padding(vertical = 1.dp),
                             ) {
-                                CoverTile(book, fillHeight = true)
+                                CoverTile(book, fillHeight = true, mediaType = mediaType, onOpenMedia = onOpenMedia)
                             }
                         }
                     }
@@ -329,21 +339,30 @@ private fun DayCell(day: CalendarDay?, mode: CalendarMode, isMovies: Boolean) {
 }
 
 @Composable
-private fun CoverTile(book: CalendarBook, fillHeight: Boolean) {
+private fun CoverTile(
+    book: CalendarBook,
+    fillHeight: Boolean,
+    mediaType: MediaType,
+    onOpenMedia: (MediaType, Long) -> Unit,
+) {
     // AsyncImage handles a missing/invalid file path by going to the error
     // branch itself — no need for a File.exists() check on the UI thread here.
     if (!book.coverPath.isNullOrBlank()) {
         AsyncImage(
             model = File(book.coverPath),
             contentDescription = book.title,
-            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-            modifier = Modifier.fillMaxSize(),
+            // Fit: обложка целиком в ячейке любой пропорции, без обрезки и искажений.
+            contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+            modifier = Modifier
+                .fillMaxSize()
+                .clickable { onOpenMedia(mediaType, book.id) },
         )
     } else {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .clickable { onOpenMedia(mediaType, book.id) },
             contentAlignment = Alignment.Center,
         ) {
             Text(

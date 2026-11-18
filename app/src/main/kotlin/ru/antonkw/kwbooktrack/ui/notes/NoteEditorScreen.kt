@@ -4,7 +4,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,6 +33,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -44,21 +45,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil.compose.AsyncImage
 import ru.antonkw.kwbooktrack.data.db.entity.NoteKind
 import ru.antonkw.kwbooktrack.data.db.entity.PhotoEntity
 import ru.antonkw.kwbooktrack.R
 import ru.antonkw.kwbooktrack.ui.common.MarkdownHelpDialog
+import ru.antonkw.kwbooktrack.ui.common.NotePhotoTile
 import ru.antonkw.kwbooktrack.ui.common.PhotoGalleryDialog
 import ru.antonkw.kwbooktrack.ui.common.PhotoSource
-import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -85,13 +83,22 @@ fun NoteEditorScreen(
     }
 
     var showMarkdownHelp by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val photosFailedMessage = stringResource(R.string.note_photos_failed, state.failedPhotos)
 
-    LaunchedEffect(state.saved) {
-        if (state.saved) onBack()
+    // Все фото на месте — уходим назад, как раньше. Часть не прикрепилась —
+    // остаёмся и говорим об этом: молча закрыть экран значило бы соврать.
+    LaunchedEffect(state.saved, state.failedPhotos) {
+        when {
+            !state.saved -> Unit
+            state.failedPhotos > 0 -> snackbarHostState.showSnackbar(photosFailedMessage)
+            else -> onBack()
+        }
     }
 
     Scaffold(
         modifier = modifier,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text(editorTitle) },
@@ -244,23 +251,12 @@ private fun EditorPhotoGallery(
         modifier = Modifier.fillMaxWidth(),
     ) {
         items(photos, key = { it.key }) { photo ->
-            val model: Any = when (photo) {
-                is EditorPhoto.Existing -> File(photo.entity.path)
-                is EditorPhoto.Pending -> photo.uri
+            val path = when (photo) {
+                is EditorPhoto.Existing -> photo.entity.path
+                is EditorPhoto.Pending -> photo.uri.toString()
             }
-            Box(
-                modifier = Modifier
-                    .size(96.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .clickable { viewerIndex = photos.indexOf(photo) },
-            ) {
-                AsyncImage(
-                    model = model,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                )
+            Box {
+                NotePhotoTile(path, onClick = { viewerIndex = photos.indexOf(photo) })
                 IconButton(
                     onClick = {
                         when (photo) {

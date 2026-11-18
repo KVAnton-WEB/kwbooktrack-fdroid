@@ -33,8 +33,6 @@ class BookRepository @Inject constructor(
      */
     suspend fun getAll(): List<BookEntity> = bookDao.getAll()
 
-    fun observeByStatus(status: BookStatus): Flow<List<BookEntity>> = bookDao.observeByStatus(status)
-
     fun search(query: String): Flow<List<BookEntity>> {
         val tokens = query.lowercase()
             .split(Regex("\\s+"))
@@ -73,9 +71,6 @@ class BookRepository @Inject constructor(
         return bookDao.insert(withSearchKeys(withTimestamps))
     }
 
-    suspend fun upsertByIsbn(book: BookEntity): Long =
-        bookDao.upsertByIsbn(withSearchKeys(book))
-
     /**
      * Вставка или обновление книги из импорта.
      *
@@ -109,23 +104,6 @@ class BookRepository @Inject constructor(
                 .joinToString(" ") { it.lowercase() },
         )
 
-    suspend fun delete(book: BookEntity): Int {
-        // Delete the row first; if DAO throws, the cover file remains, which is
-        // harmless (orphan on disk) compared to a missing cover file with a row
-        // still pointing at it.
-        // Пути файлов фото читаем ДО удаления строк: после их уже не узнать.
-        val photoPaths = photoRepository.observeByMedia(book.id, MediaType.BOOKS).first().map { it.path }
-        // Сессии чтения уйдут каскадом — внешний ключ на `books` у них остался.
-        // Заметки, фото и связи тегов чистит DAO: внешнего ключа на `books` у
-        // них больше нет.
-        val rows = bookDao.deleteWithContent(book.id)
-        if (rows > 0) {
-            photoRepository.deleteFiles(photoPaths)
-            coverStorage.delete(book.coverPath)
-        }
-        return rows
-    }
-
     suspend fun deleteById(id: Long): Int {
         // Путь обложки читаем до удаления строки — после её уже не узнать.
         val coverPath = bookDao.findById(id)?.coverPath
@@ -138,8 +116,8 @@ class BookRepository @Inject constructor(
         return rows
     }
 
-    suspend fun count(): Int = bookDao.count()
-
     /** Счётчики книг потоком — без загрузки строк. */
     fun observeCounts(): Flow<BookCounts> = bookDao.observeCounts(BookStatus.FINISHED)
+
+    suspend fun count(): Int = bookDao.count()
 }

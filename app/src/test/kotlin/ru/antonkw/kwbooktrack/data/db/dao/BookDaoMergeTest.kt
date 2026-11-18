@@ -152,6 +152,87 @@ class BookDaoMergeTest {
     }
 
     @Test
+    fun weakKeyMergeKeepsEveryFilledField() = runBlocking {
+        // Зеркало из 35 полей: забыть одно при добавлении колонки легко, а
+        // тест на отдельные поля такой пропуск не поймает. Здесь у исходной
+        // книги заполнено ВСЁ — после слияния с пустой записью ничего не
+        // должно обнулиться.
+        val full = BookEntity(
+            title = "Полная",
+            subtitle = "Подзаголовок",
+            author = "Автор",
+            isbn13 = "9780441013593",
+            pageCount = 500,
+            language = "en",
+            genre = "Фантастика",
+            publisher = "Издатель",
+            year = 1999,
+            coverPath = "/covers/a.webp",
+            rating = 5,
+            status = BookStatus.FINISHED,
+            startedAt = 1_000L,
+            finishedAt = 2_000L,
+            createdAt = 10L,
+            updatedAt = 20L,
+            source = MediaSource.TELLICO,
+            purchaseDate = 3_000L,
+            purchasePrice = 199.5,
+            binding = "Твёрдый",
+            purchasePlace = "Лавка",
+            series = "Серия",
+            seriesNumber = "7",
+            condition = "Хорошее",
+            translator = "Переводчик",
+            printYear = 1980,
+            printPages = 32.5,
+            originalLanguage = "en",
+            originalTitle = "Original",
+            annotation = "Аннотация",
+            isGift = true,
+            isLent = true,
+            isSold = true,
+            extraFields = mapOf("моё" to ExtraField("Моё", "1")),
+        )
+        // Импорт без единого заполненного поля, кроме ключа.
+        dao.insert(full)
+        dao.upsertFromImport(
+            BookEntity(title = "Полная", author = "Автор", createdAt = 0L, updatedAt = 0L),
+        )
+
+        val row = dao.observeAll().first().single()
+        val lost = listOf(
+            "subtitle" to row.subtitle,
+            "isbn13" to row.isbn13,
+            "pageCount" to row.pageCount,
+            "genre" to row.genre,
+            "publisher" to row.publisher,
+            "year" to row.year,
+            "coverPath" to row.coverPath,
+            "rating" to row.rating,
+            "startedAt" to row.startedAt,
+            "finishedAt" to row.finishedAt,
+            "purchaseDate" to row.purchaseDate,
+            "purchasePrice" to row.purchasePrice,
+            "binding" to row.binding,
+            "purchasePlace" to row.purchasePlace,
+            "series" to row.series,
+            "seriesNumber" to row.seriesNumber,
+            "condition" to row.condition,
+            "translator" to row.translator,
+            "printYear" to row.printYear,
+            "printPages" to row.printPages,
+            "originalLanguage" to row.originalLanguage,
+            "originalTitle" to row.originalTitle,
+            "annotation" to row.annotation,
+        ).filter { it.second == null }.map { it.first }
+        assertThat(lost).isEmpty()
+        assertThat(row.language).isEqualTo("en")
+        assertThat(row.status).isEqualTo(BookStatus.FINISHED)
+        assertThat(row.isGift && row.isLent && row.isSold).isTrue()
+        assertThat(row.extraFields).containsKey("моё")
+    }
+
+    @Test
     fun snapshotIdUpdatesExactlyThatRow() = runBlocking {
         // Свой zip-бэкап знает id строки: импорт обновляет ровно её, а не
         // «любую книгу с таким названием». Две книги с одинаковым названием и
@@ -181,6 +262,35 @@ class BookDaoMergeTest {
         val rows = dao.observeAll().first()
         assertThat(rows).hasSize(1)
         assertThat(rows.single().rating).isEqualTo(3)
+    }
+
+    @Test
+    fun snapshotIdMatchesTitleIgnoringSurroundingWhitespace() = runBlocking {
+        // Реимпорт своего zip-бэкапа: в БД название с пробелом по краю (так
+        // ввёл пользователь), а CSV-парсер импортёра пробелы обрезает. Точное
+        // сравнение названий не узнавало ту же строку — и импорт плодил дубль.
+        dao.insert(
+            BookEntity(
+                title = "старикам тут не место ",
+                author = "Кормак Маккарти",
+                createdAt = 0L,
+                updatedAt = 0L,
+            ),
+        )
+        val id = dao.observeAll().first().single().id
+
+        val mergedId = dao.upsertFromImport(
+            BookEntity(
+                title = "старикам тут не место",
+                author = "Кормак Маккарти",
+                createdAt = 0L,
+                updatedAt = 0L,
+            ),
+            snapshotId = id,
+        )
+
+        assertThat(mergedId).isEqualTo(id)
+        assertThat(dao.observeAll().first()).hasSize(1)
     }
 
     @Test

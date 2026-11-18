@@ -3,6 +3,7 @@ package ru.antonkw.kwbooktrack.ui.books
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.room.withTransaction
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -10,6 +11,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -18,6 +20,7 @@ import ru.antonkw.kwbooktrack.data.db.entity.MediaType
 import ru.antonkw.kwbooktrack.data.db.entity.NoteEntity
 import ru.antonkw.kwbooktrack.data.db.entity.PhotoEntity
 import ru.antonkw.kwbooktrack.data.db.entity.ReadingSessionEntity
+import ru.antonkw.kwbooktrack.data.db.KwBooktrackDatabase
 import ru.antonkw.kwbooktrack.data.media.mediaDates
 import ru.antonkw.kwbooktrack.data.progress.ReadingProgress
 import ru.antonkw.kwbooktrack.data.time.toDayMs
@@ -62,6 +65,7 @@ class BookDetailViewModel @Inject constructor(
     private val photoRepository: PhotoRepository,
     private val tagRepository: TagRepository,
     private val mediaDateRepository: MediaDateRepository,
+    private val database: KwBooktrackDatabase,
 ) : ViewModel() {
 
     private val bookId: Long = savedStateHandle.get<Long>(KEY_BOOK_ID) ?: -1L
@@ -102,14 +106,12 @@ class BookDetailViewModel @Inject constructor(
     suspend fun setCurrentPage(page: Int) {
         val now = System.currentTimeMillis()
         val book = bookRepository.findById(bookId) ?: return
-        sessionRepository.insert(
-            ReadingSessionEntity(
-                bookId = bookId,
-                startedAt = now,
-                endPage = page,
-                durationSec = null,
-            ),
-        )
+        // Повторное нажатие «Сохранить страницу» с тем же номером не создаёт
+        // запись: журнал чтения забивался бы пустыми сессиями с нулевой
+        // дельтой, а «страниц прочитано» от них не меняется.
+        // Статус обновляем и когда страница не изменилась: книга с
+        // импортированными сессиями может быть ещё не «читаю», и сохранение
+        // той же страницы раньше переводило её в READING.
         if (book.status != ru.antonkw.kwbooktrack.data.db.entity.BookStatus.FINISHED && page > 0) {
             bookRepository.update(
                 book.copy(
@@ -120,31 +122,47 @@ class BookDetailViewModel @Inject constructor(
                 ),
             )
         }
+        val lastPage = sessionRepository.observeByBook(bookId).first()
+            .firstOrNull { it.endPage != null }
+            ?.endPage
+        if (page == lastPage) return
+        sessionRepository.insert(
+            ReadingSessionEntity(
+                bookId = bookId,
+                startedAt = now,
+                endPage = page,
+                durationSec = null,
+            ),
+        )
     }
 
     suspend fun markFinished(rating: Int?) {
-        val now = System.currentTimeMillis()
-        val book = bookRepository.findById(bookId) ?: return
-        // Отметить прочитанным — добавить дату, а не заменить: книга,
-        // прочитанная в январе и отмеченная прочитанной в ноябре, сохраняет
-        // обе даты. Основная — самая ранняя.
-        val extra = mediaDateRepository.getFor(bookId, MediaType.BOOKS)
-        // Дата — полночь по местному времени (как в остальных колонках с
-        // датами), иначе «два прочтения» в один день не отличались бы от
-        // одного.
-        val today = LocalDate.now().toDayMs()
-        // Прежние даты перечитывания не теряются: «отметить прочитанным»
-        // добавляет дату, а не заменяет список.
-        val dates = (listOfNotNull(book.finishedAt) + extra + today).distinct().sorted()
-        bookRepository.update(
-            book.copy(
-                status = ru.antonkw.kwbooktrack.data.db.entity.BookStatus.FINISHED,
-                finishedAt = dates.first(),
-                rating = rating?.coerceIn(1, 5),
-                updatedAt = now,
-            ),
-        )
-        mediaDateRepository.replaceFor(bookId, MediaType.BOOKS, dates.drop(1))
+        // Отметка и даты — одной транзакцией: иначе между записями книга
+        // осталась бы прочитанной без сегодняшней даты перечитывания.
+        database.withTransaction {
+            val now = System.currentTimeMillis()
+            val book = bookRepository.findById(bookId) ?: return@withTransaction
+            // Отметить прочитанным — добавить дату, а не заменить: книга,
+            // прочитанная в январе и отмеченная прочитанной в ноябре, сохраняет
+            // обе даты. Основная — самая ранняя.
+            val extra = mediaDateRepository.getFor(bookId, MediaType.BOOKS)
+            // Дата — полночь по местному времени (как в остальных колонках с
+            // датами), иначе «два прочтения» в один день не отличались бы от
+            // одного.
+            val today = LocalDate.now().toDayMs()
+            // Прежние даты перечитывания не теряются: «отметить прочитанным»
+            // добавляет дату, а не заменяет список.
+            val dates = (listOfNotNull(book.finishedAt) + extra + today).distinct().sorted()
+            bookRepository.update(
+                book.copy(
+                    status = ru.antonkw.kwbooktrack.data.db.entity.BookStatus.FINISHED,
+                    finishedAt = dates.first(),
+                    rating = rating?.coerceIn(1, 5),
+                    updatedAt = now,
+                ),
+            )
+            mediaDateRepository.replaceFor(bookId, MediaType.BOOKS, dates.drop(1))
+        }
     }
 
     fun deleteBook() {

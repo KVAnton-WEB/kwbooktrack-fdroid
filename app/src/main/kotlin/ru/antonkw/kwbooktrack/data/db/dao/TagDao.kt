@@ -12,9 +12,6 @@ import ru.antonkw.kwbooktrack.data.db.entity.TagEntity
 
 @Dao
 interface TagDao {
-    @Query("SELECT * FROM tags ORDER BY name")
-    fun observeAll(): kotlinx.coroutines.flow.Flow<List<TagEntity>>
-
     @Query("SELECT * FROM tags WHERE name = :name LIMIT 1")
     suspend fun findByName(name: String): TagEntity?
 
@@ -53,12 +50,6 @@ interface TagDao {
             "WHERE mt.media_id = :mediaId AND mt.media_type = :mediaType ORDER BY t.name",
     )
     fun observeTagsOfMedia(mediaId: Long, mediaType: MediaType): kotlinx.coroutines.flow.Flow<List<String>>
-
-    @Query("DELETE FROM tags")
-    suspend fun deleteAll(): Int
-
-    @Query("SELECT COUNT(*) FROM tags")
-    suspend fun count(): Int
 
     /**
      * Atomic find-or-create. Two concurrent callers both seeing `findByName`
