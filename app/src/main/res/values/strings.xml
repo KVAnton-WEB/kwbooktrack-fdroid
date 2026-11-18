@@ -230,7 +230,7 @@
     <string name="note_editor_markdown_hint">Поддерживается Markdown</string>
     <string name="action_markdown_help">Подсказка по Markdown</string>
     <string name="markdown_help_title">Разметка Markdown</string>
-    <string name="markdown_help_body">`# Заголовок` — заголовок\n`## Заголовок` — подзаголовок\n`&gt; Цитата` — цитата\n`- пункт` — маркированный список\n`1. пункт` — нумерованный список\n`**жирный**` — жирный текст\n`*курсив*` — курсив\n`[текст](ссылка)` — ссылка</string>
+    <string name="markdown_help_body">`# Заголовок`\n\n`## Подзаголовок`\n\n`&gt; Цитата`\n\n`- пункт`\n\n`1. пункт`\n\n`**жирный**`\n\n`*курсив*`\n\n`[текст](ссылка)`</string>
     <string name="validation_title_required">Введите название</string>
     <string name="saved">Сохранено</string>
     <string name="action_save_changes">Сохранить изменения</string>

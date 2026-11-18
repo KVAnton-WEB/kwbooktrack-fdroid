@@ -1,1 +1,1 @@
-Offline book tracker: library, reading log, notes and statistics
+Offline book and movie tracker: library, notes, statistics

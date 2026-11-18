@@ -1,0 +1,41 @@
+Categories:
+  - Inventory
+  - Note
+License: GPL-3.0-only
+AuthorName: KVAnton-WEB
+AuthorEmail: KVAnton.WEB@yandex.ru
+SourceCode: https://github.com/KVAnton-WEB/kwbooktrack
+IssueTracker: https://github.com/KVAnton-WEB/kwbooktrack/issues
+Changelog: https://github.com/KVAnton-WEB/kwbooktrack/releases
+Donate: https://boosty.to/kvanton/donate
+Bitcoin: bc1qr0m6alqjk9zzy29ma0wpz66uas0dyrxy9hdr7a
+
+AutoName: kwbooktrack
+
+RepoType: git
+Repo: https://github.com/KVAnton-WEB/kwbooktrack.git
+
+Builds:
+  - versionName: 0.9.5-fdroid
+    versionCode: 114
+    commit: __COMMIT__
+    gradle:
+      - yes
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags ^v[0-9.]+(-fdroid)?$
+CurrentVersion: 0.9.5-fdroid
+CurrentVersionCode: 114
+
+MaintainerNotes: |-
+  Descriptions, changelogs and screenshots live in the app repository under
+  fastlane/metadata/android/{en-US,ru}; do not duplicate them here.
+
+  The release build type is signed with a local keystore when
+  keystore.properties exists. fdroidserver strips the signingConfigs block and
+  the signingConfig assignment, so the build server produces an unsigned APK
+  and signs it with the F-Droid key. Verified locally by applying the same
+  stripping: output is app-release-unsigned.apk.
+
+  The app has no INTERNET permission and no network dependencies; all data is
+  stored locally in Room.

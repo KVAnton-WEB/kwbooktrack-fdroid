@@ -1,41 +1,51 @@
-<p><b>kwbooktrack</b> is an offline tracker for your personal book collection. No account, no ads, no analytics: everything stays on your device.</p>
+<p><b>kwbooktrack</b> is an offline tracker for your personal book and movie collection. No account, no ads, no analytics: everything stays on your device and the app never asks for internet access.</p>
 
-<p><b>Library</b></p>
+<p><b>Book library</b></p>
 <ul>
-<li>Books with author, ISBN, page count, publisher, genre, language, series, binding and condition</li>
-<li>Cover photo, purchase date and price, gift / lent / sold flags</li>
-<li>Search by title, author or ISBN, filters (to read, reading, finished, abandoned, purchased) and grid or list view</li>
+<li>Author, ISBN, page count, publisher, year, genre, language, series, binding, condition, annotation</li>
+<li>Cover from the gallery or camera, purchase date and price, gift / lent / sold flags</li>
+<li>Search by title, author, ISBN and tag, filters by status and purchase period, grid or list view</li>
+<li>Scan an ISBN barcode with the camera to fill the card quickly</li>
 </ul>
 
-<p><b>Reading log</b></p>
+<p><b>Movie collection</b></p>
 <ul>
-<li>Reading sessions with current page, start and finish dates, time spent</li>
-<li>Progress in pages and percent, pages left, and honest warnings when an old backup has broken data</li>
+<li>Director, cast, country, year, genres, duration, link to the movie page</li>
+<li>Watch date, rating, comments, tags</li>
+<li>The same search, filters and grid/list switch as for books</li>
+</ul>
+
+<p><b>Reading log and progress</b></p>
+<ul>
+<li>Reading sessions with current page, dates and time spent</li>
+<li>Progress in pages and percent, pages left</li>
 </ul>
 
 <p><b>Notes, quotes and reviews</b></p>
 <ul>
 <li>Notes, quotes and reviews with optional page reference and attached photos</li>
-<li>Markdown rendering for reviews</li>
+<li>One notes list with search and a type filter</li>
+<li>Markdown in reviews and notes</li>
 </ul>
 
 <p><b>Statistics and calendar</b></p>
 <ul>
-<li>Pages read and books finished per month and per year</li>
-<li>Total money spent on books, reading calendar by day</li>
+<li>Pages read, books finished, books bought and money spent — per month and per year</li>
+<li>Movies watched and time spent watching</li>
+<li>Reading calendar by day: book covers or pages per day</li>
 </ul>
 
 <p><b>Import and export</b></p>
 <ul>
-<li>Backup and restore as a ZIP archive with CSV and covers</li>
+<li>Backup and restore as a ZIP archive with CSV, covers and photos</li>
 <li>Native Tellico format (.tc) import and export</li>
-<li>Import of Tellico XML and CSV exports, and of libraries exported from other book trackers</li>
+<li>Import of Tellico XML and CSV exports and of libraries from other book trackers</li>
 </ul>
 
-<p><b>Other</b></p>
+<p><b>Look and feel</b></p>
 <ul>
-<li>Scan an ISBN barcode with the camera to pre-fill book details</li>
-<li>No internet permission, no crash reporting, no tracking</li>
+<li>Light and dark theme, or follow the system</li>
+<li>Russian and English interface</li>
 </ul>
 
-<p>Free software, licensed under the GNU General Public License v3. Source code is available on GitHub.</p>
+<p>Free software, licensed under the GNU General Public License v3. Source code on GitHub; you can support the author via Boosty, Dalink or cryptocurrency.</p>

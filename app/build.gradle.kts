@@ -1,4 +1,5 @@
 import org.gradle.api.JavaVersion
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
@@ -8,6 +9,14 @@ plugins {
     alias(libs.plugins.hilt.android)
 }
 
+// Release-ключ: keystore.properties в корне репозитория (не в git). Если файла
+// нет — берём стандартный debug-ключ, чтобы локальная сборка ставилась поверх debug.
+// F-Droid вырезает блок signingConfigs и строку его присвоения, поэтому там
+// получается unsigned APK, который он подписывает своим ключом.
+val releaseKeystore = rootProject.file("keystore.properties")
+    .takeIf { it.isFile }
+    ?.let { file -> Properties().apply { file.inputStream().use { load(it) } } }
+
 android {
     namespace = "ru.antonkw.kwbooktrack"
     compileSdk = 34
@@ -16,9 +25,25 @@ android {
         applicationId = "ru.antonkw.kwbooktrack"
         minSdk = 31
         targetSdk = 34
-        versionCode = 112
-        versionName = "0.9.5"
+        versionCode = 114
+        versionName = "0.9.5-fdroid"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        create("release") {
+            if (releaseKeystore != null) {
+                storeFile = rootProject.file(releaseKeystore.getProperty("storeFile"))
+                storePassword = releaseKeystore.getProperty("storePassword")
+                keyAlias = releaseKeystore.getProperty("keyAlias")
+                keyPassword = releaseKeystore.getProperty("keyPassword")
+            } else {
+                storeFile = File(System.getProperty("user.home"), ".android/debug.keystore")
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
+        }
     }
 
     buildTypes {
@@ -26,9 +51,7 @@ android {
             isMinifyEnabled = false
         }
         release {
-            // Локальный «условный релиз»: подписываем debug-ключом, чтобы APK
-            // ставился поверх debug-сборки без настройки keystore.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(

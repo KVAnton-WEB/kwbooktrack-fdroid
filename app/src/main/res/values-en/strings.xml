@@ -230,7 +230,7 @@
     <string name="note_editor_markdown_hint">Markdown supported</string>
     <string name="action_markdown_help">Markdown help</string>
     <string name="markdown_help_title">Markdown formatting</string>
-    <string name="markdown_help_body">`# Heading` — heading\n`## Heading` — subheading\n`&gt; Quote` — quote\n`- item` — bullet list\n`1. item` — numbered list\n`**bold**` — bold\n`*italic*` — italic\n`[text](link)` — link</string>
+    <string name="markdown_help_body">`# Heading`\n\n`## Subheading`\n\n`&gt; Quote`\n\n`- item`\n\n`1. item`\n\n`**bold**`\n\n`*italic*`\n\n`[text](link)`</string>
     <string name="validation_title_required">Title is required</string>
     <string name="saved">Saved</string>
     <string name="action_save_changes">Save changes</string>
