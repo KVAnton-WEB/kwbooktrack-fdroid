@@ -14,6 +14,11 @@ F-Droid: подготовленные метаданные и пошаговая
 
     ./gradlew assembleDebug
 
+Облегчённая сборка (R8 + shrinkResources, подписана debug-ключом, ставится поверх debug):
+
+    ./gradlew assembleRelease
+    # app/build/outputs/apk/release/app-release.apk (~4 МБ вместо ~64)
+
 ## Tests
 
     ./gradlew test

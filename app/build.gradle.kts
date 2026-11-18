@@ -16,8 +16,8 @@ android {
         applicationId = "ru.antonkw.kwbooktrack"
         minSdk = 31
         targetSdk = 34
-        versionCode = 88
-        versionName = "0.8.1"
+        versionCode = 106
+        versionName = "0.9.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -26,11 +26,11 @@ android {
             isMinifyEnabled = false
         }
         release {
-            // Ponytail: minify is off because there is no signing config — the
-            // release variant isn't shippable yet. Before v0.2: enable minify,
-            // add a signingConfig from a Gradle property, and verify the ProGuard
-            // rules below are actually applied (currently dead weight).
-            isMinifyEnabled = false
+            // Локальный «условный релиз»: подписываем debug-ключом, чтобы APK
+            // ставился поверх debug-сборки без настройки keystore.
+            signingConfig = signingConfigs.getByName("debug")
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
