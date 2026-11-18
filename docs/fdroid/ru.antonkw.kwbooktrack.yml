@@ -12,8 +12,11 @@ Bitcoin: bc1qr0m6alqjk9zzy29ma0wpz66uas0dyrxy9hdr7a
 
 AutoName: kwbooktrack
 
+# F-Droid собирает из отдельного репозитория: main — это та ветка, которую
+# fdroidserver клонирует по умолчанию, а в основном репозитории main живёт
+# своей жизнью и содержит свои версии. Тег v*-fdroid ставится только здесь.
 RepoType: git
-Repo: https://github.com/KVAnton-WEB/kwbooktrack.git
+Repo: https://github.com/KVAnton-WEB/kwbooktrack-fdroid.git
 
 Builds:
   - versionName: 0.9.5-fdroid
@@ -28,6 +31,11 @@ CurrentVersion: 0.9.5-fdroid
 CurrentVersionCode: 114
 
 MaintainerNotes: |-
+  This builds from the mirror repository kwbooktrack-fdroid, whose main branch
+  is the F-Droid release branch of kvbooktrack. Upstream development happens in
+  KVAnton-WEB/kwbooktrack; the mirror is updated by pushing that branch to main
+  and pushing the v*-fdroid tag together with it.
+
   Descriptions, changelogs and screenshots live in the app repository under
   fastlane/metadata/android/{en-US,ru}; do not duplicate them here.
 
