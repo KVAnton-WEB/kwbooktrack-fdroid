@@ -1,0 +1,1 @@
+Yearly statistics charts: empty years are gone, six bars fit on screen and the rest scroll horizontally.

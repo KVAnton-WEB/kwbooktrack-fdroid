@@ -35,6 +35,27 @@ class StatisticsChartValuesTest {
     }
 
     @Test
+    fun yearsWithoutDataAreSkipped() {
+        // 2011 и 2026 в коллекции, между ними ничего: пятнадцати столбиков
+        // пустоты быть не должно.
+        val years = yearsWithData(listOf(2011, 2026), listOf(2026), emptyList())
+        assertThat(years).containsExactly(2011, 2026).inOrder()
+    }
+
+    @Test
+    fun yearsOfAllChartsAreMerged() {
+        // У книг годы прочтения и покупок разные — графики должны говорить
+        // про один и тот же набор годов.
+        val years = yearsWithData(listOf(2020), listOf(2024), listOf(2022), listOf(2024))
+        assertThat(years).containsExactly(2020, 2022, 2024).inOrder()
+    }
+
+    @Test
+    fun noYearsAtAllGivesEmptyList() {
+        assertThat(yearsWithData(emptyList(), emptyList())).isEmpty()
+    }
+
+    @Test
     fun otherYearsAreNotMixedIn() {
         val values = chartPagesByMonth(listOf(MonthlyPages(2025, 3, 50)), 2026)
         assertThat(values[3]).isEqualTo(0)

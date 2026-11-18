@@ -1,14 +1,18 @@
 package ru.antonkw.kwbooktrack.ui.stats
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -43,7 +47,6 @@ import ru.antonkw.kwbooktrack.data.stats.MonthlyBooks
 import ru.antonkw.kwbooktrack.data.stats.MonthlyPages
 import ru.antonkw.kwbooktrack.data.stats.MovieStats
 import ru.antonkw.kwbooktrack.data.stats.ReadingStats
-import ru.antonkw.kwbooktrack.data.stats.StatsCalculator
 import ru.antonkw.kwbooktrack.data.stats.YearlyPages
 import ru.antonkw.kwbooktrack.ui.common.formatDuration
 import ru.antonkw.kwbooktrack.ui.common.formatDurationDot
@@ -135,7 +138,14 @@ private fun BookCharts(stats: ReadingStats, selection: ChartSelection) {
     val periodLabel = periodLabel(selection)
     val chartLabels = when (selection.mode) {
         ChartMode.BY_MONTH -> monthLabels()
-        ChartMode.BY_YEAR -> StatsCalculator.yearRange(stats.minYear, stats.maxYear).map { it.toString() }
+        // Только годы с данными: ряд 2010..2014 без единой книги давал бы
+        // четыре пустых столбика и растягивал график.
+        ChartMode.BY_YEAR -> yearsWithData(
+            stats.yearlyCompleted.map { it.year },
+            stats.yearlyPages.map { it.year },
+            stats.yearlyPurchased.map { it.year },
+            stats.yearlySpend.map { it.year },
+        ).ifEmpty { listOf(selection.year) }.map { it.toString() }
     }
 
     ChartCard(
@@ -198,7 +208,10 @@ private fun MovieCharts(stats: MovieStats, selection: ChartSelection) {
     val periodLabel = periodLabel(selection)
     val chartLabels = when (selection.mode) {
         ChartMode.BY_MONTH -> monthLabels()
-        ChartMode.BY_YEAR -> StatsCalculator.yearRange(stats.minYear, stats.maxYear).map { it.toString() }
+        ChartMode.BY_YEAR -> yearsWithData(
+            stats.yearlyWatched.map { it.year },
+            stats.yearlyMinutes.map { it.year },
+        ).ifEmpty { listOf(selection.year) }.map { it.toString() }
     }
 
     ChartCard(
@@ -314,6 +327,17 @@ internal fun chartPagesByMonth(monthly: List<MonthlyPages>, year: Int): Map<Int,
 internal fun chartPagesByYear(yearly: List<YearlyPages>): Map<Int, Int> =
     yearly.associate { it.year to it.pages.coerceAtLeast(0) }
 
+/**
+ * Годы для графика — только те, где есть данные.
+ *
+ * Ряд «от первого года до последнего» рисовал пустые столбики за годы, в
+ * которые ничего не происходило: в коллекции 2011 и 2026 между ними получалось
+ * 15 столбиков, из которых два с половиной. Наборы годов разных графиков
+ * объединяются — все графики должны говорить про одни и те же годы.
+ */
+internal fun yearsWithData(vararg years: List<Int>): List<Int> =
+    years.flatMap { it }.filter { it > 0 }.distinct().sorted()
+
 /** Сколько книг (прочитанных или купленных) приходится на каждый месяц года. */
 private fun monthlyCountsChartValues(monthly: List<MonthlyBooks>, year: Int): Map<Int, Int> {
     val byMonth = monthly.filter { it.year == year }.associate { it.month to it.count }
@@ -341,8 +365,16 @@ private fun BarChartWithLabels(
     val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
     val barValueColor = MaterialTheme.colorScheme.onPrimary
     val maxVal = max(values.values.maxOrNull() ?: 0, 1)
+    // Годов может быть много: шесть столбцов делят ширину экрана, остальные
+    // уходят в горизонтальный скролл. Фиксированная ширина нужна потому, что
+    // внутри скролла `weight` не к чему прижиматься — ширина там бесконечная.
+    val scrollable = labels.size > MAX_VISIBLE_BARS
 
-    Column(modifier = Modifier.fillMaxWidth()) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (scrollable) Modifier.horizontalScroll(rememberScrollState()) else Modifier),
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -358,9 +390,7 @@ private fun BarChartWithLabels(
                 val v = values[key] ?: 0
                 val frac = if (maxVal > 0) v.toFloat() / maxVal else 0f
                 Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
+                    modifier = barModifier(scrollable),
                     contentAlignment = Alignment.BottomCenter,
                 ) {
                     Column(
@@ -399,7 +429,7 @@ private fun BarChartWithLabels(
             labels.forEach { label ->
                 Text(
                     text = label,
-                    modifier = Modifier.weight(1f),
+                    modifier = barModifier(scrollable),
                     style = MaterialTheme.typography.labelSmall,
                     color = labelColor,
                     textAlign = TextAlign.Center,
@@ -410,3 +440,13 @@ private fun BarChartWithLabels(
         }
     }
 }
+
+/** Ширина столбца: делим ширину экрана, в скролле — фиксированная. */
+private fun RowScope.barModifier(scrollable: Boolean): Modifier =
+    if (scrollable) Modifier.width(BAR_WIDTH) else Modifier.weight(1f)
+
+/** Сколько столбцов видно без прокрутки. */
+private const val MAX_VISIBLE_BARS = 6
+
+/** Ширина столбца в прокручиваемом ряду: шесть таких влезают в экран. */
+private val BAR_WIDTH = 52.dp
