@@ -1,0 +1,1 @@
+Only the yearly statistics chart scrolls now; all twelve months stay on screen.

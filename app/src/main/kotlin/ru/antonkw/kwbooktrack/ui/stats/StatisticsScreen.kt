@@ -154,6 +154,7 @@ private fun BookCharts(stats: ReadingStats, selection: ChartSelection) {
             ChartMode.BY_YEAR -> stringResource(R.string.stats_chart_finished_by_year)
         },
         labels = chartLabels,
+        scrollable = selection.mode == ChartMode.BY_YEAR,
         values = when (selection.mode) {
             ChartMode.BY_MONTH -> monthlyCountsChartValues(stats.monthlyCompleted, selection.year)
             ChartMode.BY_YEAR -> stats.yearlyCompleted.associate { it.year to it.count }
@@ -166,6 +167,7 @@ private fun BookCharts(stats: ReadingStats, selection: ChartSelection) {
             ChartMode.BY_YEAR -> stringResource(R.string.stats_chart_pages_by_year)
         },
         labels = chartLabels,
+        scrollable = selection.mode == ChartMode.BY_YEAR,
         values = when (selection.mode) {
             ChartMode.BY_MONTH -> chartPagesByMonth(stats.monthlyPages, selection.year)
             ChartMode.BY_YEAR -> chartPagesByYear(stats.yearlyPages)
@@ -178,6 +180,7 @@ private fun BookCharts(stats: ReadingStats, selection: ChartSelection) {
             ChartMode.BY_YEAR -> stringResource(R.string.stats_chart_purchased_by_year)
         },
         labels = chartLabels,
+        scrollable = selection.mode == ChartMode.BY_YEAR,
         values = when (selection.mode) {
             ChartMode.BY_MONTH -> monthlyCountsChartValues(stats.monthlyPurchased, selection.year)
             ChartMode.BY_YEAR -> stats.yearlyPurchased.associate { it.year to it.count }
@@ -190,6 +193,7 @@ private fun BookCharts(stats: ReadingStats, selection: ChartSelection) {
             ChartMode.BY_YEAR -> stringResource(R.string.stats_chart_spent_by_year)
         },
         labels = chartLabels,
+        scrollable = selection.mode == ChartMode.BY_YEAR,
         values = when (selection.mode) {
             ChartMode.BY_MONTH -> monthlySpendChartValues(stats, selection.year)
             ChartMode.BY_YEAR -> stats.yearlySpend.associate { it.year to it.amount }
@@ -220,6 +224,7 @@ private fun MovieCharts(stats: MovieStats, selection: ChartSelection) {
             ChartMode.BY_YEAR -> stringResource(R.string.stats_chart_movies_by_year)
         },
         labels = chartLabels,
+        scrollable = selection.mode == ChartMode.BY_YEAR,
         values = when (selection.mode) {
             ChartMode.BY_MONTH -> monthlyCountsChartValues(stats.monthlyWatched, selection.year)
             ChartMode.BY_YEAR -> stats.yearlyWatched.associate { it.year to it.count }
@@ -232,6 +237,7 @@ private fun MovieCharts(stats: MovieStats, selection: ChartSelection) {
             ChartMode.BY_YEAR -> stringResource(R.string.stats_chart_minutes_by_year)
         },
         labels = chartLabels,
+        scrollable = selection.mode == ChartMode.BY_YEAR,
         values = when (selection.mode) {
             ChartMode.BY_MONTH -> monthlyMinutesChartValues(stats.monthlyMinutes, selection.year)
             ChartMode.BY_YEAR -> stats.yearlyMinutes.associate { it.year to it.pages }
@@ -247,6 +253,8 @@ private fun ChartCard(
     labels: List<String>,
     values: Map<Int, Int>,
     format: (Int) -> String = { it.toString() },
+    /** Прокрутка — только для годов: месяцев всегда 12, они влезают. */
+    scrollable: Boolean = false,
 ) {
     Card {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -254,7 +262,7 @@ private fun ChartCard(
                 text = title,
                 style = MaterialTheme.typography.titleMedium,
             )
-            BarChartWithLabels(labels = labels, values = values, format = format)
+            BarChartWithLabels(labels = labels, values = values, format = format, scrollable = scrollable)
         }
     }
 }
@@ -359,21 +367,21 @@ private fun BarChartWithLabels(
     labels: List<String>,
     values: Map<Int, Int>,
     format: (Int) -> String = { it.toString() },
+    scrollable: Boolean,
 ) {
     val barColor = MaterialTheme.colorScheme.primary
     val emptyColor = MaterialTheme.colorScheme.surfaceVariant
     val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
     val barValueColor = MaterialTheme.colorScheme.onPrimary
     val maxVal = max(values.values.maxOrNull() ?: 0, 1)
-    // Годов может быть много: шесть столбцов делят ширину экрана, остальные
-    // уходят в горизонтальный скролл. Фиксированная ширина нужна потому, что
-    // внутри скролла `weight` не к чему прижиматься — ширина там бесконечная.
-    val scrollable = labels.size > MAX_VISIBLE_BARS
+    // Прокрутка — только для годов, и только когда их больше, чем влезает.
+    // Месяцев всегда 12: они делят ширину поровну, и трогать их незачем.
+    val scroll = scrollable && labels.size > MAX_VISIBLE_BARS
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .then(if (scrollable) Modifier.horizontalScroll(rememberScrollState()) else Modifier),
+            .then(if (scroll) Modifier.horizontalScroll(rememberScrollState()) else Modifier),
     ) {
         Row(
             modifier = Modifier
@@ -390,7 +398,7 @@ private fun BarChartWithLabels(
                 val v = values[key] ?: 0
                 val frac = if (maxVal > 0) v.toFloat() / maxVal else 0f
                 Box(
-                    modifier = barModifier(scrollable),
+                    modifier = barModifier(scroll),
                     contentAlignment = Alignment.BottomCenter,
                 ) {
                     Column(
@@ -429,7 +437,7 @@ private fun BarChartWithLabels(
             labels.forEach { label ->
                 Text(
                     text = label,
-                    modifier = barModifier(scrollable),
+                    modifier = barModifier(scroll),
                     style = MaterialTheme.typography.labelSmall,
                     color = labelColor,
                     textAlign = TextAlign.Center,
@@ -442,8 +450,8 @@ private fun BarChartWithLabels(
 }
 
 /** Ширина столбца: делим ширину экрана, в скролле — фиксированная. */
-private fun RowScope.barModifier(scrollable: Boolean): Modifier =
-    if (scrollable) Modifier.width(BAR_WIDTH) else Modifier.weight(1f)
+private fun RowScope.barModifier(scroll: Boolean): Modifier =
+    if (scroll) Modifier.width(BAR_WIDTH) else Modifier.weight(1f)
 
 /** Сколько столбцов видно без прокрутки. */
 private const val MAX_VISIBLE_BARS = 6
