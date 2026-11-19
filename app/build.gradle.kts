@@ -14,10 +14,10 @@ android {
 
     defaultConfig {
         applicationId = "ru.antonkw.kwbooktrack"
-        minSdk = 31
+        minSdk = 28
         targetSdk = 34
-        versionCode = 115
-        versionName = "0.9.5-fdroid.2"
+        versionCode = 120
+        versionName = "0.9.5-fdroid.3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

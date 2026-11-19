@@ -4,7 +4,9 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.ImageDecoder
+import android.os.Build
 import java.io.ByteArrayOutputStream
+import java.nio.ByteBuffer
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.max
@@ -16,7 +18,7 @@ import kotlin.math.roundToInt
  * прилетают файлы на 1600×2400 и больше. Хранить их как есть — это мегабайты
  * на книгу ради пикселей, которые никто не увидит. Поэтому на записи длинная
  * сторона ужимается до [MAX_LONG_SIDE_PX] и всё перекодируется в lossy WebP
- * (платформенный энкодер с API 30, минимум приложения — 31).
+ * (lossy — с API 30, на 28–29 lossless).
  *
  * Файл на книгу ровно один: [FileCoverStorage] переименовывает temp-файл в
  * финальный, отдельной копии под полноэкранный просмотр не заводим — отдаём
@@ -40,7 +42,7 @@ class CoverTranscoder @Inject constructor() {
      */
     fun toWebp(bytes: ByteArray, maxLongSidePx: Int = MAX_LONG_SIDE_PX): ByteArray? =
         runCatching {
-            val source = ImageDecoder.createSource(bytes)
+            val source = ImageDecoder.createSource(ByteBuffer.wrap(bytes))
             val decoded = ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
                 decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
                 val w = info.size.width
@@ -53,7 +55,7 @@ class CoverTranscoder @Inject constructor() {
             val scaled = if (max(decoded.width, decoded.height) <= maxLongSidePx) decoded else scaleTo(decoded, maxLongSidePx)
             try {
                 ByteArrayOutputStream().use { out ->
-                    scaled.compress(Bitmap.CompressFormat.WEBP_LOSSY, QUALITY, out)
+                    scaled.compress(lossyWebpFormat(), QUALITY, out)
                     out.toByteArray()
                 }
             } finally {
@@ -61,6 +63,11 @@ class CoverTranscoder @Inject constructor() {
                 decoded.recycle()
             }
         }.getOrNull()
+
+    /** Lossy WebP есть только с API 30; на 28–29 доступен лишь lossless WebP. */
+    private fun lossyWebpFormat(): Bitmap.CompressFormat =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) Bitmap.CompressFormat.WEBP_LOSSY
+        else Bitmap.CompressFormat.WEBP
 
     private fun scaleTo(src: Bitmap, maxLongSidePx: Int): Bitmap {
         val scale = maxLongSidePx.toFloat() / max(src.width, src.height)

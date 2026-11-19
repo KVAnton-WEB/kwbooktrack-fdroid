@@ -72,7 +72,7 @@ Crypto (tap an address in the app's About screen to copy it):
 
 ## Tech stack
 
-Kotlin, Jetpack Compose, Material 3, Hilt, Room, Markwon, Coil. `minSdk` 31.
+Kotlin, Jetpack Compose, Material 3, Hilt, Room, Markwon, Coil. `minSdk` 28.
 
 ## License
 
