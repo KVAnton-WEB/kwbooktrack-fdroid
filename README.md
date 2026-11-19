@@ -39,7 +39,7 @@ the device.
 
 - ZIP backup and restore with CSV, covers and photos
 - Native Tellico format (`.tc`) import and export
-- Import of Tellico XML and CSV exports and of libraries from other trackers
+- Import of Tellico XML and CSV exports
 
 **Other**
 
@@ -54,11 +54,6 @@ the device.
 | ![Statistics](fastlane/metadata/android/en-US/images/phoneScreenshots/5.png) | ![Reading calendar](fastlane/metadata/android/en-US/images/phoneScreenshots/6.png) | ![Movies](fastlane/metadata/android/en-US/images/phoneScreenshots/7.png) |
 
 The same set is kept in Russian under `fastlane/metadata/android/ru/images/phoneScreenshots/`
-and is what F-Droid shows. To reshoot:
-
-    adb shell am start -n ru.antonkw.kwbooktrack/.MainActivity
-    adb exec-out screencap -p > fastlane/metadata/android/ru/images/phoneScreenshots/1.png
-
 Switch the interface language in the app: About → Interface language → English.
 
 ## Support the author
@@ -102,20 +97,3 @@ Minified build (R8 + shrinkResources):
 
     ./gradlew test
 
-## Contributing — version discipline
-
-Every commit must bump the app version. A `pre-commit` hook enforces this:
-both `versionName` and `versionCode` in `app/build.gradle.kts` must change
-relative to the previous commit. The first commit of a brand-new clone is
-exempt.
-
-Enable once per clone:
-
-    git config core.hooksPath hooks
-
-If the hook blocks you, do the bump it asks for. For deliberate no-bump
-commits (rebase, doc-only), use `git commit --no-verify`.
-
-Self-check the hook locally:
-
-    bash hooks/test-pre-commit.sh
